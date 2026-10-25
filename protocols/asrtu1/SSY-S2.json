@@ -1,0 +1,64 @@
+{
+ "packet": "SSY-S2",
+ "main_type": 181,
+ "sub_type": 2,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "SSY-C20000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型",
+   "formula": "F={UX|B5H(星敏感器Y)}",
+   "name_en": "Telemetry Main Type"
+  },
+  {
+   "id": "SSY-C20001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|02H(第2类遥测)}",
+   "name_en": "Telemetry Sub Type"
+  },
+  {
+   "id": "SSY-C20002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=X<s>",
+   "name_en": "OBC Time Accumulated Seconds Integer"
+  },
+  {
+   "id": "SSY-C20006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=X<s>",
+   "name_en": "OBC Time Seconds Fraction"
+  },
+  {
+   "id": "SSY-C20008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=X<s>",
+   "name_en": "UTC Time Accumulated Seconds"
+  },
+  {
+   "id": "SSY-C20012.7.16",
+   "bits": "0012.7.16",
+   "name_cn": "指令类型",
+   "formula": "F=HX<s>",
+   "name_en": "Command Type"
+  },
+  {
+   "id": "SSY-C20014.7.800",
+   "bits": "0014.7.800",
+   "name_cn": "调试用参数值",
+   "formula": "F=HX",
+   "name_en": "Debug Parameter Value"
+  },
+  {
+   "id": "SSY-C20114.7.8",
+   "bits": "0114.7.8",
+   "name_cn": "帧尾",
+   "formula": "F=HX",
+   "name_en": "Frame Tail"
+  }
+ ]
+}

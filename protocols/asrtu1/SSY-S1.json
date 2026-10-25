@@ -1,0 +1,176 @@
+{
+ "packet": "SSY-S1",
+ "main_type": 181,
+ "sub_type": 1,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "SSY-C10000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型",
+   "formula": "F={UX|B5H(星敏感器Y)}",
+   "name_en": "Telemetry Main Type"
+  },
+  {
+   "id": "SSY-C10001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|01H(第1类遥测)}",
+   "name_en": "Telemetry Sub Type"
+  },
+  {
+   "id": "SSY-C10002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=X<s>",
+   "name_en": "OBC Time Accumulated Seconds Integer"
+  },
+  {
+   "id": "SSY-C10006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=X<s>",
+   "name_en": "OBC Time Seconds Fraction"
+  },
+  {
+   "id": "SSY-C10008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=X<s>",
+   "name_en": "UTC Time Accumulated Seconds"
+  },
+  {
+   "id": "SSY-C10012.7.16",
+   "bits": "0012.7.16",
+   "name_cn": "指令类型",
+   "formula": "F=HX<s>",
+   "name_en": "Command Type"
+  },
+  {
+   "id": "SSY-C10014.7.8",
+   "bits": "0014.7.8",
+   "name_cn": "成像器件温度",
+   "formula": "F=HX<℃>",
+   "name_en": "Imaging Device Temperature"
+  },
+  {
+   "id": "SSY-C10015.7.8",
+   "bits": "0015.7.8",
+   "name_cn": "成像器件工作状态",
+   "formula": "F={UX|1H(异常),0H(正常)}",
+   "name_en": "Imaging Device Operating Status"
+  },
+  {
+   "id": "SSY-C10015.6.1",
+   "bits": "0015.6.1",
+   "name_cn": "SRAM状态",
+   "formula": "F={UX|1H(异常),0H(正常)}",
+   "name_en": "SRAM Status"
+  },
+  {
+   "id": "SSY-C10015.5.1",
+   "bits": "0015.5.1",
+   "name_cn": "FLASH状态",
+   "formula": "F={UX|1H(异常),0H(正常)}",
+   "name_en": "FLASH Status"
+  },
+  {
+   "id": "SSY-C10015.4.1",
+   "bits": "0015.4.1",
+   "name_cn": "管理程序完整性",
+   "formula": "F={UX|1H(异常),0H(正常)}",
+   "name_en": "Management Program Integrity"
+  },
+  {
+   "id": "SSY-C10015.3.1",
+   "bits": "0015.3.1",
+   "name_cn": "导航星库完整性",
+   "formula": "F={UX|1H(异常),0H(正常)}",
+   "name_en": "Navigation Star Catalog Integrity"
+  },
+  {
+   "id": "SSY-C10015.2.1",
+   "bits": "0015.2.1",
+   "name_cn": "应用程序镜像1完整性",
+   "formula": "F={UX|1H(异常),0H(正常)}",
+   "name_en": "Application Program Image 1 Integrity"
+  },
+  {
+   "id": "SSY-C10015.1.1",
+   "bits": "0015.1.1",
+   "name_cn": "应用程序镜像2完整性",
+   "formula": "F={UX|1H(异常),0H(正常)}",
+   "name_en": "Application Program Image 2 Integrity"
+  },
+  {
+   "id": "SSY-C10015.0.1",
+   "bits": "0015.0.1",
+   "name_cn": "应用程序镜像3完整性",
+   "formula": "F={UX|1H(异常),0H(正常)}",
+   "name_en": "Application Program Image 3 Integrity"
+  },
+  {
+   "id": "SSY-C10016.7.1",
+   "bits": "0016.7.1",
+   "name_cn": "应用程序镜像4完整性",
+   "formula": "F={UX|1H(异常),0H(正常)}",
+   "name_en": "Application Program Image 4 Integrity"
+  },
+  {
+   "id": "SSY-C10016.6.1",
+   "bits": "0016.6.1",
+   "name_cn": "应用程序镜像5完整性",
+   "formula": "F={UX|1H(异常),0H(正常)}",
+   "name_en": "Application Program Image 5 Integrity"
+  },
+  {
+   "id": "SSY-C10016.5.1",
+   "bits": "0016.5.1",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "SSY-C10016.4.1",
+   "bits": "0016.4.1",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "SSY-C10016.3.1",
+   "bits": "0016.3.1",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "SSY-C10016.2.1",
+   "bits": "0016.2.1",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "SSY-C10016.1.1",
+   "bits": "0016.1.1",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "SSY-C10016.0.1",
+   "bits": "0016.0.1",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "SSY-C10017.7.8",
+   "bits": "0017.7.8",
+   "name_cn": "帧尾",
+   "formula": "F=HX",
+   "name_en": "Frame Tail"
+  }
+ ]
+}
