@@ -44,6 +44,8 @@ public:
     ~Database();
     bool open(const QString &path, QString *error=nullptr);
     bool save(const QString &name,const QVector<Frame> &frames,QString *error=nullptr);
+    QVector<QPair<qint64,QString>> sessions(QString *error=nullptr) const;
+    QVector<Frame> load(qint64 sessionId,QString *error=nullptr) const;
 private:
     QString connection_;
     QSqlDatabase db_;
