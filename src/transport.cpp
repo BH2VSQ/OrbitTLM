@@ -99,7 +99,7 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
         ordered.push_back(&f);
         if(f.master>=0) counters.push_back(f.master);
     }
-    if(counters.size()>=2 && counters.size()==frames.size() && counters.size()<128){
+    if(counters.size()>=2 && counters.size()<128){
         std::sort(counters.begin(),counters.end());
         counters.erase(std::unique(counters.begin(),counters.end()),counters.end());
         int gap=-1,start=0;
@@ -112,6 +112,8 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
         // ambiguous and we preserve source order instead.
         if(gap>128){
             std::stable_sort(ordered.begin(),ordered.end(),[start](const Frame *a,const Frame *b){
+                if(a->master<0)return false;
+                if(b->master<0)return true;
                 return ((a->master-start+256)%256)<((b->master-start+256)%256);
             });
         }
