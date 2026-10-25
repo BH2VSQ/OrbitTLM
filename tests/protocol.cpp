@@ -75,6 +75,12 @@ private slots:
         Database db;QString error;
         QVERIFY2(db.open(temp.filePath("db.sqlite"),&error),qPrintable(error));
         QVERIFY2(db.save("test",{f},&error),qPrintable(error));
+        const auto sessions=db.sessions(&error);
+        QCOMPARE(sessions.size(),1);
+        const auto restored=db.load(sessions[0].first,&error);
+        QCOMPARE(restored.size(),1);
+        QCOMPARE(restored[0].hash,f.hash);
+        QCOMPARE(restored[0].fields.size(),f.fields.size());
         QVERIFY2(Protocol::exportCsv(temp.filePath("samples.csv"),{f},&error),qPrintable(error));
         QVERIFY2(Protocol::exportJson(temp.filePath("samples.json"),{f},&error),qPrintable(error));
         QFile csv(temp.filePath("samples.csv"));QVERIFY(csv.open(QIODevice::ReadOnly));
