@@ -83,6 +83,13 @@ private slots:
         QCOMPARE(restored[0].fields.size(),f.fields.size());
         QVERIFY2(Protocol::exportCsv(temp.filePath("samples.csv"),{f},&error),qPrintable(error));
         QVERIFY2(Protocol::exportJson(temp.filePath("samples.json"),{f},&error),qPrintable(error));
+        f.quality="log_fec_reported";
+        QVERIFY2(Protocol::exportAttitudeCsv(temp.filePath("attitude.csv"),{f},&error),qPrintable(error));
+        QFile qcsv(temp.filePath("attitude.csv"));
+        QVERIFY(qcsv.open(QIODevice::ReadOnly));
+        const auto lines=qcsv.readAll();
+        QVERIFY(lines.contains("candidate_unverified"));
+        QVERIFY(lines.contains("q0,q1,q2,q3,norm"));
         QFile csv(temp.filePath("samples.csv"));QVERIFY(csv.open(QIODevice::ReadOnly));
         QVERIFY(csv.readAll().contains("candidate.quaternion.q0"));
         QFile json(temp.filePath("samples.json"));QVERIFY(json.open(QIODevice::ReadOnly));
