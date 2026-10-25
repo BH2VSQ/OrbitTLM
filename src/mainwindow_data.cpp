@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "mainwindow_widgets.h"
+#include "by04.h"
 #include <QApplication>
 #include <QChart>
 #include <QChartView>
@@ -101,6 +102,10 @@ QString MainWindow::utcLabel(const QDateTime &time)const{
                           QStringLiteral("接收时间未知");
 }
 QString MainWindow::eventTitle(const BusinessPacket &packet)const{
+    if(packet.identification=="by04_ccsds_header_only")
+        return packet.packetLabel;
+    if(packet.identification=="by04_opaque_kiss")
+        return QStringLiteral("BY04 · 未分类 KISS 业务包");
     if(!packet.packetName.isEmpty()){
         const QString &id=packet.packetName;
         if(id.startsWith("SAT"))return QStringLiteral("卫星平台遥测 · ")+id;
@@ -204,8 +209,11 @@ void MainWindow::rebuildSession(){
     packets_=orbit::Transport::reassemble(frames_,&transportStats_);
     orbit::BusinessStats bs;
     business_=catalogReady_&&satellite()=="ASRTU-1"?
-        catalog_.decodeAll(packets_,&bs):QVector<BusinessPacket>{};
-    // BY04 keeps the KISS events without misusing ASRTU-1 engineering offsets.
+        catalog_.decodeAll(packets_,&bs):
+        (satellite()=="BY04"?orbit::By04Decoder::decodeAll(packets_):
+                             QVector<BusinessPacket>{});
+    // BY04 headers are decoded independently; its physical engineering field
+    // maps must not be borrowed from the ASRTU-1 catalog.
     if(business_.isEmpty()&&!packets_.isEmpty()){
         business_.reserve(packets_.size());
         for(const auto &p:packets_){
@@ -235,8 +243,10 @@ void MainWindow::populateEvents(){
             QStringLiteral("本机记录时间；尚未确认日志时区\n%1").arg(basis)));
         eventTable_->setItem(i,1,item(title,
             QStringLiteral("应用数据包字节：%1\nCRC：未校验").arg(b.transport.bytes.size())));
-        const QString status=b.packetName.isEmpty()?QStringLiteral("类型未知"):
-                                              QStringLiteral("已匹配字段表");
+        const QString status=b.identification=="by04_ccsds_header_only"?
+            QStringLiteral("CCSDS 包头已解析 · 工程量待定义"):
+            (b.packetName.isEmpty()?QStringLiteral("类型未知"):
+                                    QStringLiteral("已匹配字段表"));
         auto *quality=item(status+" · "+(b.transport.fecEvidence=="log_fec_reported"?
                                          QStringLiteral("FEC 日志"):QStringLiteral("结构恢复")));
         quality->setForeground(b.packetName.isEmpty()?QColor("#73859a"):QColor("#216a9f"));
@@ -301,13 +311,29 @@ void MainWindow::updateMetrics(){
     }else timeMetric_->setText(QStringLiteral("未记录"));
     frameMetric_->setText(QString::number(frames_.size()));
     int good=0;
-    for(const auto &p:business_)if(!p.packetName.isEmpty())++good;
+    for(const auto &p:business_)
+        if(!p.packetName.isEmpty())++good;
+    const bool by04=satellite()=="BY04";
+    recognizedOnly_->setText(by04?QStringLiteral("仅显示已解析包头"):
+                                  QStringLiteral("仅显示已识别数据"));
+    auto label=[](QLabel *value){
+        return value->parentWidget()->findChild<QLabel*>("subtitle");
+    };
+    if(auto *caption=label(recognizedMetric_))
+        caption->setText(by04?QStringLiteral("已解析 CCSDS 包头"):
+                             QStringLiteral("已识别业务包"));
+    if(auto *caption=label(unknownMetric_))
+        caption->setText(by04?QStringLiteral("未分类 KISS 业务包"):
+                             QStringLiteral("未识别业务包"));
     recognizedMetric_->setText(QString::number(good));
     unknownMetric_->setText(QString::number(business_.size()-good));
     imageMetric_->setText(QString::number(images_.size()));
     transportMetric_->setText(QStringLiteral("%1 包").arg(packets_.size()));
-    message_->setText(QStringLiteral("KISS 已重组：%1 · 应用 CRC 未校验 · 缺帧中断：%2")
-        .arg(packets_.size()).arg(transportStats_.interruptedByCounterGap));
+    message_->setText(satellite()=="BY04"?
+        QStringLiteral("BY04 · KISS %1 包 · 工程字段表待确认 · VC1 原生 SSDV %2 包")
+            .arg(packets_.size()).arg(images_.size()):
+        QStringLiteral("KISS 已重组：%1 · 应用 CRC 未校验 · 缺帧中断：%2")
+            .arg(packets_.size()).arg(transportStats_.interruptedByCounterGap));
 }
 void MainWindow::updateOverview(int index){
     if(index<0||index>=business_.size()){
@@ -566,19 +592,26 @@ void MainWindow::setDiagnosticsVisible(bool visible){
 }
 void MainWindow::scanSsdv(){
     if(!imageApid_)return;
-    images_=orbit::ImageTools::candidatesFromKiss(packets_,imageApid_->value());
+    const bool by04=satellite()=="BY04";
+    images_=by04?orbit::By04Decoder::images(frames_):
+                 orbit::ImageTools::candidatesFromKiss(packets_,imageApid_->value());
+    imageApid_->setEnabled(!by04);
     imageTable_->setRowCount(images_.size());
     for(int i=0;i<images_.size();++i){
         const auto &p=images_[i];
         const QStringList row={QString::number(p.imageId),
             QString::number(p.packetId),
             QString("%1 × %2").arg(p.width).arg(p.height),
-            QStringLiteral("候选，CRC 未校验")};
+            p.status=="dslwp_crc32_pass"?QStringLiteral("DSLWP CRC32 通过"):
+            (p.status=="dslwp_crc32_failed"?QStringLiteral("DSLWP CRC32 失败"):
+                                               QStringLiteral("候选，CRC 未校验"))};
         for(int j=0;j<row.size();++j)imageTable_->setItem(i,j,item(row[j]));
     }
-    imageInfo_->setText(QStringLiteral("APID %1：发现 %2 个 SSDV 候选片段；"
-                         "候选≠已验证，JPEG 还原需要外部解码工具。")
-                             .arg(imageApid_->value()).arg(images_.size()));
+    imageInfo_->setText(by04?
+        QStringLiteral("BY04 · VC1 218 字节 DSLWP SSDV · %1 个有效结构分片；仅通过独立 DSLWP CRC 的分片标记为已校验。")
+            .arg(images_.size()):
+        QStringLiteral("APID %1：发现 %2 个 SSDV 候选分片；JPEG 还原需要外部解码工具。")
+            .arg(imageApid_->value()).arg(images_.size()));
     if(imageMetric_)imageMetric_->setText(QString::number(images_.size()));
     if(!images_.isEmpty())updateImageProgress(images_.first().imageId);
     else{

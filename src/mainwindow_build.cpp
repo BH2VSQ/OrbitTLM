@@ -484,7 +484,7 @@ void MainWindow::buildImages(QTabWidget *tabs){
     imageInfo_=subtitle(QStringLiteral("SSDV 图片恢复：候选图像数据不等价于 CRC 验证成功"));
     layout->addWidget(imageInfo_);
     auto *row=new QHBoxLayout;
-    row->addWidget(new QLabel(QStringLiteral("图像业务 APID")));
+    row->addWidget(new QLabel(QStringLiteral("图像业务 APID（BY04 固定 VC1）")));
     imageApid_=new QSpinBox;
     imageApid_->setRange(0,2047);imageApid_->setValue(240);
     row->addWidget(imageApid_);
