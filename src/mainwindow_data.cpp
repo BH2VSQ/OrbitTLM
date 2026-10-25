@@ -471,6 +471,18 @@ void MainWindow::plotEngineering(const QString &packet,const QString &code,int u
     engineeringChart_->setChart(chart);
 }
 void MainWindow::updateAttitude(int index){
+    if(satellite()=="BY04"){
+        for(auto *q:quaternion_)if(q)q->setText(QStringLiteral("—"));
+        normLabel_->setText(QStringLiteral("—"));
+        attitudeWidget_->setQuaternion(QQuaternion(),false);
+        attitudeInfo_->setText(QStringLiteral(
+            "BY04 · 航天器姿态工程字段映射尚未确认。"
+            "不使用 ASRTU-1 SAT-S3 四元数位置，也不推断轨道或极化角。"));
+        auto *chart=new QChart;
+        chart->setTitle(QStringLiteral("BY04 姿态时序：等待专用工程遥测字段表"));
+        attitudeChart_->setChart(chart);
+        return;
+    }
     const auto *last=latestRecognized(index,{"SAT-S3"});
     bool has[4]{false,false,false,false};
     double q[4]{};
@@ -721,6 +733,12 @@ void MainWindow::exportEngineering(bool csv){
 }
 void MainWindow::exportQuaternions(bool experimental){
     if(frames_.isEmpty())return;
+    if(!experimental && satellite()=="BY04"){
+        QMessageBox::information(this,QStringLiteral("BY04 四元数"),
+            QStringLiteral("BY04 的姿态工程遥测位置和换算尚未确认，"
+                           "不能套用 ASRTU-1 的 SAT-S3 字段定义导出四元数。"));
+        return;
+    }
     const QString path=QFileDialog::getSaveFileName(this,
         experimental?QStringLiteral("实验性候选四元数（非正式姿态）"):
                      QStringLiteral("SAT-S3 解算四元数"),
