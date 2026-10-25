@@ -8,7 +8,7 @@ set(CMAKE_AUTORCC ON)
 include(CTest)
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Widgets Network Sql Charts)
 qt_standard_project_setup()
-add_library(orbittlm_core STATIC src/core.cpp src/core.h src/schema.cpp src/schema.h src/ssdv.cpp src/ssdv.h src/transport.cpp src/transport.h)
+add_library(orbittlm_core STATIC src/core.cpp src/core.h src/schema.cpp src/schema.h src/ssdv.cpp src/ssdv.h src/transport.cpp src/transport.h src/business.cpp src/business.h)
 target_include_directories(orbittlm_core PUBLIC src)
 target_link_libraries(orbittlm_core PUBLIC Qt6::Core Qt6::Sql Qt6::Network)
 add_executable(OrbitTLM-cli src/cli.cpp)
@@ -24,3 +24,16 @@ if(BUILD_TESTING)
     add_test(NAME cli_help COMMAND OrbitTLM-cli --help)
 endif()
 install(TARGETS OrbitTLM OrbitTLM-cli RUNTIME DESTINATION bin BUNDLE DESTINATION .)
+
+# Keep all 27 mission field catalogs available offline, including Windows CI artifacts.
+foreach(target OrbitTLM OrbitTLM-cli orbit_tests)
+  if(TARGET ${target})
+    add_custom_command(TARGET ${target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/protocols/asrtu1"
+        "$<TARGET_FILE_DIR:${target}>/protocols/asrtu1"
+      VERBATIM)
+  endif()
+endforeach()
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/protocols/asrtu1"
+        DESTINATION "bin/protocols")
