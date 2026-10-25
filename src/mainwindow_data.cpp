@@ -65,6 +65,8 @@ QString labelStatus(const QString &s){
     if(s=="invalid_source_bit_position")return QStringLiteral("原始字段定义异常");
     if(s=="raw_unsupported_formula"||s.startsWith("raw_"))return QStringLiteral("仅原始值");
     if(s=="candidate_unverified")return QStringLiteral("实验性候选");
+    if(s=="protocol_header_only")return QStringLiteral("CCSDS 协议字段");
+    if(s=="raw_unverified_business")return QStringLiteral("业务含义未定义");
     return s.isEmpty()?QStringLiteral("未知"):s;
 }
 QTableWidgetItem *item(const QString &text,const QString &tooltip={}){
@@ -404,8 +406,11 @@ void MainWindow::populateEngineering(int index){
             QStringLiteral("当前时段暂无符合公开 27 类定义的分系统业务包；原始 KISS 已保留于“原始数据”。"));
         return;
     }
-    engineeringSummary_->setText(QStringLiteral("%1 · %2 项参数 · 识别方式：%3 · 应用 CRC 未校验")
-        .arg(eventTitle(*chosen)).arg(chosen->fields.size()).arg(chosen->identification));
+    engineeringSummary_->setText(chosen->identification=="by04_ccsds_header_only"?
+        QStringLiteral("%1 · CCSDS 包头已解析 · %2 项协议字段 · BY04 工程遥测字段仍待确认")
+            .arg(eventTitle(*chosen)).arg(chosen->fields.size()):
+        QStringLiteral("%1 · %2 项参数 · 识别方式：%3 · 应用 CRC 未校验")
+            .arg(eventTitle(*chosen)).arg(chosen->fields.size()).arg(chosen->identification));
     QHash<QString,QTreeWidgetItem*> groups;
     QSignalBlocker treeBlocked(fieldTree_);
     for(const auto &f:chosen->fields){
