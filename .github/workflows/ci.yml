@@ -1,0 +1,25 @@
+name: CMake Qt6 CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt6 and SQLite
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build g++ qt6-base-dev qt6-charts-dev libqt6sql6-sqlite
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+      - name: Compile
+        run: cmake --build build --parallel 2
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Archive Linux program
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrbitTLM-linux
+          path: build/OrbitTLM

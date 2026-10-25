@@ -1,0 +1,15 @@
+/build/
+/cmake-build-*/
+/.cache/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.bin
+*.wav
+*.tmp
+__pycache__/
+.idea/
+.vs/
+.vscode/
+.DS_Store
