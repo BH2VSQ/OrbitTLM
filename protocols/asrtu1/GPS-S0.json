@@ -1,0 +1,890 @@
+{
+ "packet": "GPS-S0",
+ "main_type": 184,
+ "sub_type": 0,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "GPS-C00000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型",
+   "formula": "F={UX|B8H(GNSS)}",
+   "name_en": "Telemetry Main Type09 High-Resolution Camera"
+  },
+  {
+   "id": "GPS-C00001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|00H(第0类遥测)}",
+   "name_en": "Telemetry Sub Type00H"
+  },
+  {
+   "id": "GPS-C00002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=UX<s>",
+   "name_en": "OBC Time Accumulated Seconds Integer"
+  },
+  {
+   "id": "GPS-C00006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=UX<ms>",
+   "name_en": "OBC Time Seconds Fraction"
+  },
+  {
+   "id": "GPS-C00008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=UX<s>",
+   "name_en": "UTC Time Accumulated Seconds"
+  },
+  {
+   "id": "GPS-C00012.7.32",
+   "bits": "0012.7.32",
+   "name_cn": "UTC累计秒",
+   "formula": "F=UX<s>",
+   "name_en": "UTC Accumulated Seconds"
+  },
+  {
+   "id": "GPS-C00016.7.2",
+   "bits": "0016.7.2",
+   "name_cn": "定位工作状态",
+   "formula": "F={UX|0H(不工作),1H(L1频点工作),2H(L2频点工作),3H(双频点工作)}",
+   "name_en": "Positioning Working Status"
+  },
+  {
+   "id": "GPS-C00016.5.1",
+   "bits": "0016.5.1",
+   "name_cn": "TMARK状态1H(超时故障)0H(正常)",
+   "formula": "F={UX|1H(超时故障),0H(正常)}",
+   "name_en": "TMARK Status1H (Timeout Fault)0H (Normal)"
+  },
+  {
+   "id": "GPS-C00016.4.1",
+   "bits": "0016.4.1",
+   "name_cn": "定轨计算超时故障标志",
+   "formula": "F={UX|1H(超时故障),0H(正常)}",
+   "name_en": "Orbit Determination Calculation Timeout Fault Flag"
+  },
+  {
+   "id": "GPS-C00016.3.4",
+   "bits": "0016.3.4",
+   "name_cn": "CANA总线复位次数",
+   "formula": "F=UX",
+   "name_en": "CANA Bus Reset Count"
+  },
+  {
+   "id": "GPS-C00017.7.32",
+   "bits": "0017.7.32",
+   "name_cn": "TIC计数",
+   "formula": "F=UX",
+   "name_en": "TIC Count"
+  },
+  {
+   "id": "GPS-C00021.7.32",
+   "bits": "0021.7.32",
+   "name_cn": "保留固定为AA",
+   "formula": "F=X",
+   "name_en": "Reserved Fixed as AA"
+  },
+  {
+   "id": "GPS-C00025.7.8",
+   "bits": "0025.7.8",
+   "name_cn": "主核SRAM错误回写计数",
+   "formula": "F=UX",
+   "name_en": "Master Core SRAM Error Write-back Count"
+  },
+  {
+   "id": "GPS-C00026.7.8",
+   "bits": "0026.7.8",
+   "name_cn": "从核SRAM错误回写计数",
+   "formula": "F=UX",
+   "name_en": "Slave Core SRAM Error Write-back Count"
+  },
+  {
+   "id": "GPS-C00027.7.16",
+   "bits": "0027.7.16",
+   "name_cn": "定轨解算错误信息码",
+   "formula": "F=X",
+   "name_en": "Orbit Determination Calculation Error Information Code"
+  },
+  {
+   "id": "GPS-C00029.7.6",
+   "bits": "0029.7.6",
+   "name_cn": "板间通信数据错误计数",
+   "formula": "F=UX",
+   "name_en": "Inter-board Communication Data Error Count"
+  },
+  {
+   "id": "GPS-C00029.1.2",
+   "bits": "0029.1.2",
+   "name_cn": "当前工作模式",
+   "formula": "F={UX|1H(GPS工作模式),2H(BD工作模式),3H(兼容工作模式)}",
+   "name_en": "Current Working Mode"
+  },
+  {
+   "id": "GPS-C00030.7.3",
+   "bits": "0030.7.3",
+   "name_cn": "接口软件对导航定位软件复位原因",
+   "formula": "F={UX|1H(导航定位软件复位),2H(导航定位软件切工作模式复位),3H(保留),4H(定轨异常复位导航定位软件),5H(导航定位软件 30 分钟非定位复位),6H(Tmark 超时复位导航定位软件)}",
+   "name_en": "Interface Software Reset Cause for Navigation and Positioning Software"
+  },
+  {
+   "id": "GPS-C00030.4.5",
+   "bits": "0030.4.5",
+   "name_cn": "接口软件对导航定位软件复位次数",
+   "formula": "F=UX",
+   "name_en": "Interface Software Reset Count for Navigation and Positioning Software"
+  },
+  {
+   "id": "GPS-C00031.7.8",
+   "bits": "0031.7.8",
+   "name_cn": "接收间接指令计数",
+   "formula": "F=UX",
+   "name_en": "Receive Indirect Command Count"
+  },
+  {
+   "id": "GPS-C00032.7.16",
+   "bits": "0032.7.16",
+   "name_cn": "导航定位软件（或下位机接口软件）上注数据包帧序号/增量数据长度",
+   "formula": "F=X",
+   "name_en": "Navigation and Positioning Software (or Lower Machine Interface Software) Upload Data Packet Frame Sequence Number / Incremental Data Length"
+  },
+  {
+   "id": "GPS-C00034.7.8",
+   "bits": "0034.7.8",
+   "name_cn": "导航定位软件（或下位机接口软件）程序版本号/校验字",
+   "formula": "F=X",
+   "name_en": "Navigation and Positioning Software (or Lower Machine Interface Software) Program Version Number / Checkword"
+  },
+  {
+   "id": "GPS-C00035.7.2",
+   "bits": "0035.7.2",
+   "name_cn": "导航定位软件（或下位机接口软件）程序上注命令",
+   "formula": "F={UX|0H(初始状态),1H(程序注入允许),2H(程序注入结束),3H(启动注入程序)}",
+   "name_en": "Navigation and Positioning Software (or Lower Machine Interface Software) Program Upload Command"
+  },
+  {
+   "id": "GPS-C00035.5.3",
+   "bits": "0035.5.3",
+   "name_cn": "程序上注校验返回值",
+   "formula": "F={UX|000：初始状态；001：全部正确；010：帧头错误；011：长度为零；100：校验错误；其他：保留}",
+   "name_en": "Program Upload Checksum Return Value"
+  },
+  {
+   "id": "GPS-C00035.2.1",
+   "bits": "0035.2.1",
+   "name_cn": "导航定位软件（或下位机接口软件）程序上注启动状态",
+   "formula": "F={UX|1H(上注程序启动),0H(初始状态)}",
+   "name_en": "Navigation and Positioning Software (or Lower Machine Interface Software) Program Upload Startup Status"
+  },
+  {
+   "id": "GPS-C00035.1.1",
+   "bits": "0035.1.1",
+   "name_cn": "上注数据来源",
+   "formula": "F={UX|1H(导航定位软件),0H(下位机接口软件)}",
+   "name_en": "Upload Data Source"
+  },
+  {
+   "id": "GPS-C00035.0.1",
+   "bits": "0035.0.1",
+   "name_cn": "定轨数据输出标识",
+   "formula": "F={UX|1H(禁止),0H(允许)}",
+   "name_en": "Orbit Determination Data Output Identifier"
+  },
+  {
+   "id": "GPS-C00036.7.8",
+   "bits": "0036.7.8",
+   "name_cn": "单点定位使用星数",
+   "formula": "F=X",
+   "name_en": "Number of Stars Used in Single-point Positioning"
+  },
+  {
+   "id": "GPS-C00037.7.8",
+   "bits": "0037.7.8",
+   "name_cn": "滤波使用星数",
+   "formula": "F=X",
+   "name_en": "Number of Stars Used in Filtering"
+  },
+  {
+   "id": "GPS-C00038.7.2",
+   "bits": "0038.7.2",
+   "name_cn": "滤波器收敛标记",
+   "formula": "F={UX|1H(收敛),0H(未收敛),3H(发散)}",
+   "name_en": "Filter Convergence Flag"
+  },
+  {
+   "id": "GPS-C00038.5.1",
+   "bits": "0038.5.1",
+   "name_cn": "单点定位成功标记",
+   "formula": "F={UX|1H(成功),0H(失败)}",
+   "name_en": "Single-point Positioning Success Flag"
+  },
+  {
+   "id": "GPS-C00038.4.4",
+   "bits": "0038.4.4",
+   "name_cn": "定轨分时计算步骤",
+   "formula": "F=X",
+   "name_en": "Orbit Determination Time-sharing Calculation Steps"
+  },
+  {
+   "id": "GPS-C00038.0.1",
+   "bits": "0038.0.1",
+   "name_cn": "滤波器初始化标记",
+   "formula": "F={UX|1H(初始化),0H(未初始化)}",
+   "name_en": "Filter Initialization Flag"
+  },
+  {
+   "id": "GPS-C00039.7.1",
+   "bits": "0039.7.1",
+   "name_cn": "上注轨道参数成功写入ROM标记",
+   "formula": "F={UX|1H(成功),0H(失败)}",
+   "name_en": "Orbit Parameter Upload Successfully Written to ROM Flag"
+  },
+  {
+   "id": "GPS-C00039.6.1",
+   "bits": "0039.6.1",
+   "name_cn": "上注轨道参数成功传输标记",
+   "formula": "F={UX|1H(成功),0H(失败)}",
+   "name_en": "Orbit Parameter Upload Successfully Transmitted Flag"
+  },
+  {
+   "id": "GPS-C00039.5.2",
+   "bits": "0039.5.2",
+   "name_cn": "1PPS秒脉冲发送标识",
+   "formula": "F={UX|0H(初态,1PPS秒脉冲未输出),1H(初态,1PPS秒脉冲输出),2H(1PPS秒脉冲输出指令允许),3H(1PPS秒脉冲输出指令禁止)}",
+   "name_en": "1PPS Second Pulse Send Identifier"
+  },
+  {
+   "id": "GPS-C00039.3.4",
+   "bits": "0039.3.4",
+   "name_cn": "CANB总线复位次数",
+   "formula": "F=X",
+   "name_en": "CANB Bus Reset Count"
+  },
+  {
+   "id": "GPS-C00040.7.8",
+   "bits": "0040.7.8",
+   "name_cn": "当前GPS跳秒值",
+   "formula": "F=X",
+   "name_en": "Current GPS Leap Second Value"
+  },
+  {
+   "id": "GPS-C00041.7.8",
+   "bits": "0041.7.8",
+   "name_cn": "当前BD跳秒值",
+   "formula": "F=X",
+   "name_en": "Current BD Leap Second Value"
+  },
+  {
+   "id": "GPS-C00042.7.4",
+   "bits": "0042.7.4",
+   "name_cn": "GPSL1可用卫星",
+   "formula": "F=UX",
+   "name_en": "GPS L1 Available Satellites"
+  },
+  {
+   "id": "GPS-C00042.3.4",
+   "bits": "0042.3.4",
+   "name_cn": "BDSB1可用星数",
+   "formula": "F=UX",
+   "name_en": "BDS B1 Available Star Count"
+  },
+  {
+   "id": "GPS-C00043.7.32",
+   "bits": "0043.7.32",
+   "name_cn": "GPS钟差",
+   "formula": "F=X",
+   "name_en": "GPS Clock Bias"
+  },
+  {
+   "id": "GPS-C00047.7.32",
+   "bits": "0047.7.32",
+   "name_cn": "BDS钟差",
+   "formula": "F=X",
+   "name_en": "BDS Clock Bias"
+  },
+  {
+   "id": "GPS-C00051.7.32",
+   "bits": "0051.7.32",
+   "name_cn": "钟飘",
+   "formula": "F=X",
+   "name_en": "Clock Drift"
+  },
+  {
+   "id": "GPS-C00055.7.8",
+   "bits": "0055.7.8",
+   "name_cn": "PDOP值",
+   "formula": "F=UX*0.1",
+   "name_en": "PDOP Value"
+  },
+  {
+   "id": "GPS-C00056.7.16",
+   "bits": "0056.7.16",
+   "name_cn": "GPS周数",
+   "formula": "F=X",
+   "name_en": "GPS Week Number"
+  },
+  {
+   "id": "GPS-C00058.7.32",
+   "bits": "0058.7.32",
+   "name_cn": "GPS周内秒整秒",
+   "formula": "F=X",
+   "name_en": "GPS Seconds of Week - Whole Second"
+  },
+  {
+   "id": "GPS-C00062.7.32",
+   "bits": "0062.7.32",
+   "name_cn": "GPS周内秒小数秒",
+   "formula": "F=X",
+   "name_en": "GPS Seconds of Week - Fractional Second"
+  },
+  {
+   "id": "GPS-C00066.7.1",
+   "bits": "0066.7.1",
+   "name_cn": "时间有效标志",
+   "formula": "F={UX|0H(无效),1H(有效)}",
+   "name_en": "Time Validity Flag"
+  },
+  {
+   "id": "GPS-C00066.6.2",
+   "bits": "0066.6.2",
+   "name_cn": "工作解算状态",
+   "formula": "F={UX|0H(初始状态),1H(观测未定位),3H(观测并定位)}",
+   "name_en": "Working Calculation Status"
+  },
+  {
+   "id": "GPS-C00066.4.3",
+   "bits": "0066.4.3",
+   "name_cn": "非定位原因",
+   "formula": "F={UX|0H(初始状态),1H(最小二乘返回值异常),2H(几何分布因子超差),3H(GPS时间解算超差),4H(用户单轴位置超差),5H(用户位速解算超差),6H(用户时间数据超差)}",
+   "name_en": "Non-positioning Cause"
+  },
+  {
+   "id": "GPS-C00066.1.2",
+   "bits": "0066.1.2",
+   "name_cn": "定位解算模式",
+   "formula": "F={UX|0H(未结算),1H(单GPS定位解算),2H(单BD定位解算),3H(GPS/BD组合定位解算)}",
+   "name_en": "Positioning Calculation Mode"
+  },
+  {
+   "id": "GPS-C00067.7.6",
+   "bits": "0067.7.6",
+   "name_cn": "GPS第1通道捕获卫星号",
+   "formula": "F=X",
+   "name_en": "GPS Channel1 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00067.1.1",
+   "bits": "0067.1.1",
+   "name_cn": "GPS第1通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel1 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00067.0.1",
+   "bits": "0067.0.1",
+   "name_cn": "GPS第1通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel1 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00068.7.8",
+   "bits": "0068.7.8",
+   "name_cn": "GPS第1通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel1 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00069.7.8",
+   "bits": "0069.7.8",
+   "name_cn": "GPS第1通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel1 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00070.7.8",
+   "bits": "0070.7.8",
+   "name_cn": "GPS第1通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel1 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00071.7.6",
+   "bits": "0071.7.6",
+   "name_cn": "GPS第2通道捕获卫星号",
+   "formula": "F=UX",
+   "name_en": "GPS Channel2 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00071.1.1",
+   "bits": "0071.1.1",
+   "name_cn": "GPS第2通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel2 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00071.0.1",
+   "bits": "0071.0.1",
+   "name_cn": "GPS第2通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel2 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00072.7.8",
+   "bits": "0072.7.8",
+   "name_cn": "GPS第2通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel2 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00073.7.8",
+   "bits": "0073.7.8",
+   "name_cn": "GPS第2通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel2 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00074.7.8",
+   "bits": "0074.7.8",
+   "name_cn": "GPS第2通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel2 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00075.7.6",
+   "bits": "0075.7.6",
+   "name_cn": "GPS第3通道捕获卫星号",
+   "formula": "F=UX",
+   "name_en": "GPS Channel3 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00075.1.1",
+   "bits": "0075.1.1",
+   "name_cn": "GPS第3通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel3 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00075.0.1",
+   "bits": "0075.0.1",
+   "name_cn": "GPS第3通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel3 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00076.7.8",
+   "bits": "0076.7.8",
+   "name_cn": "GPS第3通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel3 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00077.7.8",
+   "bits": "0077.7.8",
+   "name_cn": "GPS第3通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel3 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00078.7.8",
+   "bits": "0078.7.8",
+   "name_cn": "GPS第3通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel3 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00079.7.6",
+   "bits": "0079.7.6",
+   "name_cn": "GPS第4通道捕获卫星号",
+   "formula": "F=X",
+   "name_en": "GPS Channel4 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00079.1.1",
+   "bits": "0079.1.1",
+   "name_cn": "GPS第4通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel4 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00079.0.1",
+   "bits": "0079.0.1",
+   "name_cn": "GPS第4通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel4 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00080.7.8",
+   "bits": "0080.7.8",
+   "name_cn": "GPS第4通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel4 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00081.7.8",
+   "bits": "0081.7.8",
+   "name_cn": "GPS第4通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel4 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00082.7.8",
+   "bits": "0082.7.8",
+   "name_cn": "GPS第4通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel4 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00083.7.6",
+   "bits": "0083.7.6",
+   "name_cn": "GPS第5通道捕获卫星号",
+   "formula": "F=X",
+   "name_en": "GPS Channel5 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00083.1.1",
+   "bits": "0083.1.1",
+   "name_cn": "GPS第5通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel5 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00083.0.1",
+   "bits": "0083.0.1",
+   "name_cn": "GPS第5通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel5 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00084.7.8",
+   "bits": "0084.7.8",
+   "name_cn": "GPS第5通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel5 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00085.7.8",
+   "bits": "0085.7.8",
+   "name_cn": "GPS第5通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel5 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00086.7.8",
+   "bits": "0086.7.8",
+   "name_cn": "GPS第5通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel5 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00087.7.6",
+   "bits": "0087.7.6",
+   "name_cn": "GPS第6通道捕获卫星号",
+   "formula": "F=X",
+   "name_en": "GPS Channel6 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00087.1.1",
+   "bits": "0087.1.1",
+   "name_cn": "GPS第6通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel6 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00087.0.1",
+   "bits": "0087.0.1",
+   "name_cn": "GPS第6通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel6 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00088.7.8",
+   "bits": "0088.7.8",
+   "name_cn": "GPS第6通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel6 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00089.7.8",
+   "bits": "0089.7.8",
+   "name_cn": "GPS第6通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel6 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00090.7.8",
+   "bits": "0090.7.8",
+   "name_cn": "GPS第6通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel6 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00091.7.6",
+   "bits": "0091.7.6",
+   "name_cn": "GPS第7通道捕获卫星号",
+   "formula": "F=X",
+   "name_en": "GPS Channel7 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00091.1.1",
+   "bits": "0091.1.1",
+   "name_cn": "GPS第7通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel7 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00091.0.1",
+   "bits": "0091.0.1",
+   "name_cn": "GPS第7通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel7 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00092.7.8",
+   "bits": "0092.7.8",
+   "name_cn": "GPS第7通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel7 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00093.7.8",
+   "bits": "0093.7.8",
+   "name_cn": "GPS第7通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel7 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00094.7.8",
+   "bits": "0094.7.8",
+   "name_cn": "GPS第7通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel7 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00095.7.6",
+   "bits": "0095.7.6",
+   "name_cn": "GPS第8通道捕获卫星号",
+   "formula": "F=X",
+   "name_en": "GPS Channel8 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00095.1.1",
+   "bits": "0095.1.1",
+   "name_cn": "GPS第8通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel8 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00095.0.1",
+   "bits": "0095.0.1",
+   "name_cn": "GPS第8通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel8 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00096.7.8",
+   "bits": "0096.7.8",
+   "name_cn": "GPS第8通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel8 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00097.7.8",
+   "bits": "0097.7.8",
+   "name_cn": "GPS第8通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel8 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00098.7.8",
+   "bits": "0098.7.8",
+   "name_cn": "GPS第8通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel8 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00099.7.6",
+   "bits": "0099.7.6",
+   "name_cn": "GPS第9通道捕获卫星号",
+   "formula": "F=X",
+   "name_en": "GPS Channel9 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00099.1.1",
+   "bits": "0099.1.1",
+   "name_cn": "GPS第9通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel9 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00099.0.1",
+   "bits": "0099.0.1",
+   "name_cn": "GPS第9通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel9 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00100.7.8",
+   "bits": "0100.7.8",
+   "name_cn": "GPS第9通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel9 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00101.7.8",
+   "bits": "0101.7.8",
+   "name_cn": "GPS第9通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel9 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00102.7.8",
+   "bits": "0102.7.8",
+   "name_cn": "GPS第9通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel9 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00103.7.6",
+   "bits": "0103.7.6",
+   "name_cn": "GPS第10通道捕获卫星号",
+   "formula": "F=X",
+   "name_en": "GPS Channel10 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00103.1.1",
+   "bits": "0103.1.1",
+   "name_cn": "GPS第10通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel10 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00103.0.1",
+   "bits": "0103.0.1",
+   "name_cn": "GPS第10通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel10 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00104.7.8",
+   "bits": "0104.7.8",
+   "name_cn": "GPS第10通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel10 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00105.7.8",
+   "bits": "0105.7.8",
+   "name_cn": "GPS第10通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel10 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00106.7.8",
+   "bits": "0106.7.8",
+   "name_cn": "GPS第10通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel10 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00107.7.6",
+   "bits": "0107.7.6",
+   "name_cn": "GPS第11通道捕获卫星号",
+   "formula": "F=X",
+   "name_en": "GPS Channel11 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00107.1.1",
+   "bits": "0107.1.1",
+   "name_cn": "GPS第11通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel11 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00107.0.1",
+   "bits": "0107.0.1",
+   "name_cn": "GPS第11通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel11 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00108.7.8",
+   "bits": "0108.7.8",
+   "name_cn": "GPS第11通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel11 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00109.7.8",
+   "bits": "0109.7.8",
+   "name_cn": "GPS第11通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel11 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00110.7.8",
+   "bits": "0110.7.8",
+   "name_cn": "GPS第11通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel11 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00111.7.6",
+   "bits": "0111.7.6",
+   "name_cn": "GPS第12通道捕获卫星号",
+   "formula": "F=X",
+   "name_en": "GPS Channel12 Captured Satellite Number"
+  },
+  {
+   "id": "GPS-C00111.1.1",
+   "bits": "0111.1.1",
+   "name_cn": "GPS第12通道比特同步状态",
+   "formula": "F={UX|0H(比特未同步),1H(比特同步)}",
+   "name_en": "GPS Channel12 Bit Synchronization Status"
+  },
+  {
+   "id": "GPS-C00111.0.1",
+   "bits": "0111.0.1",
+   "name_cn": "GPS第12通道帧同步状态",
+   "formula": "F={UX|0H(帧未同步),1H(帧同步)}",
+   "name_en": "GPS Channel12 Frame Synchronization Status"
+  },
+  {
+   "id": "GPS-C00112.7.8",
+   "bits": "0112.7.8",
+   "name_cn": "GPS第12通道载噪比",
+   "formula": "F=X",
+   "name_en": "GPS Channel12 Carrier-to-Noise Ratio"
+  },
+  {
+   "id": "GPS-C00113.7.8",
+   "bits": "0113.7.8",
+   "name_cn": "GPS第12通道导航星使用状态",
+   "formula": "F=X",
+   "name_en": "GPS Channel12 Navigation Satellite Usage Status"
+  },
+  {
+   "id": "GPS-C00114.7.8",
+   "bits": "0114.7.8",
+   "name_cn": "GPS第12通道跟踪参数",
+   "formula": "F=X",
+   "name_en": "GPS Channel12 Tracking Parameters"
+  },
+  {
+   "id": "GPS-C00115.7.384",
+   "bits": "0115.7.384",
+   "name_cn": "北斗信息不解析",
+   "formula": "F=X",
+   "name_en": "Beidou Information Not Parsed"
+  },
+  {
+   "id": "GPS-C00163.7.8",
+   "bits": "0163.7.8",
+   "name_cn": "帧尾",
+   "formula": "F=X",
+   "name_en": "Frame Tail"
+  }
+ ]
+}

@@ -1,0 +1,183 @@
+{
+ "packet": "TTC-S1",
+ "main_type": 1,
+ "sub_type": 1,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "TTC-C10000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "id_0",
+   "formula": "F=HX",
+   "name_en": "id_0"
+  },
+  {
+   "id": "TTC-C10001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "id_1",
+   "formula": "F=HX",
+   "name_en": "id_1"
+  },
+  {
+   "id": "TTC-C10002.7.16",
+   "bits": "0002.7.16",
+   "name_cn": "HI档发射增益",
+   "formula": "F=SX",
+   "name_en": "gain_tx_HI"
+  },
+  {
+   "id": "TTC-C10004.7.16",
+   "bits": "0004.7.16",
+   "name_cn": "LO档发射增益",
+   "formula": "F=SX",
+   "name_en": "gain_tx_LO"
+  },
+  {
+   "id": "TTC-C10006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "I通道直流偏置",
+   "formula": "F=SX",
+   "name_en": "bias_I"
+  },
+  {
+   "id": "TTC-C10008.7.16",
+   "bits": "0008.7.16",
+   "name_cn": "Q通道直流偏置",
+   "formula": "F=SX",
+   "name_en": "bias_Q"
+  },
+  {
+   "id": "TTC-C100010.7.16",
+   "bits": "0010.7.16",
+   "name_cn": "降功率vbat_rx阈值",
+   "formula": "F=SX",
+   "name_en": "threshold_u_vbat_rx_powerdown"
+  },
+  {
+   "id": "TTC-C100012.7.16",
+   "bits": "0012.7.16",
+   "name_cn": "关转发vbat_rx阈值",
+   "formula": "F=SX",
+   "name_en": "threshold_u_vbat_rx_repeateroff"
+  },
+  {
+   "id": "TTC-C100014.7.8",
+   "bits": "0014.7.8",
+   "name_cn": "t_pa阈值",
+   "formula": "F=SX",
+   "name_en": "threshold_t_pa"
+  },
+  {
+   "id": "TTC-C100015.7.8",
+   "bits": "0015.7.8",
+   "name_cn": "连续发射使能",
+   "formula": "F=HX",
+   "name_en": "continuous_en"
+  },
+  {
+   "id": "TTC-C100016.7.8",
+   "bits": "0016.7.8",
+   "name_cn": "OBC看门狗使能",
+   "formula": "F=HX",
+   "name_en": "obc_wdt_en"
+  },
+  {
+   "id": "TTC-C100017.7.8",
+   "bits": "0017.7.8",
+   "name_cn": "CTCSS使能",
+   "formula": "F=HX",
+   "name_en": "ctcss_en"
+  },
+  {
+   "id": "TTC-C100018.7.8",
+   "bits": "0018.7.8",
+   "name_cn": "CTCSS积分次数",
+   "formula": "F=SX",
+   "name_en": "ctcss_n_integration"
+  },
+  {
+   "id": "TTC-C100019.7.8",
+   "bits": "0019.7.8",
+   "name_cn": "CTCSS尾音长度",
+   "formula": "F=SX",
+   "name_en": "ctcss_n_tail"
+  },
+  {
+   "id": "TTC-C100020.7.32",
+   "bits": "0020.7.32",
+   "name_cn": "CTCSS系数",
+   "formula": "F=FX",
+   "name_en": "ctcss_coeff"
+  },
+  {
+   "id": "TTC-C100024.7.32",
+   "bits": "0024.7.32",
+   "name_cn": "CTCSS阈值",
+   "formula": "F=FX",
+   "name_en": "ctcss_threshold"
+  },
+  {
+   "id": "TTC-C100028.7.32",
+   "bits": "0028.7.32",
+   "name_cn": "HAM通道FM解调增益",
+   "formula": "F=FX",
+   "name_en": "gain_fmdm_ham"
+  },
+  {
+   "id": "TTC-C100032.7.32",
+   "bits": "0032.7.32",
+   "name_cn": "TC通道FM解调增益",
+   "formula": "F=FX",
+   "name_en": "gain_fmdm_tc"
+  },
+  {
+   "id": "TTC-C100036.7.32",
+   "bits": "0036.7.32",
+   "name_cn": "OBC看门狗周期",
+   "formula": "F=UX",
+   "name_en": "interval_obc_wdt"
+  },
+  {
+   "id": "TTC-C100040.7.16",
+   "bits": "0040.7.16",
+   "name_cn": "preamble长度",
+   "formula": "F=UX",
+   "name_en": "preamble_len"
+  },
+  {
+   "id": "TTC-C100042.7.16",
+   "bits": "0042.7.16",
+   "name_cn": "trailer长度",
+   "formula": "F=UX",
+   "name_en": "trailer_len"
+  },
+  {
+   "id": "TTC-C100044.7.32",
+   "bits": "0044.7.32",
+   "name_cn": "BEACON工参周期",
+   "formula": "F=UX",
+   "name_en": "interval_hk_BEACON"
+  },
+  {
+   "id": "TTC-C100048.7.224",
+   "bits": "0048.7.224",
+   "name_cn": "28字节消息",
+   "formula": "F=STR",
+   "name_en": "message"
+  },
+  {
+   "id": "TTC-C100076.7.32",
+   "bits": "0076.7.32",
+   "name_cn": "AGC寄存器",
+   "formula": "F=HX",
+   "name_en": "agc_reg"
+  },
+  {
+   "id": "TTC-C100080.7.32",
+   "bits": "0080.7.32",
+   "name_cn": "CRC",
+   "formula": "F=HX",
+   "name_en": "crc"
+  }
+ ]
+}

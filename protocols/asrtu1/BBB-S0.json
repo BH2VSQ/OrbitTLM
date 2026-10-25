@@ -1,0 +1,498 @@
+{
+ "packet": "BBB-S0",
+ "main_type": 2,
+ "sub_type": 0,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "BBB-C00000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "Z7 温度",
+   "formula": "F=SX",
+   "name_en": "Z7 Temperature"
+  },
+  {
+   "id": "BBB-C00001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "PCB 温度",
+   "formula": "F=SX",
+   "name_en": "PCB Temperature"
+  },
+  {
+   "id": "BBB-C00002.7.1",
+   "bits": "0002.7.1",
+   "name_cn": "SPI 初始化状态",
+   "formula": "F={UX|1H(工作状态),0H(初始化状态)}",
+   "name_en": "SPI Initialization Status"
+  },
+  {
+   "id": "BBB-C00002.6.1",
+   "bits": "0002.6.1",
+   "name_cn": "SPI FIFO 状态",
+   "formula": "F={UX|1H(满足传输),0H(不满足传输)}",
+   "name_en": "SPI FIFO Status"
+  },
+  {
+   "id": "BBB-C00002.5.1",
+   "bits": "0002.5.1",
+   "name_cn": "X功放使能状态",
+   "formula": "F={UX|1H(使能),0H(未使能)}",
+   "name_en": "X Amplifier Enable Status"
+  },
+  {
+   "id": "BBB-C00002.4.1",
+   "bits": "0002.4.1",
+   "name_cn": "天线切换状态",
+   "formula": "F={UX|1H(天线2),0H(天线1)}",
+   "name_en": "Antenna Switching Status"
+  },
+  {
+   "id": "BBB-C00002.3.1",
+   "bits": "0002.3.1",
+   "name_cn": "TMTC PDU 工作状态",
+   "formula": "F={UX|1H(工作),0H(未工作)}",
+   "name_en": "TMTC PDU Working Status"
+  },
+  {
+   "id": "BBB-C00002.2.1",
+   "bits": "0002.2.1",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "BBB-C00002.1.1",
+   "bits": "0002.1.1",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "BBB-C00002.0.1",
+   "bits": "0002.0.1",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "BBB-C00003.7.32",
+   "bits": "0003.7.32",
+   "name_cn": "接收信号强度",
+   "formula": "F.6=FX",
+   "name_en": "Received Signal Strength"
+  },
+  {
+   "id": "BBB-C00007.7.32",
+   "bits": "0007.7.32",
+   "name_cn": "接收频偏",
+   "formula": "F.6=FX",
+   "name_en": "Received Frequency Offset"
+  },
+  {
+   "id": "BBB-C00011.7.8",
+   "bits": "0011.7.8",
+   "name_cn": "无线接收计数",
+   "formula": "F=UX",
+   "name_en": "Wireless Receive Count"
+  },
+  {
+   "id": "BBB-C00012.7.8",
+   "bits": "0012.7.8",
+   "name_cn": "无线发送计数",
+   "formula": "F=UX",
+   "name_en": "Wireless Send Count"
+  },
+  {
+   "id": "BBB-C00013.7.8",
+   "bits": "0013.7.8",
+   "name_cn": "无线指令接收计数",
+   "formula": "F=UX",
+   "name_en": "Wireless Command Receive Count"
+  },
+  {
+   "id": "BBB-C00014.7.8",
+   "bits": "0014.7.8",
+   "name_cn": "无线指令错误计数",
+   "formula": "F=UX",
+   "name_en": "Wireless Command Error Count"
+  },
+  {
+   "id": "BBB-C00015.7.8",
+   "bits": "0015.7.8",
+   "name_cn": "无线最近指令",
+   "formula": "F=X",
+   "name_en": "Wireless Most Recent Command"
+  },
+  {
+   "id": "BBB-C00016.7.8",
+   "bits": "0016.7.8",
+   "name_cn": "无线执行结果",
+   "formula": "F=X",
+   "name_en": "Wireless Execution Result"
+  },
+  {
+   "id": "BBB-C00017.7.8",
+   "bits": "0017.7.8",
+   "name_cn": "CAN 错误计数",
+   "formula": "F=UX",
+   "name_en": "CAN Error Count"
+  },
+  {
+   "id": "BBB-C00018.7.8",
+   "bits": "0018.7.8",
+   "name_cn": "CAN 接收计数",
+   "formula": "F=UX",
+   "name_en": "CAN Receive Count"
+  },
+  {
+   "id": "BBB-C00019.7.8",
+   "bits": "0019.7.8",
+   "name_cn": "CAN 发送计数",
+   "formula": "F=UX",
+   "name_en": "CAN Send Count"
+  },
+  {
+   "id": "BBB-C00020.7.8",
+   "bits": "0020.7.8",
+   "name_cn": "任务过程标识",
+   "formula": "F=X",
+   "name_en": "Task Process Identifier"
+  },
+  {
+   "id": "BBB-C00021.7.8",
+   "bits": "0021.7.8",
+   "name_cn": "下传自增计数",
+   "formula": "F=UX",
+   "name_en": "Download Auto-increment Count"
+  },
+  {
+   "id": "BBB-C00022.7.8",
+   "bits": "0022.7.8",
+   "name_cn": "CAN 最近指令",
+   "formula": "F=X",
+   "name_en": "CAN Most Recent Command"
+  },
+  {
+   "id": "BBB-C00023.7.8",
+   "bits": "0023.7.8",
+   "name_cn": "CAN 执行结果",
+   "formula": "F=X",
+   "name_en": "CAN Execution Result"
+  },
+  {
+   "id": "BBB-C00024.7.32",
+   "bits": "0024.7.32",
+   "name_cn": "Z7 运行时间",
+   "formula": "F=UX",
+   "name_en": "Z7 Run Time"
+  },
+  {
+   "id": "BBB-C00028.7.32",
+   "bits": "0028.7.32",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "BBB-C00032.7.1",
+   "bits": "0032.7.1",
+   "name_cn": "配置1状态",
+   "formula": "F={UX|1H(已配置),0H(未配置)}",
+   "name_en": "Configuration1 Status"
+  },
+  {
+   "id": "BBB-C00032.6.1",
+   "bits": "0032.6.1",
+   "name_cn": "配置2状态",
+   "formula": "F={UX|1H(已配置),0H(未配置)}",
+   "name_en": "Configuration2 Status"
+  },
+  {
+   "id": "BBB-C00032.5.1",
+   "bits": "0032.5.1",
+   "name_cn": "配置3状态",
+   "formula": "F={UX|1H(已配置),0H(未配置)}",
+   "name_en": "Configuration3 Status"
+  },
+  {
+   "id": "BBB-C00032.4.1",
+   "bits": "0032.4.1",
+   "name_cn": "配置4状态",
+   "formula": "F={UX|1H(已配置),0H(未配置)}",
+   "name_en": "Configuration4 Status"
+  },
+  {
+   "id": "BBB-C00032.3.1",
+   "bits": "0032.3.1",
+   "name_cn": "当前启动分区",
+   "formula": "F={UX|1H(A区),0H(B区)}",
+   "name_en": "Current Boot Partition"
+  },
+  {
+   "id": "BBB-C00032.2.1",
+   "bits": "0032.2.1",
+   "name_cn": "下次启动分区",
+   "formula": "F={UX|1H(A区),0H(B区)}",
+   "name_en": "Next Boot Partition"
+  },
+  {
+   "id": "BBB-C00032.1.1",
+   "bits": "0032.1.1",
+   "name_cn": "分区切换使能",
+   "formula": "F={UX|1H(使能),0H(未使能)}",
+   "name_en": "Partition Switching Enable"
+  },
+  {
+   "id": "BBB-C00032.0.1",
+   "bits": "0032.0.1",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "BBB-C00033.7.8",
+   "bits": "0033.7.8",
+   "name_cn": "Z7 指令执行计数",
+   "formula": "F=UX",
+   "name_en": "Z7 Command Execution Count"
+  },
+  {
+   "id": "BBB-C00034.7.8",
+   "bits": "0034.7.8",
+   "name_cn": "文件发送序号",
+   "formula": "F=UX",
+   "name_en": "File Send Sequence Number"
+  },
+  {
+   "id": "BBB-C00035.7.32",
+   "bits": "0035.7.32",
+   "name_cn": "文件发送长度",
+   "formula": "F=UX",
+   "name_en": "File Send Length"
+  },
+  {
+   "id": "BBB-C00039.7.32",
+   "bits": "0039.7.32",
+   "name_cn": "文件发送CRC",
+   "formula": "F=X",
+   "name_en": "File Send CRC"
+  },
+  {
+   "id": "BBB-C00043.7.32",
+   "bits": "0043.7.32",
+   "name_cn": "文件发送偏移地址",
+   "formula": "F=X",
+   "name_en": "File Send Offset Address"
+  },
+  {
+   "id": "BBB-C00047.7.16",
+   "bits": "0047.7.16",
+   "name_cn": "文件发送包长",
+   "formula": "F=UX",
+   "name_en": "File Send Packet Length"
+  },
+  {
+   "id": "BBB-C00049.7.8",
+   "bits": "0049.7.8",
+   "name_cn": "系统errno序号",
+   "formula": "F=X",
+   "name_en": "System errno Sequence Number"
+  },
+  {
+   "id": "BBB-C00050.7.8",
+   "bits": "0050.7.8",
+   "name_cn": "文件接收序号",
+   "formula": "F=UX",
+   "name_en": "File Receive Sequence Number"
+  },
+  {
+   "id": "BBB-C00051.7.16",
+   "bits": "0051.7.16",
+   "name_cn": "文件接收总包数",
+   "formula": "F=UX",
+   "name_en": "File Receive Total Packet Count"
+  },
+  {
+   "id": "BBB-C00053.7.16",
+   "bits": "0053.7.16",
+   "name_cn": "文件接收完成包数",
+   "formula": "F=UX",
+   "name_en": "File Receive Completed Packet Count"
+  },
+  {
+   "id": "BBB-C00055.7.16",
+   "bits": "0055.7.16",
+   "name_cn": "文件接收最后包序号",
+   "formula": "F=UX",
+   "name_en": "File Receive Last Packet Sequence Number"
+  },
+  {
+   "id": "BBB-C00057.7.8",
+   "bits": "0057.7.8",
+   "name_cn": "数传 FEC Sector 序号",
+   "formula": "F=UX",
+   "name_en": "Data Transmission FEC Sector Sequence Number"
+  },
+  {
+   "id": "BBB-C00058.7.8",
+   "bits": "0058.7.8",
+   "name_cn": "数传 FEC Sector 总数",
+   "formula": "F=UX",
+   "name_en": "Data Transmission FEC Sector Total Count"
+  },
+  {
+   "id": "BBB-C00059.7.32",
+   "bits": "0059.7.32",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "BBB-C00063.7.8",
+   "bits": "0063.7.8",
+   "name_cn": "Z7 软件版本",
+   "formula": "F=X",
+   "name_en": "Z7 Software Version"
+  },
+  {
+   "id": "BBB-C00064.7.8",
+   "bits": "0064.7.8",
+   "name_cn": "Z7 复位计数",
+   "formula": "F=UX",
+   "name_en": "Z7 Reset Count"
+  },
+  {
+   "id": "BBB-C00065.7.8",
+   "bits": "0065.7.8",
+   "name_cn": "内核电压",
+   "formula": "F.3=UX/10",
+   "name_en": "Kernel Voltage"
+  },
+  {
+   "id": "BBB-C00066.7.8",
+   "bits": "0066.7.8",
+   "name_cn": "IO 电压",
+   "formula": "F.3=UX/10",
+   "name_en": "IO Voltage"
+  },
+  {
+   "id": "BBB-C00067.7.8",
+   "bits": "0067.7.8",
+   "name_cn": "DDR 电压",
+   "formula": "F.3=UX/10",
+   "name_en": "DDR Voltage"
+  },
+  {
+   "id": "BBB-C00068.7.8",
+   "bits": "0068.7.8",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "BBB-C00069.7.8",
+   "bits": "0069.7.8",
+   "name_cn": "CPU 1 使用率",
+   "formula": "F.1=UX/2.55",
+   "name_en": "CPU1 Usage Rate"
+  },
+  {
+   "id": "BBB-C00070.7.8",
+   "bits": "0070.7.8",
+   "name_cn": "CPU 2 使用率",
+   "formula": "F.1=UX/2.55",
+   "name_en": "CPU2 Usage Rate"
+  },
+  {
+   "id": "BBB-C00071.7.8",
+   "bits": "0071.7.8",
+   "name_cn": "内存使用率",
+   "formula": "F.1=UX/2.55",
+   "name_en": "Memory Usage Rate"
+  },
+  {
+   "id": "BBB-C00072.7.8",
+   "bits": "0072.7.8",
+   "name_cn": "程序A区使用率",
+   "formula": "F=UX",
+   "name_en": "Program Area A Usage Rate"
+  },
+  {
+   "id": "BBB-C00073.7.8",
+   "bits": "0073.7.8",
+   "name_cn": "程序B区使用率",
+   "formula": "F=UX",
+   "name_en": "Program Area B Usage Rate"
+  },
+  {
+   "id": "BBB-C00074.7.8",
+   "bits": "0074.7.8",
+   "name_cn": "数据区使用率",
+   "formula": "F=UX",
+   "name_en": "Data Area Usage Rate"
+  },
+  {
+   "id": "BBB-C00075.7.8",
+   "bits": "0075.7.8",
+   "name_cn": "缓存文件接收序号",
+   "formula": "F=UX",
+   "name_en": "Cache File Receive Sequence Number"
+  },
+  {
+   "id": "BBB-C00076.7.32",
+   "bits": "0076.7.32",
+   "name_cn": "文件接收长度",
+   "formula": "F=UX",
+   "name_en": "File Receive Length"
+  },
+  {
+   "id": "BBB-C00080.7.16",
+   "bits": "0080.7.16",
+   "name_cn": "缓存文件接收包长",
+   "formula": "F=UX",
+   "name_en": "Cache File Receive Packet Length"
+  },
+  {
+   "id": "BBB-C00082.7.8",
+   "bits": "0082.7.8",
+   "name_cn": "当前DSP",
+   "formula": "F=X",
+   "name_en": "Current DSP"
+  },
+  {
+   "id": "BBB-C00083.7.8",
+   "bits": "0083.7.8",
+   "name_cn": "当前FPGA",
+   "formula": "F=X",
+   "name_en": "Current FPGA"
+  },
+  {
+   "id": "BBB-C00084.7.32",
+   "bits": "0084.7.32",
+   "name_cn": "UHF帧间隔时间",
+   "formula": "F=UX",
+   "name_en": "UHF Frame Interval Time"
+  },
+  {
+   "id": "BBB-C00088.7.8",
+   "bits": "0088.7.8",
+   "name_cn": "本机工参下行间隔",
+   "formula": "F=UX*30",
+   "name_en": "Local Engineering Parameters Downlink Interval"
+  },
+  {
+   "id": "BBB-C00089.7.8",
+   "bits": "0089.7.8",
+   "name_cn": "遥测 FEC 冗余率",
+   "formula": "F.6=UX/256",
+   "name_en": "Telemetry FEC Redundancy Rate"
+  },
+  {
+   "id": "BBB-C00090.7.8",
+   "bits": "0090.7.8",
+   "name_cn": "数传 FEC 冗余率",
+   "formula": "F.6=UX/256",
+   "name_en": "Data Transmission FEC Redundancy Rate"
+  }
+ ]
+}

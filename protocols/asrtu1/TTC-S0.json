@@ -1,0 +1,449 @@
+{
+ "packet": "TTC-S0",
+ "main_type": 1,
+ "sub_type": 0,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "TTC-C00000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "配置状态",
+   "formula": "F=HX",
+   "name_en": "config"
+  },
+  {
+   "id": "TTC-C00001.7.5",
+   "bits": "0001.7.5",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "rsvd"
+  },
+  {
+   "id": "TTC-C00001.2.1",
+   "bits": "0001.2.1",
+   "name_cn": "OBC遥测使能状态",
+   "formula": "F=HX",
+   "name_en": "obc_tlm_en"
+  },
+  {
+   "id": "TTC-C00001.1.1",
+   "bits": "0001.1.1",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "rsvd"
+  },
+  {
+   "id": "TTC-C00001.0.1",
+   "bits": "0001.0.1",
+   "name_cn": "CTCSS使能状态",
+   "formula": "F=HX",
+   "name_en": "ctcss_en"
+  },
+  {
+   "id": "TTC-C00002.7.8",
+   "bits": "0002.7.8",
+   "name_cn": "OBC看门狗状态",
+   "formula": "F=HX",
+   "name_en": "obc_wdt_flag"
+  },
+  {
+   "id": "TTC-C00003.7.2",
+   "bits": "0003.7.2",
+   "name_cn": "发射机PLL复位计数",
+   "formula": "F=HX",
+   "name_en": "tx_pll_reset_count"
+  },
+  {
+   "id": "TTC-C00003.5.1",
+   "bits": "0003.5.1",
+   "name_cn": "发射机开关状态",
+   "formula": "F=HX",
+   "name_en": "tx_on"
+  },
+  {
+   "id": "TTC-C00003.4.1",
+   "bits": "0003.4.1",
+   "name_cn": "发射机PLL状态",
+   "formula": "F=HX",
+   "name_en": "tx_pll_status"
+  },
+  {
+   "id": "TTC-C00003.3.3",
+   "bits": "0003.3.3",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "rsvd"
+  },
+  {
+   "id": "TTC-C00003.0.1",
+   "bits": "0003.0.1",
+   "name_cn": "接收机PLL状态",
+   "formula": "F=HX",
+   "name_en": "rx_pll_status"
+  },
+  {
+   "id": "TTC-C00004.7.16",
+   "bits": "0004.7.16",
+   "name_cn": "TX增益",
+   "formula": "F=SX",
+   "name_en": "gain_tx"
+  },
+  {
+   "id": "TTC-C00006.7.8",
+   "bits": "0006.7.8",
+   "name_cn": "5V接收电流",
+   "formula": "F=UX*4",
+   "name_en": "i_5v_rx"
+  },
+  {
+   "id": "TTC-C00007.7.8",
+   "bits": "0007.7.8",
+   "name_cn": "5V接收电压",
+   "formula": "F=UX/32",
+   "name_en": "v_5v_rx"
+  },
+  {
+   "id": "TTC-C00008.7.8",
+   "bits": "0008.7.8",
+   "name_cn": "5V发射电流",
+   "formula": "F=UX*4",
+   "name_en": "i_5v_tx"
+  },
+  {
+   "id": "TTC-C00009.7.8",
+   "bits": "0009.7.8",
+   "name_cn": "5V发射电压",
+   "formula": "F=UX/32",
+   "name_en": "v_5v_tx"
+  },
+  {
+   "id": "TTC-C000010.7.8",
+   "bits": "0010.7.8",
+   "name_cn": "3V3电流",
+   "formula": "F=UX*4",
+   "name_en": "i_3v3"
+  },
+  {
+   "id": "TTC-C000011.7.8",
+   "bits": "0011.7.8",
+   "name_cn": "3V3电压",
+   "formula": "F=UX/32",
+   "name_en": "v_3v3"
+  },
+  {
+   "id": "TTC-C000012.7.32",
+   "bits": "0012.7.32",
+   "name_cn": "TC通道直流偏置",
+   "formula": "F=FX",
+   "name_en": "dc_offset_tc"
+  },
+  {
+   "id": "TTC-C000016.7.32",
+   "bits": "0016.7.32",
+   "name_cn": "HAM通道RSSI",
+   "formula": "F=FX",
+   "name_en": "rssi_ham"
+  },
+  {
+   "id": "TTC-C000020.7.32",
+   "bits": "0020.7.32",
+   "name_cn": "TC通道SNR",
+   "formula": "F=FX",
+   "name_en": "snr_tc"
+  },
+  {
+   "id": "TTC-C000024.7.32",
+   "bits": "0024.7.32",
+   "name_cn": "TC通道RSSI",
+   "formula": "F=FX",
+   "name_en": "rssi_tc"
+  },
+  {
+   "id": "TTC-C000028.7.8",
+   "bits": "0028.7.8",
+   "name_cn": "模拟RSSI",
+   "formula": "F=HX",
+   "name_en": "rssi_analog"
+  },
+  {
+   "id": "TTC-C000029.7.8",
+   "bits": "0029.7.8",
+   "name_cn": "STM32温度",
+   "formula": "F=SX",
+   "name_en": "temp_stm32"
+  },
+  {
+   "id": "TTC-C000030.7.8",
+   "bits": "0030.7.8",
+   "name_cn": "功放温度",
+   "formula": "F=SX",
+   "name_en": "temp_pa"
+  },
+  {
+   "id": "TTC-C000031.7.16",
+   "bits": "0031.7.16",
+   "name_cn": "HAM通道直流偏置",
+   "formula": "F=SX*2.907",
+   "name_en": "dc_offset_ham"
+  },
+  {
+   "id": "TTC-C000033.7.8",
+   "bits": "0033.7.8",
+   "name_cn": "CAN发送计数",
+   "formula": "F=UX",
+   "name_en": "n_can_tx"
+  },
+  {
+   "id": "TTC-C000034.7.8",
+   "bits": "0034.7.8",
+   "name_cn": "CAN接收计数",
+   "formula": "F=UX",
+   "name_en": "n_can_rx"
+  },
+  {
+   "id": "TTC-C000035.7.8",
+   "bits": "0035.7.8",
+   "name_cn": "CAN错误包计数",
+   "formula": "F=UX",
+   "name_en": "n_can_err_pkt"
+  },
+  {
+   "id": "TTC-C000036.7.8",
+   "bits": "0036.7.8",
+   "name_cn": "CAN执行错误计数",
+   "formula": "F=UX",
+   "name_en": "n_can_err_exe"
+  },
+  {
+   "id": "TTC-C000037.7.8",
+   "bits": "0037.7.8",
+   "name_cn": "CAN最近指令",
+   "formula": "F=HX",
+   "name_en": "can_last_command"
+  },
+  {
+   "id": "TTC-C000038.7.8",
+   "bits": "0038.7.8",
+   "name_cn": "CAN最近返回值",
+   "formula": "F=HX",
+   "name_en": "can_last_return"
+  },
+  {
+   "id": "TTC-C000039.7.8",
+   "bits": "0039.7.8",
+   "name_cn": "无线发送计数",
+   "formula": "F=UX",
+   "name_en": "n_rf_tx"
+  },
+  {
+   "id": "TTC-C000040.7.8",
+   "bits": "0040.7.8",
+   "name_cn": "无线接收抛弃计数",
+   "formula": "F=UX",
+   "name_en": "n_rf_rx_dropped"
+  },
+  {
+   "id": "TTC-C000041.7.8",
+   "bits": "0041.7.8",
+   "name_cn": "无线接收计数",
+   "formula": "F=UX",
+   "name_en": "n_rf_rx"
+  },
+  {
+   "id": "TTC-C000042.7.8",
+   "bits": "0042.7.8",
+   "name_cn": "无线错误包计数",
+   "formula": "F=UX",
+   "name_en": "n_rf_err_pkt"
+  },
+  {
+   "id": "TTC-C000043.7.8",
+   "bits": "0043.7.8",
+   "name_cn": "无线执行错误计数",
+   "formula": "F=UX",
+   "name_en": "n_rf_err_exe"
+  },
+  {
+   "id": "TTC-C000044.7.8",
+   "bits": "0044.7.8",
+   "name_cn": "无线FEC错误计数",
+   "formula": "F=UX",
+   "name_en": "n_rf_err_fec"
+  },
+  {
+   "id": "TTC-C000045.7.8",
+   "bits": "0045.7.8",
+   "name_cn": "无线最近指令",
+   "formula": "F=HX",
+   "name_en": "rf_last_command"
+  },
+  {
+   "id": "TTC-C000046.7.8",
+   "bits": "0046.7.8",
+   "name_cn": "无线星务指令计数",
+   "formula": "F=UX",
+   "name_en": "n_rf_obc_command"
+  },
+  {
+   "id": "TTC-C000047.7.32",
+   "bits": "0047.7.32",
+   "name_cn": "AGC寄存器",
+   "formula": "F=HX",
+   "name_en": "agc_reg"
+  },
+  {
+   "id": "TTC-C000051.7.32",
+   "bits": "0051.7.32",
+   "name_cn": "FTP接收文件ID",
+   "formula": "F=HX",
+   "name_en": "ftp_rx_file_id"
+  },
+  {
+   "id": "TTC-C000055.7.32",
+   "bits": "0055.7.32",
+   "name_cn": "FTP接收文件长度",
+   "formula": "F=UX",
+   "name_en": "ftp_rx_file_len"
+  },
+  {
+   "id": "TTC-C000059.7.32",
+   "bits": "0059.7.32",
+   "name_cn": "FTP接收文件CRC",
+   "formula": "F=HX",
+   "name_en": "ftp_rx_file_crc"
+  },
+  {
+   "id": "TTC-C000063.7.16",
+   "bits": "0063.7.16",
+   "name_cn": "FTP接收包长",
+   "formula": "F=UX",
+   "name_en": "ftp_rx_pkt_len"
+  },
+  {
+   "id": "TTC-C000065.7.32",
+   "bits": "0065.7.32",
+   "name_cn": "FTP接收包数",
+   "formula": "F=UX",
+   "name_en": "ftp_rx_n_received"
+  },
+  {
+   "id": "TTC-C000069.7.32",
+   "bits": "0069.7.32",
+   "name_cn": "FTP丢失包数",
+   "formula": "F=UX",
+   "name_en": "ftp_rx_n_missing"
+  },
+  {
+   "id": "TTC-C000073.7.8",
+   "bits": "0073.7.8",
+   "name_cn": "目标NID",
+   "formula": "F=HX",
+   "name_en": "target_nid"
+  },
+  {
+   "id": "TTC-C000074.7.8",
+   "bits": "074.7.8",
+   "name_cn": "FTP发送文件ID",
+   "formula": "F=HX",
+   "name_en": "ftp_tx_file_id"
+  },
+  {
+   "id": "TTC-C000075.7.32",
+   "bits": "0075.7.32",
+   "name_cn": "FTP发送文件长度",
+   "formula": "F=UX",
+   "name_en": "ftp_tx_file_len"
+  },
+  {
+   "id": "TTC-C000079.7.32",
+   "bits": "0079.7.32",
+   "name_cn": "FTP发送文件CRC",
+   "formula": "F=HX",
+   "name_en": "ftp_tx_file_crc"
+  },
+  {
+   "id": "TTC-C000083.7.16",
+   "bits": "0083.7.16",
+   "name_cn": "FTP发送包长",
+   "formula": "F=UX",
+   "name_en": "ftp_tx_pkt_len"
+  },
+  {
+   "id": "TTC-C000085.7.32",
+   "bits": "0085.7.32",
+   "name_cn": "FTP发送完成包数",
+   "formula": "F=UX",
+   "name_en": "ftp_tx_n_received"
+  },
+  {
+   "id": "TTC-C000089.7.32",
+   "bits": "0089.7.32",
+   "name_cn": "FTP发送缺失包数",
+   "formula": "F=UX",
+   "name_en": "ftp_tx_n_missing"
+  },
+  {
+   "id": "TTC-C000093.7.32",
+   "bits": "0093.7.32",
+   "name_cn": "文件读取计数",
+   "formula": "F=UX",
+   "name_en": "n_data_read"
+  },
+  {
+   "id": "TTC-C000097.7.32",
+   "bits": "0097.7.32",
+   "name_cn": "无线发送抛弃计数",
+   "formula": "F=UX",
+   "name_en": "n_rf_rx_dropped"
+  },
+  {
+   "id": "TTC-C000101.7.8",
+   "bits": "0101.7.8",
+   "name_cn": "复位计数",
+   "formula": "F=UX",
+   "name_en": "n_reset"
+  },
+  {
+   "id": "TTC-C000102.7.8",
+   "bits": "0102.7.8",
+   "name_cn": "复位标识",
+   "formula": "F=HX",
+   "name_en": "flag_reset"
+  },
+  {
+   "id": "TTC-C000103.7.8",
+   "bits": "0103.7.8",
+   "name_cn": "系统状态标识",
+   "formula": "F=HX",
+   "name_en": "flag_sys"
+  },
+  {
+   "id": "TTC-C000104.7.32",
+   "bits": "0104.7.32",
+   "name_cn": "ARM运行时间",
+   "formula": "F=UX",
+   "name_en": "runtime_arm"
+  },
+  {
+   "id": "TTC-C000108.7.32",
+   "bits": "0108.7.32",
+   "name_cn": "AVR运行时间",
+   "formula": "F=UX",
+   "name_en": "runtime_avr"
+  },
+  {
+   "id": "TTC-C000112.7.32",
+   "bits": "0112.7.32",
+   "name_cn": "CTCSS检测",
+   "formula": "F=FX",
+   "name_en": "ctcss_det"
+  },
+  {
+   "id": "TTC-C000116.7.32",
+   "bits": "0116.7.32",
+   "name_cn": "CTCSS计数",
+   "formula": "F=UX",
+   "name_en": "ctcss_count"
+  }
+ ]
+}

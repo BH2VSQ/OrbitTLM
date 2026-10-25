@@ -1,0 +1,92 @@
+{
+ "packet": "TTC-S2",
+ "main_type": 1,
+ "sub_type": 2,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "TTC-C20000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "id_0",
+   "formula": "F=HX",
+   "name_en": "id_0"
+  },
+  {
+   "id": "TTC-C20001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "id_1",
+   "formula": "F=HX",
+   "name_en": "id_1"
+  },
+  {
+   "id": "TTC-C20002.7.8",
+   "bits": "0002.7.8",
+   "name_cn": "ADF7021锁定检测",
+   "formula": "F=HX",
+   "name_en": "adf7021_ld"
+  },
+  {
+   "id": "TTC-C20003.7.8",
+   "bits": "0003.7.8",
+   "name_cn": "错误标识",
+   "formula": "F=HX",
+   "name_en": "err_flag"
+  },
+  {
+   "id": "TTC-C20004.7.32",
+   "bits": "0004.7.32",
+   "name_cn": "AGC寄存器",
+   "formula": "F=HX",
+   "name_en": "agc_reg"
+  },
+  {
+   "id": "TTC-C20008.7.16",
+   "bits": "0008.7.16",
+   "name_cn": "232发送计数",
+   "formula": "F=UX",
+   "name_en": "n_tx_232"
+  },
+  {
+   "id": "TTC-C200010.7.16",
+   "bits": "0010.7.16",
+   "name_cn": "232接收计数",
+   "formula": "F=UX",
+   "name_en": "n_tx_232"
+  },
+  {
+   "id": "TTC-C200012.7.32",
+   "bits": "0012.7.32",
+   "name_cn": "运行时间",
+   "formula": "F=UX",
+   "name_en": "runtime"
+  },
+  {
+   "id": "TTC-C200016.7.16",
+   "bits": "0016.7.16",
+   "name_cn": "模拟RSSI",
+   "formula": "F=HX",
+   "name_en": "rssi_analog"
+  },
+  {
+   "id": "TTC-C200018.7.8",
+   "bits": "0018.7.8",
+   "name_cn": "失锁计数",
+   "formula": "F=UX",
+   "name_en": "unlock_count"
+  },
+  {
+   "id": "TTC-C200019.7.8",
+   "bits": "0019.7.8",
+   "name_cn": "复位标识",
+   "formula": "F=HX",
+   "name_en": "reset_flag"
+  },
+  {
+   "id": "TTC-C200020.7.32",
+   "bits": "0020.7.32",
+   "name_cn": "复位计数",
+   "formula": "F=UX",
+   "name_en": "reset_count"
+  }
+ ]
+}
