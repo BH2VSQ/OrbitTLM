@@ -36,6 +36,7 @@
 #include <QVBoxLayout>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 using orbit::BusinessPacket;
 using orbit::EngineeringField;
