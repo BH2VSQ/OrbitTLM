@@ -20,6 +20,8 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QProcess>
+#include <QProgressBar>
+#include <QSet>
 #include <QQuaternion>
 #include <QSaveFile>
 #include <QSignalBlocker>
@@ -577,6 +579,31 @@ void MainWindow::scanSsdv(){
                          "候选≠已验证，JPEG 还原需要外部解码工具。")
                              .arg(imageApid_->value()).arg(images_.size()));
     if(imageMetric_)imageMetric_->setText(QString::number(images_.size()));
+    if(!images_.isEmpty())updateImageProgress(images_.first().imageId);
+    else{
+        imageCoverage_->setRange(0,1);
+        imageCoverage_->setValue(0);
+        imageCoverage_->setFormat(QStringLiteral("尚无观测序号"));
+        imageCoverageNote_->setText(QStringLiteral("尚无候选分片 · 总包数未知"));
+    }
+}
+void MainWindow::updateImageProgress(int imageId){
+    QSet<int> unique;
+    int lo=std::numeric_limits<int>::max(),hi=-1;
+    for(const auto &p:images_)if(p.imageId==imageId){
+        unique.insert(p.packetId);
+        lo=std::min(lo,p.packetId);hi=std::max(hi,p.packetId);
+    }
+    if(hi<lo)return;
+    const int span=hi-lo+1;
+    const int missing=span-unique.size();
+    imageCoverage_->setRange(0,std::max(1,span));
+    imageCoverage_->setValue(unique.size());
+    imageCoverage_->setFormat(QStringLiteral("已观测 %v / %m 个序号"));
+    imageCoverageNote_->setText(QStringLiteral(
+       "图像 ID %1 · 观测包序号 %2–%3 · 范围内缺口 %4 个 · 总包数未知，"
+       "此进度只反映观测序号跨度，不是图片完整度")
+       .arg(imageId).arg(lo).arg(hi).arg(missing));
 }
 void MainWindow::exportSsdv(){
     if(images_.isEmpty()){

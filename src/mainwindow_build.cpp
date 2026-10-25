@@ -25,6 +25,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSlider>
@@ -495,6 +496,13 @@ void MainWindow::buildImages(QTabWidget *tabs){
     row->addWidget(decode);
     row->addStretch(1);
     layout->addLayout(row);
+    imageCoverageNote_=subtitle(QStringLiteral("总分片数未知 · 无法推断整幅图片完成度"));
+    layout->addWidget(imageCoverageNote_);
+    imageCoverage_=new QProgressBar;
+    imageCoverage_->setRange(0,1);
+    imageCoverage_->setValue(0);
+    imageCoverage_->setFormat(QStringLiteral("尚无观测序号"));
+    layout->addWidget(imageCoverage_);
     auto *split=new QSplitter(Qt::Horizontal);
     imagePreview_=new ImagePreview;
     split->addWidget(imagePreview_);
@@ -507,6 +515,10 @@ void MainWindow::buildImages(QTabWidget *tabs){
     split->setSizes({550,430});
     layout->addWidget(split,1);
     connect(scan,&QPushButton::clicked,this,[this]{scanSsdv();});
+    connect(imageTable_,&QTableWidget::itemSelectionChanged,this,[this]{
+        const int idx=imageTable_->currentRow();
+        if(idx>=0&&idx<images_.size())updateImageProgress(images_[idx].imageId);
+    });
     connect(save,&QPushButton::clicked,this,[this]{exportSsdv();});
     connect(decode,&QPushButton::clicked,this,[this]{decodeSsdv();});
     tabs->addTab(page,QStringLiteral("图像数据"));

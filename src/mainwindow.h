@@ -22,6 +22,7 @@ class QTreeWidget;
 class QTreeWidgetItem;
 class QTimer;
 class QSpinBox;
+class QProgressBar;
 class QStackedWidget;
 class QFrame;
 class AttitudeWidget;
@@ -64,6 +65,7 @@ private:
     void exportSsdv();
     void decodeSsdv();
     void scanSsdv();
+    void updateImageProgress(int imageId);
     QString satellite() const;
     QString eventTitle(const orbit::BusinessPacket &packet) const;
     QString qualityLabel(const QString &status) const;
@@ -112,4 +114,6 @@ private:
     QLabel *quaternion_[4]{};
     QLabel *normLabel_=nullptr;
     QSpinBox *imageApid_=nullptr;
+    QProgressBar *imageCoverage_=nullptr;
+    QLabel *imageCoverageNote_=nullptr;
 };
