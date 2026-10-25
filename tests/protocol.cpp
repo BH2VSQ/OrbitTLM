@@ -393,6 +393,18 @@ private slots:
         QVERIFY(j.value("spacecraft_utc").isNull());
         QCOMPARE(j.value("integrity").toString(),QString("not_crc_verified"));
     }
+    void unknownTelemetrySubtypeRemainsOpaque(){
+        BusinessCatalog catalog;QString err;
+        QVERIFY2(catalog.loadDirectory(QCoreApplication::applicationDirPath()+
+                 "/protocols/asrtu1",&err),qPrintable(err));
+        ApplicationPacket p;p.bytes=QByteArray::fromHex("08f0fba100bf0f127482d900");
+        const auto b=catalog.decode(p);
+        QVERIFY(b.packetName.isEmpty());
+        QCOMPARE(b.mainType,0xf0);
+        QCOMPARE(b.subType,0x0f);
+        QCOMPARE(b.fields.size(),0);
+        QCOMPARE(b.identification,QString("unmatched_legacy_envelope_candidate"));
+    }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
         QVERIFY(f.complete);

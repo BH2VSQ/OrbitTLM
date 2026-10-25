@@ -228,7 +228,19 @@ BusinessPacket BusinessCatalog::decode(const ApplicationPacket &packet)const{
             out.identification="legacy_kiss_envelope_candidate";
         }
     }
-    if(!kind)return out;
+    if(!kind){
+        // Candidate envelope identifiers are diagnostic only, NOT a packet match.
+        if(bytes.size()>8){
+            out.mainType=at(bytes,1);out.subType=at(bytes,6);
+            out.identification="unmatched_legacy_envelope_candidate";
+        }else{
+            out.mainType=at(bytes,0);out.subType=at(bytes,1);
+            out.identification="unmatched_native_prefix_candidate";
+        }
+        out.packetLabel=QString("Unknown candidate %1/%2")
+           .arg(out.mainType,2,16,QChar('0')).arg(out.subType,2,16,QChar('0')).toUpper();
+        return out;
+    }
     out.packetName=kind->name;out.mainType=kind->main;out.subType=kind->sub;
     out.packetLabel=kind->name;
     for(const Definition &d:kind->fields){

@@ -485,7 +485,7 @@ private:
             const QStringList cols={
                 b.transport.captureLocal.isValid()
                     ?b.transport.captureLocal.toString("yyyy-MM-dd HH:mm:ss.zzz"):"(unknown)",
-                b.packetName.isEmpty()?"(unknown)":b.packetName,
+                b.packetName.isEmpty()?b.packetLabel:b.packetName,
                 b.mainType<0?"":QString("0x%1").arg(b.mainType,2,16,QChar('0')).toUpper(),
                 b.subType<0?"":QString::number(b.subType),
                 QString("%1 / %2").arg(b.fields.size()).arg(b.skippedFields),
