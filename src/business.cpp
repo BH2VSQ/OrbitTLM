@@ -184,9 +184,11 @@ bool BusinessCatalog::loadDirectory(const QString &directory,QString *error){
             if(loc.size()!=3){if(error)*error="Malformed bit position "+d.bits;return false;}
             bool a=false,b=false,c=false;
             d.offset=loc[0].toInt(&a);d.msb=loc[1].toInt(&b);d.length=loc[2].toInt(&c);
-            if(!a||!b||!c||d.offset<0||d.msb<0||d.msb>7||d.length<1||d.length>65536){
-                if(error)*error="Invalid field range "+d.bits;return false;
-            }
+            // Published mission tables contain occasional malformed ranges
+            // (e.g. negative length). Preserve their identities as invalid,
+            // not silently "fix" them and not reject all other telemetry fields.
+            if(!a||!b||!c||d.offset<0||d.msb<0||d.msb>7||d.length<1||d.length>65536)
+                d.length=-1;
             kind.fields.push_back(d);
         }
         const quint32 identity=key(kind.main,kind.sub);
@@ -225,6 +227,12 @@ BusinessPacket BusinessCatalog::decode(const ApplicationPacket &packet)const{
     out.packetName=kind->name;out.mainType=kind->main;out.subType=kind->sub;
     out.packetLabel=kind->name;
     for(const Definition &d:kind->fields){
+        if(d.length<1){
+            out.fields.push_back({d.code,d.bits,d.nameCn,d.nameEn,d.formula,
+                                  "","","","","invalid_source_bit_position"});
+            ++out.skippedFields;
+            continue;
+        }
         Raw raw;
         if(!readBits(payload,d.offset,d.msb,d.length,raw)){
             ++out.skippedFields;continue;
