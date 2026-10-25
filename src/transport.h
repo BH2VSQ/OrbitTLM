@@ -26,6 +26,7 @@ struct ApplicationPacket {
     QDateTime captureLocal;         // no spacecraft UTC implied
     QString timestampBasis = "unknown";
     QString crcStatus = "not_checked";
+    QString fecEvidence = "unknown";
     QString classification = "opaque_variable_length";
     QString diagnostic;
     int vcid = -1;
