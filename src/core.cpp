@@ -1,0 +1,292 @@
+#include "core.h"
+#include <QCryptographicHash>
+#include <QFile>
+#include <QHash>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QRegularExpression>
+#include <QSaveFile>
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QTextStream>
+#include <QUuid>
+#include <QtEndian>
+#include <algorithm>
+#include <bit>
+#include <cmath>
+namespace orbit {
+namespace {
+int byte(const QByteArray &data,int pos) { return static_cast<unsigned char>(data.at(pos)); }
+QString sha(const QByteArray &data) {
+    return QString::fromLatin1(QCryptographicHash::hash(data,QCryptographicHash::Sha256).toHex());
+}
+bool kiss(const QByteArray &encoded,QByteArray &out) {
+    out.clear();
+    for (int i=0;i<encoded.size();++i) {
+        const int c=byte(encoded,i);
+        if(c!=0xdb) { out.append(char(c));continue; }
+        if(i+1==encoded.size()) return false;
+        const int next=byte(encoded,++i);
+        if(next==0xdc) out.append(char(0xc0));
+        else if(next==0xdd)out.append(char(0xdb));
+        else return false;
+    }
+    return true;
+}
+QString escaped(QString s) {s.replace('"',"\"\"");return "\""+s+"\"";}
+QString hex(const QByteArray &x) {return QString::fromLatin1(x.toHex(' ').toUpper());}
+void candidateQuaternion(Frame &f) {
+    // Observed candidate, NOT identified as actual spacecraft attitude.
+    if(f.satellite!="ASRTU-1" || f.apid!=0x0f0 || f.payload.size()<156) return;
+    float q[4]{};double norm=0.0;
+    for(int i=0;i<4;++i){
+        const quint32 bits=qFromBigEndian<quint32>(
+            reinterpret_cast<const uchar*>(f.payload.constData()+140+4*i));
+        q[i]=std::bit_cast<float>(bits);
+        if(!std::isfinite(q[i]))return;
+        norm+=double(q[i])*q[i];
+    }
+    if(std::abs(norm-1.0)>0.001)return;
+    for(int i=0;i<4;i++)f.fields.push_back({
+        QString("candidate.quaternion.q%1").arg(i),
+        QString::number(double(q[i]),'g',10),"","candidate_unverified"});
+    f.fields.push_back({"candidate.quaternion.norm",
+        QString::number(std::sqrt(norm),'g',10),"","candidate_unverified"});
+}
+}
+Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
+    Frame f;f.bytes=raw;f.hash=sha(raw);f.satellite=satellite;
+    if(raw.size()!=223){f.error="Incomplete/non-223-byte record";return f;}
+    const int b0=byte(raw,0),b1=byte(raw,1);
+    if((b0>>6)!=0){f.error="Unsupported TM version";return f;}
+    f.master=byte(raw,2);f.virtualCount=byte(raw,3);f.vcid=(b1>>1)&7;
+    if(f.vcid!=0 && f.vcid!=2) {
+        f.error="Unrecognized VCID; preserved without guessed application decoding";return f;
+    }
+    const int start=raw.indexOf(char(0xc0),5);
+    if(start<0){f.error="Missing KISS opening delimiter (or continuation)";return f;}
+    const int end=raw.indexOf(char(0xc0),start+1);
+    if(end<0){f.error="Missing KISS closing delimiter (or continuation)";return f;}
+    QByteArray packet;
+    if(!kiss(raw.mid(start+1,end-start-1),packet)) {
+        f.error="Malformed KISS escape";return f;
+    }
+    if(packet.size()<7){f.error="Short CCSDS Space Packet";return f;}
+    const int header=(byte(packet,0)<<8)|byte(packet,1);
+    const int seq=(byte(packet,2)<<8)|byte(packet,3);
+    const int length=((byte(packet,4)<<8)|byte(packet,5))+1;
+    if((header>>13)!=0){f.error="Unexpected CCSDS packet version";return f;}
+    if(packet.size()!=length+6){
+        f.error=QString("Space Packet size %1 != declared %2").arg(packet.size()).arg(length+6);return f;
+    }
+    f.complete=true;f.apid=header&0x7ff;f.sequence=seq&0x3fff;
+    f.payload=packet.mid(6);f.quality="structural_only";
+    f.error="No parity bytes available: RS validity cannot be independently certified";
+    f.fields.push_back({"ccsds.apid",QString::number(f.apid),"","verified_protocol"});
+    f.fields.push_back({"ccsds.vcid",QString::number(f.vcid),"","verified_protocol"});
+    f.fields.push_back({"ccsds.sequence",QString::number(f.sequence),"","verified_protocol"});
+    candidateQuaternion(f);
+    return f;
+}
+QVector<Frame> Protocol::fromLog(const QString &path,const QString &satellite,QString *error){
+    QFile file(path);
+    if(!file.open(QIODevice::ReadOnly|QIODevice::Text)){
+        if(error)*error=file.errorString();return {};
+    }
+    const QRegularExpression tag(
+        R"(^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+) FEC frame #\d+ \[([^\]]+)\])");
+    const QRegularExpression row(R"(^[0-9A-Fa-f]{4}:\s+((?:[0-9A-Fa-f]{2}\s*){1,16})$)");
+    QVector<Frame> records;QByteArray buffer;QString when,route;bool active=false;
+    auto flush=[&]{
+        if(buffer.isEmpty())return;
+        Frame f=parse(buffer,satellite);
+        f.sources.push_back("log:"+route);
+        f.captureLocal=QDateTime::fromString(when,"yyyy-MM-dd HH:mm:ss.zzz");
+        f.timeBasis="logger_local_unverified";
+        if(f.complete)f.quality="log_fec_reported";
+        records.push_back(std::move(f));buffer.clear();
+    };
+    QTextStream in(&file);
+    while(!in.atEnd()){
+        const QString line=in.readLine().trimmed();
+        const auto hdr=tag.match(line);
+        if(hdr.hasMatch()){
+            flush();active=true;when=hdr.captured(1);route=hdr.captured(2);continue;
+        }
+        if(!active)continue;
+        const auto hexRow=row.match(line);
+        if(hexRow.hasMatch()){
+            QString s=hexRow.captured(1);
+            s.remove(QRegularExpression(R"(\s+)"));
+            buffer+=QByteArray::fromHex(s.toLatin1());
+        }else if(line.size()>=19 && line.at(4)=='-' && line.at(7)=='-' &&
+                 line.at(10)==' ' && line.at(13)==':' && !line.contains("FEC frame")){
+            flush();active=false;
+        }
+    }
+    flush();return records;
+}
+QVector<Frame> Protocol::fromBin(const QString &path,const QString &satellite,QString *error){
+    QFile file(path);
+    if(!file.open(QIODevice::ReadOnly)){
+        if(error)*error=file.errorString();return {};
+    }
+    QVector<Frame> records;int index=0;
+    while(true){
+        const QByteArray raw=file.read(223);
+        if(raw.isEmpty())break;
+        Frame f=parse(raw,satellite);
+        f.sources.push_back("bin:block:"+QString::number(index++));
+        records.push_back(std::move(f));
+    }
+    return records;
+}
+QVector<Frame> Protocol::fuse(const QVector<Frame> &logs,const QVector<Frame> &bins,Stats *stats){
+    Stats s;s.logObservations=logs.size();s.binBlocks=bins.size();
+    QHash<QString,int> seen;QVector<Frame> result;
+    auto insert=[&](const Frame &f){
+        const auto it=seen.constFind(f.hash);
+        if(it!=seen.constEnd()){
+            Frame &prior=result[*it];
+            ++s.duplicates;
+            for(const QString &src:f.sources)if(!prior.sources.contains(src))prior.sources<<src;
+            if(!prior.captureLocal.isValid() && f.captureLocal.isValid()){
+                prior.captureLocal=f.captureLocal;prior.timeBasis=f.timeBasis;
+            }
+            if(f.quality=="log_fec_reported" && prior.complete)prior.quality=f.quality;
+        }else{
+            seen.insert(f.hash,result.size());result.push_back(f);
+        }
+    };
+    for(const Frame &f:logs)insert(f);
+    for(const Frame &f:bins)insert(f);
+    std::stable_sort(result.begin(),result.end(),[](const Frame &a,const Frame &b){
+        if(a.captureLocal.isValid()!=b.captureLocal.isValid())return a.captureLocal.isValid();
+        return a.captureLocal<b.captureLocal;
+    });
+    s.unique=result.size();
+    for(const Frame &f:result){
+        if(!f.complete)++s.invalid;
+        else if(f.quality=="log_fec_reported")++s.trustedFromLog;
+        else ++s.structuralOnly;
+    }
+    if(stats)*stats=s;
+    return result;
+}
+QJsonObject Protocol::toJson(const Frame &f){
+    QJsonObject object{{"hash",f.hash},{"satellite",f.satellite},
+        {"capture_local",f.captureLocal.isValid()?f.captureLocal.toString(Qt::ISODateWithMs):QString()},
+        {"time_basis",f.timeBasis},{"spacecraft_utc",QJsonValue::Null},
+        {"quality",f.quality},{"diagnostic",f.error},
+        {"master_count",f.master},{"virtual_count",f.virtualCount},
+        {"vcid",f.vcid},{"apid",f.apid},{"sequence",f.sequence},
+        {"complete",f.complete},{"raw_hex",hex(f.bytes)},{"payload_hex",hex(f.payload)}};
+    QJsonArray fields,sources;
+    for(const auto &x:f.sources)sources.append(x);
+    for(const auto &x:f.fields)fields.append(
+        QJsonObject{{"name",x.name},{"value",x.value},{"unit",x.unit},{"status",x.status}});
+    object.insert("sources",sources);object.insert("fields",fields);return object;
+}
+bool Protocol::exportCsv(const QString &path,const QVector<Frame> &frames,QString *error){
+    QSaveFile f(path);
+    if(!f.open(QIODevice::WriteOnly|QIODevice::Text)){
+        if(error)*error=f.errorString();return false;
+    }
+    QTextStream out(&f);
+    out<<"satellite,capture_local,time_basis,spacecraft_utc,master,vcid,apid,sequence,quality,field,value,unit,field_status,sha256\n";
+    for(const Frame &frame:frames){
+        const QString left=escaped(frame.satellite)+","+
+            escaped(frame.captureLocal.isValid()?frame.captureLocal.toString(Qt::ISODateWithMs):QString())+","+
+            escaped(frame.timeBasis)+",,"+QString::number(frame.master)+","+
+            QString::number(frame.vcid)+","+QString::number(frame.apid)+","+
+            QString::number(frame.sequence)+","+escaped(frame.quality)+",";
+        if(frame.fields.isEmpty())out<<left<<",,,,"<<escaped(frame.hash)<<"\n";
+        for(const auto &x:frame.fields)
+            out<<left<<escaped(x.name)<<","<<escaped(x.value)<<","<<escaped(x.unit)<<","<<
+                escaped(x.status)<<","<<escaped(frame.hash)<<"\n";
+    }
+    if(!f.commit()){if(error)*error=f.errorString();return false;}
+    return true;
+}
+bool Protocol::exportJson(const QString &path,const QVector<Frame> &frames,QString *error){
+    QJsonArray array;
+    for(const auto &f:frames)array.append(toJson(f));
+    QSaveFile file(path);
+    if(!file.open(QIODevice::WriteOnly)){if(error)*error=file.errorString();return false;}
+    file.write(QJsonDocument(array).toJson(QJsonDocument::Indented));
+    if(!file.commit()){if(error)*error=file.errorString();return false;}
+    return true;
+}
+Database::Database():connection_("OrbitTLM_"+QUuid::createUuid().toString(QUuid::WithoutBraces)){}
+Database::~Database(){db_={};QSqlDatabase::removeDatabase(connection_);}
+bool Database::open(const QString &path,QString *error){
+    db_=QSqlDatabase::addDatabase("QSQLITE",connection_);
+    db_.setDatabaseName(path);
+    if(!db_.open()){if(error)*error=db_.lastError().text();return false;}
+    QSqlQuery query(db_);
+    const QStringList statements={
+        "PRAGMA foreign_keys = ON",
+        "CREATE TABLE IF NOT EXISTS sessions(id INTEGER PRIMARY KEY, name TEXT NOT NULL, imported_utc TEXT NOT NULL)",
+        "CREATE TABLE IF NOT EXISTS frames(id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES sessions(id), hash TEXT NOT NULL, satellite TEXT, "
+        "capture_local TEXT, time_basis TEXT, quality TEXT, diagnostic TEXT, master INTEGER, virtual_count INTEGER, vcid INTEGER, apid INTEGER, "
+        "sequence INTEGER, sources TEXT, raw BLOB, payload BLOB, UNIQUE(session_id,hash))",
+        "CREATE TABLE IF NOT EXISTS fields(id INTEGER PRIMARY KEY, frame_id INTEGER NOT NULL REFERENCES frames(id), name TEXT, value TEXT, unit TEXT, status TEXT)",
+        "CREATE INDEX IF NOT EXISTS frame_time ON frames(session_id,capture_local)",
+        "CREATE INDEX IF NOT EXISTS field_name ON fields(name)"
+    };
+    for(const QString &sql:statements)if(!query.exec(sql)){
+        if(error)*error=query.lastError().text();return false;
+    }
+    return true;
+}
+bool Database::save(const QString &name,const QVector<Frame> &frames,QString *error){
+    if(!db_.isOpen()){if(error)*error="Database not open";return false;}
+    if(!db_.transaction()){if(error)*error=db_.lastError().text();return false;}
+    QSqlQuery session(db_);
+    session.prepare("INSERT INTO sessions(name,imported_utc) VALUES(?,?)");
+    session.addBindValue(name);
+    session.addBindValue(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+    if(!session.exec()){if(error)*error=session.lastError().text();db_.rollback();return false;}
+    const auto sessionId=session.lastInsertId().toLongLong();
+    QSqlQuery insert(db_),field(db_);
+    insert.prepare("INSERT INTO frames(session_id,hash,satellite,capture_local,time_basis,quality,diagnostic,master,virtual_count,vcid,apid,sequence,sources,raw,payload) "
+                   "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    field.prepare("INSERT INTO fields(frame_id,name,value,unit,status) VALUES(?,?,?,?,?)");
+    for(const Frame &f:frames){
+        insert.bindValue(0,sessionId);insert.bindValue(1,f.hash);insert.bindValue(2,f.satellite);
+        insert.bindValue(3,f.captureLocal.isValid()?QVariant(f.captureLocal.toString(Qt::ISODateWithMs)):QVariant());
+        insert.bindValue(4,f.timeBasis);insert.bindValue(5,f.quality);insert.bindValue(6,f.error);
+        insert.bindValue(7,f.master);insert.bindValue(8,f.virtualCount);insert.bindValue(9,f.vcid);
+        insert.bindValue(10,f.apid);insert.bindValue(11,f.sequence);
+        insert.bindValue(12,f.sources.join(';'));insert.bindValue(13,f.bytes);insert.bindValue(14,f.payload);
+        if(!insert.exec()){if(error)*error=insert.lastError().text();db_.rollback();return false;}
+        const auto frameId=insert.lastInsertId().toLongLong();
+        for(const auto &x:f.fields){
+            field.bindValue(0,frameId);field.bindValue(1,x.name);field.bindValue(2,x.value);
+            field.bindValue(3,x.unit);field.bindValue(4,x.status);
+            if(!field.exec()){if(error)*error=field.lastError().text();db_.rollback();return false;}
+        }
+    }
+    if(!db_.commit()){if(error)*error=db_.lastError().text();return false;}
+    return true;
+}
+LiveTcp::LiveTcp(QObject *parent):QObject(parent){
+    connect(&socket_,&QTcpSocket::readyRead,this,[this]{
+        queued_+=socket_.readAll();
+        while(queued_.size()>=223){
+            const QByteArray bytes=queued_.left(223);queued_.remove(0,223);
+            Frame frame=Protocol::parse(bytes,satellite_);
+            frame.sources<<"live:tcp";frame.captureLocal=QDateTime::currentDateTime();
+            frame.timeBasis="receiver_local";
+            emit received(frame);
+        }
+    });
+    connect(&socket_,&QTcpSocket::connected,this,[this]{emit status("Connected");});
+    connect(&socket_,&QTcpSocket::disconnected,this,[this]{emit status("Disconnected");});
+    connect(&socket_,&QTcpSocket::errorOccurred,this,[this](auto){emit status(socket_.errorString());});
+}
+void LiveTcp::start(const QString &host,quint16 port,const QString &satellite){
+    socket_.abort();queued_.clear();satellite_=satellite;socket_.connectToHost(host,port);
+}
+void LiveTcp::stop(){socket_.disconnectFromHost();queued_.clear();}
+}
