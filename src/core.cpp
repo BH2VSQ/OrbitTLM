@@ -217,6 +217,35 @@ bool Protocol::exportJson(const QString &path,const QVector<Frame> &frames,QStri
     if(!file.commit()){if(error)*error=file.errorString();return false;}
     return true;
 }
+bool Protocol::exportAttitudeCsv(const QString &path,const QVector<Frame> &frames,QString *error){
+    QSaveFile output(path);
+    if(!output.open(QIODevice::WriteOnly|QIODevice::Text)){
+        if(error)*error=output.errorString();return false;
+    }
+    QTextStream csv(&output);
+    csv<<"satellite,capture_local,time_basis,spacecraft_utc,q0,q1,q2,q3,norm,quality,semantic_status,frame_sha256\n";
+    for(const auto &f:frames){
+        // Only FEC-reported records: physical attitude semantics still unverified.
+        if(f.quality!="log_fec_reported")continue;
+        QString values[5];bool has[5]={false,false,false,false,false};
+        const QString names[5]={"candidate.quaternion.q0","candidate.quaternion.q1",
+             "candidate.quaternion.q2","candidate.quaternion.q3","candidate.quaternion.norm"};
+        for(const auto &field:f.fields)
+            for(int i=0;i<5;++i)if(field.name==names[i]&&field.status=="candidate_unverified"){
+                values[i]=field.value;has[i]=true;
+            }
+        if(!std::all_of(std::begin(has),std::end(has),[](bool x){return x;}))continue;
+        csv<<escaped(f.satellite)<<","<<
+             escaped(f.captureLocal.toString(Qt::ISODateWithMs))<<","<<
+             escaped(f.timeBasis)<<",";
+        // Empty spacecraft_utc is intentional; do not mislabel recorder time as satellite UTC.
+        csv<<",";
+        for(const auto &v:values)csv<<v<<",";
+        csv<<escaped(f.quality)<<",candidate_unverified,"<<escaped(f.hash)<<"\n";
+    }
+    if(!output.commit()){if(error)*error=output.errorString();return false;}
+    return true;
+}
 Database::Database():connection_("OrbitTLM_"+QUuid::createUuid().toString(QUuid::WithoutBraces)){}
 Database::~Database(){db_={};QSqlDatabase::removeDatabase(connection_);}
 bool Database::open(const QString &path,QString *error){
