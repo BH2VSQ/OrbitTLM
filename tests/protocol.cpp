@@ -500,15 +500,17 @@ private slots:
         const auto falseKiss=Transport::reassemble(frames,&stats);
         QCOMPARE(falseKiss.size(),0);
         const auto images=By04Decoder::images(frames);
-        QVERIFY(images.size()>=9);
-        int crcPass=0;
+        QCOMPARE(images.size(),11);
+        int crcPass=0,crcFail=0;
         for(const auto &packet:images){
             QCOMPARE(packet.bytes.size(),218);
             if(packet.status=="dslwp_crc32_pass")++crcPass;
-            QCOMPARE(packet.width,320);
-            QCOMPARE(packet.height,240);
+            if(packet.status=="dslwp_crc32_failed")++crcFail;
+            QCOMPARE(packet.width,640);
+            QCOMPARE(packet.height,480);
         }
-        QVERIFY(crcPass>=7);
+        QCOMPARE(crcPass,10);
+        QCOMPARE(crcFail,1);
     }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
