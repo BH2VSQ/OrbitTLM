@@ -1,5 +1,6 @@
 #pragma once
 #include "core.h"
+#include "transport.h"
 #include <QVector>
 namespace orbit {
 struct ImagePacket {
@@ -12,6 +13,7 @@ struct ImagePacket {
 class ImageTools {
 public:
     static QVector<ImagePacket> candidates(const QVector<Frame> &frames,int apid);
+    static QVector<ImagePacket> candidatesFromKiss(const QVector<ApplicationPacket> &packets,int apid);
     static bool savePackets(const QVector<ImagePacket> &packets,const QString &filename,QString *error=nullptr);
 };
 }
