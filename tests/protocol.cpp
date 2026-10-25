@@ -261,6 +261,18 @@ private slots:
         QCOMPARE(packets.size(),0);
         QCOMPARE(stats.interruptedByCounterGap,1);
     }
+    void malformedKissEscapeMustNotProducePacket(){
+        QByteArray tm(223,char(0xc0));
+        tm.replace(0,5,QByteArray::fromHex("2054010100"));
+        tm[5]=char(0xc0);tm[6]=char(0x33);tm[7]=char(0xdb);
+        tm[8]=char(0xc0); // unexpected FEND, not TFEND/TFESC
+        auto f=Protocol::parse(tm,"ASRTU-1");
+        TransportStats stats;
+        const auto packets=Transport::reassemble({f},{},PacketFilter::PreserveAll,&stats);
+        QCOMPARE(packets.size(),0);
+        QCOMPARE(stats.malformedEscapePackets,1);
+        QCOMPARE(stats.decodedPackets,0);
+    }
     void standardCrcVectorsRemainDistinctFromMissionCrc(){
         const QByteArray msg("123456789");
         CrcConfig x25;
