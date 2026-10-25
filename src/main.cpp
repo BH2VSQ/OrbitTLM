@@ -1,4 +1,7 @@
 #include "core.h"
+#include "schema.h"
+#include <QFileInfo>
+#include <QSignalBlocker>
 #include <QApplication>
 #include <QAction>
 #include <QChart>
@@ -100,6 +103,21 @@ public:
             updatePaths();
         });
         menu->addAction("Import chosen sources",[this]{loadSession();});
+        menu->addAction("Load telemetry schema...",[this]{
+            const QString path=QFileDialog::getOpenFileName(this,"Load JSON telemetry schema",{},"JSON (*.json)");
+            if(path.isEmpty())return;
+            Schema candidate;QString why;
+            if(!candidate.load(path,&why)){QMessageBox::warning(this,"Invalid schema",why);return;}
+            if(candidate.satellite()!=selectedSatellite()){
+                QMessageBox::warning(this,"Satellite mismatch","Schema is for "+candidate.satellite());return;
+            }
+            schema_=candidate;hasSchema_=true;
+            for(auto &frame:frames_)schema_.apply(frame);
+            for(const auto &name:schema_.names())if(chartSelect_->findText(name)<0)
+                chartSelect_->addItem(name);
+            fillTable();updateChart();
+            statusBar()->showMessage("Loaded "+path+" (engineering semantics require independent validation)",8000);
+        });
         menu->addSeparator();
         menu->addAction("Export CSV",[this]{exportFile(true);});
         menu->addAction("Export JSON",[this]{exportFile(false);});
@@ -240,6 +258,9 @@ private:
         auto bins=binPath_.isEmpty()?QVector<Frame>{}:Protocol::fromBin(binPath_,sat,&err);
         if(!err.isEmpty()){QMessageBox::warning(this,"BIN import",err);return;}
         frames_=Protocol::fuse(logs,bins,&stats_);
+        if(hasSchema_ && schema_.satellite()==sat){
+            for(auto &frame:frames_)schema_.apply(frame);
+        }
         fillTable();
         timeline_->setRange(0,std::max(0,int(frames_.size())-1));
         if(!frames_.isEmpty())showFrame(0);
@@ -330,6 +351,8 @@ private:
     Database database_;
     LiveTcp *live_=nullptr;
     Stats stats_;
+    Schema schema_;
+    bool hasSchema_=false;
     QVector<Frame> frames_;
     QLabel *sources_=nullptr,*banner_=nullptr,*timeLabel_=nullptr;
     QComboBox *satellite_=nullptr,*speed_=nullptr,*chartSelect_=nullptr;
