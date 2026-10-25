@@ -25,6 +25,7 @@ jobs:
           path: |
             build/OrbitTLM
             build/OrbitTLM-cli
+            build/protocols/asrtu1/**
 
   windows:
     runs-on: windows-2022
