@@ -183,6 +183,16 @@ public:
         });
         menu->addAction("Export CSV",[this]{exportFile(true);});
         menu->addAction("Export JSON",[this]{exportFile(false);});
+        menu->addAction("Export quaternion series CSV",[this]{
+            if(frames_.isEmpty())return;
+            const QString out=QFileDialog::getSaveFileName(this,"Export quaternion time series",
+                                              "quaternion_series.csv","CSV (*.csv)");
+            if(out.isEmpty())return;
+            QString error;
+            if(!Protocol::exportAttitudeCsv(out,frames_,&error))
+                QMessageBox::warning(this,"Attitude export",error);
+            else statusBar()->showMessage("Exported candidate quaternion series (unverified semantics)",8000);
+        });
         auto bar=addToolBar("Session");
         auto chooseLog=bar->addAction("LOG");connect(chooseLog,&QAction::triggered,this,[this]{
             logPath_=QFileDialog::getOpenFileName(this,"Select log",{},"Log files (*.log *.txt);;All files (*)");
@@ -387,16 +397,22 @@ private:
         auto chart=new QChart;
         auto series=new QLineSeries(chart);
         const QString requested=chartSelect_->currentText();
+        QDateTime firstTime;
+        for(const auto &f:frames_)if(f.captureLocal.isValid()) {firstTime=f.captureLocal;break;}
         for(int i=0;i<frames_.size();++i){
             const Frame &f=frames_[i];
             if(f.quality!="log_fec_reported")continue;
             for(const auto &x:f.fields)if(x.name==requested){
                 bool ok=false;double value=x.value.toDouble(&ok);
-                if(ok&&std::isfinite(value))series->append(i,value);
+                if(ok&&std::isfinite(value)) {
+                    const double xsec=(firstTime.isValid()&&f.captureLocal.isValid())
+                        ? firstTime.msecsTo(f.captureLocal)/1000.0 : double(i);
+                    series->append(xsec,value);
+                }
             }
         }
         chart->addSeries(series);chart->createDefaultAxes();
-        chart->setTitle(requested+" (unverified semantics; X = frame index)");
+        chart->setTitle(requested+" (unverified semantics; X = elapsed logger seconds)");
         chart_->setChart(chart);
     }
     void exportFile(bool csv){
