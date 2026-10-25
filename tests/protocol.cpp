@@ -356,6 +356,43 @@ private slots:
         QVERIFY(unknownFormula<40);
         QVERIFY(invalidSource<20);
     }
+    void ieeeFloatAndEnumBitConversion(){
+        BusinessCatalog catalog;QString err;
+        QVERIFY2(catalog.loadDirectory(QCoreApplication::applicationDirPath()+
+                 "/protocols/asrtu1",&err),qPrintable(err));
+        QByteArray bytes(220,char(0));
+        bytes[0]=char(0xAA);bytes[1]=char(0); // ZGK-S0
+        const quint32 ieee=qToBigEndian(std::bit_cast<quint32>(1.25f));
+        memcpy(bytes.data()+14,&ieee,4);
+        ApplicationPacket p;p.bytes=bytes;
+        auto rec=catalog.decode(p);
+        bool haveFloat=false;
+        for(const auto &f:rec.fields)
+            if(f.bits=="0014.7.32" && f.formula=="F=FX"){
+                haveFloat=true;
+                QVERIFY(std::abs(f.value.toDouble()-1.25)<1e-6);
+                QCOMPARE(f.status,QString("table_formula"));
+            }
+        QVERIFY(haveFloat);
+    }
+    void chronologicalBusinessExportKeepsUnknownTimeDistinct(){
+        BusinessCatalog catalog;QString err;
+        QVERIFY2(catalog.loadDirectory(QCoreApplication::applicationDirPath()+
+                 "/protocols/asrtu1",&err),qPrintable(err));
+        ApplicationPacket a,b,c;
+        a.bytes=QByteArray::fromHex("f003");
+        b.bytes=a.bytes;c.bytes=a.bytes;
+        a.captureLocal=QDateTime::fromString("2026-10-24T23:08:00",Qt::ISODate);
+        b.captureLocal=QDateTime::fromString("2026-10-24T23:06:00",Qt::ISODate);
+        const auto packets=catalog.decodeAll({a,c,b});
+        QCOMPARE(packets.size(),3);
+        QCOMPARE(packets[0].transport.captureLocal,b.captureLocal);
+        QCOMPARE(packets[1].transport.captureLocal,a.captureLocal);
+        QVERIFY(!packets[2].transport.captureLocal.isValid());
+        const auto j=BusinessCatalog::toJson(packets[2]);
+        QVERIFY(j.value("spacecraft_utc").isNull());
+        QCOMPARE(j.value("integrity").toString(),QString("not_crc_verified"));
+    }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
         QVERIFY(f.complete);

@@ -267,6 +267,14 @@ QVector<BusinessPacket> BusinessCatalog::decodeAll(const QVector<ApplicationPack
             if(f.status.startsWith("raw_"))++counts.unsupportedFields;
         decoded.push_back(std::move(result));
     }
+    // Sort only by genuine receiver timestamps. BIN-only records remain
+    // unordered in absolute UTC; they follow known-time records stably.
+    std::stable_sort(decoded.begin(),decoded.end(),[](const BusinessPacket &a,const BusinessPacket &b){
+        const auto &ta=a.transport.captureLocal,&tb=b.transport.captureLocal;
+        if(ta.isValid()!=tb.isValid())return ta.isValid();
+        if(!ta.isValid())return false;
+        return ta<tb;
+    });
     if(stats)*stats=counts;
     return decoded;
 }
