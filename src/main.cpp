@@ -162,6 +162,25 @@ public:
             job->start(tool,{"-d",input,output});
         });
         menu->addSeparator();
+        menu->addAction("Open saved session...",[this]{
+            QString problem;
+            const auto sessions=database_.sessions(&problem);
+            if(!problem.isEmpty()){QMessageBox::warning(this,"SQLite",problem);return;}
+            if(sessions.isEmpty()){QMessageBox::information(this,"Sessions","No saved sessions.");return;}
+            QStringList names;
+            for(const auto &x:sessions)names << QString("#%1 — %2").arg(x.first).arg(x.second);
+            bool ok=false;
+            const QString choice=QInputDialog::getItem(this,"History","Saved session",names,0,false,&ok);
+            if(!ok || choice.isEmpty())return;
+            const int index=names.indexOf(choice);
+            frames_=database_.load(sessions[index].first,&problem);
+            if(!problem.isEmpty()){QMessageBox::warning(this,"SQLite",problem);return;}
+            fillTable();
+            timeline_->setRange(0,std::max(0,int(frames_.size())-1));
+            if(!frames_.isEmpty())showFrame(0);
+            updateChart();
+            statusBar()->showMessage("Historical session loaded — "+choice,7000);
+        });
         menu->addAction("Export CSV",[this]{exportFile(true);});
         menu->addAction("Export JSON",[this]{exportFile(false);});
         auto bar=addToolBar("Session");
