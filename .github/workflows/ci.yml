@@ -18,6 +18,12 @@ jobs:
         run: cmake --build build --parallel 2
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: Upload Qt overview screenshot (if available)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrbitTLM-UI-preview
+          path: build/OrbitTLM-UI-preview.png
+          if-no-files-found: ignore
       - name: Archive Linux program
         uses: actions/upload-artifact@v4
         with:

@@ -13,6 +13,12 @@ private slots:
     void startupShowsChineseOverviewAndHidesDebug() {
         QStandardPaths::setTestModeEnabled(true);
         MainWindow window;
+        window.show();
+        QApplication::processEvents();
+        // Best-effort offscreen render snapshot, not a prerequisite for tests.
+        const QPixmap preview=window.grab();
+        if(!preview.isNull())
+            preview.save(QApplication::applicationDirPath()+"/OrbitTLM-UI-preview.png");
         const auto *tabs=window.findChild<QTabWidget*>("mainPages");
         QVERIFY(tabs!=nullptr);
         QVERIFY(tabs->count()>=6);

@@ -69,3 +69,18 @@ Two layouts are recognized:
 Unrecognized KISS packets remain visible and exportable without being misclassified. Published field definitions alone cannot prove application CRC validity or prove that every captured channel conveys one of these 27 packet types.
 
 Source tables may contain malformed ranges. Invalid definitions are not silently corrected; they are reported as `invalid_source_bit_position` while the remaining fields continue decoding. Unrecognized formulae also retain raw values.
+
+## 中文桌面工作台（Qt 6）
+
+默认页面为 **总览**：顶部展示真实的接收时间范围、去重传输帧、已识别/未识别业务包和 KISS 重组情况；右侧四个分系统状态面板只使用已识别的历史业务数据。不存在的工程量显示“暂无已识别的遥测参数”，而不是猜测值。
+
+左侧“**数据回放列表**”按可用接收时间展示完整重组的 KISS 业务包，支持过滤、仅显示已识别包、暂停/播放、前后移动和倍率切换。状态栏、信息卡明确区分 **日志报告 FEC 成功**、**仅结构恢复** 与 **应用 CRC 未校验**；不会把未识别的 `F0/0F` 等业务包冒充 SAT-S3。
+
+- **业务遥测**：已识别的卫星分系统包历史、按参数类别分组的中文属性、原始 HEX/位位置/公式及所选工程量时序曲线。
+- **姿态与轨道**：仅使用成功匹配 SAT-S3 字段表的 q0..q3；四元数模长、相对时序曲线及简化 3D 示意。未知的姿态坐标系、应用 CRC 和星载 UTC 不会被赋予假定的准确性。
+- **图像数据**：选定图像 APID 后扫描 SSDV 候选、按图像 ID 观测包序号跨度提示缺口、导出 SSDV、调用用户指定的可信外部解码器查看 JPEG。观测序号覆盖率 **不是** 整幅图像的完成百分比。
+- **原始数据**：KISS HEX、源帧候选 APID 和分包列表。
+- **调试信息**：通过菜单“工具 → 显示调试信息”打开，包含 MFC、VCID、帧级来源、HASH、错误与重组诊断，默认隐藏。
+- **历史会话 / 导出**：保留 SQLite 重开与已有 CLI/CSV/JSON/四元数导出，BY04 不会错误使用 ASRTU-1 字段表。
+
+UI 的 QtTest 启动及标签可见性测试纳入 Linux/Windows CI。Linux 离屏测试在支持绘制的环境会附带 `OrbitTLM-UI-preview.png` 供审阅。
