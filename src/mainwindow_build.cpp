@@ -8,6 +8,7 @@
 #include <QComboBox>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QDir>
 #include <QFont>
 #include <QFormLayout>
 #include <QFrame>
@@ -279,6 +280,7 @@ void MainWindow::buildWorkspace(){
     recognizedOnly_=new QCheckBox(QStringLiteral("仅显示已识别数据"));
     leftLayout->addWidget(recognizedOnly_);
     eventTable_=new QTableWidget(0,4);
+    eventTable_->setObjectName("eventTimeline");
     eventTable_->setHorizontalHeaderLabels({QStringLiteral("时间"),
         QStringLiteral("数据包 / 事件"),QStringLiteral("状态"),QStringLiteral("来源")});
     setupTable(eventTable_);
@@ -296,6 +298,7 @@ void MainWindow::buildWorkspace(){
     connect(recognizedOnly_,&QCheckBox::toggled,this,[this]{applyEventFilter();});
     split->addWidget(left);
     pages_=new QTabWidget;
+    pages_->setObjectName("mainPages");
     buildOverview(pages_);
     buildEngineering(pages_);
     buildAttitude(pages_);

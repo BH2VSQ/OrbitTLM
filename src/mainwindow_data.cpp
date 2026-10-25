@@ -10,6 +10,8 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QGroupBox>
+#include <QColor>
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QLabel>
