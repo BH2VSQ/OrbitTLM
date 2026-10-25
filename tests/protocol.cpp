@@ -1,5 +1,6 @@
 #include "core.h"
 #include "schema.h"
+#include "ssdv.h"
 #include <QtTest/QtTest>
 #include <QFile>
 #include <QTemporaryDir>
@@ -94,6 +95,24 @@ private slots:
         QCOMPARE(by04.fields.back().status,QString("schema_declared_unverified"));
         Frame asrtu=Protocol::parse(syntheticFrame(),"ASRTU-1");
         QCOMPARE(schema.apply(asrtu),0);
+    }
+    void ssdvOnlyWhenExplicitApidAndConsecutivePackets(){
+        QByteArray bytes(256,char(0));
+        bytes[0]=char(0x55);bytes[1]=char(0x67);
+        bytes[6]=char(2);bytes[7]=char(0);bytes[8]=char(1);
+        bytes[9]=char(20);bytes[10]=char(15);
+        Frame a,b;
+        a.apid=0x321;a.sequence=11;a.complete=true;a.quality="log_fec_reported";
+        a.payload=bytes.left(128);
+        b.apid=a.apid;b.sequence=12;b.complete=true;b.quality=a.quality;
+        b.payload=bytes.mid(128);
+        const auto found=ImageTools::candidates({a,b},0x321);
+        QCOMPARE(found.size(),1);
+        QCOMPARE(found[0].packetId,1);
+        QCOMPARE(found[0].width,320);
+        QCOMPARE(ImageTools::candidates({a,b},0x320).size(),0);
+        b.sequence=14;
+        QCOMPARE(ImageTools::candidates({a,b},0x321).size(),0);
     }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
