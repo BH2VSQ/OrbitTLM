@@ -284,9 +284,9 @@ public:
         packetControls->addWidget(crcMode_);
         packetControls->addWidget(new QLabel("CRC preset applies to entire KISS content; not mission verified"));
         packetLayout->addLayout(packetControls);
-        packetTable_=new QTableWidget(0,7);
+        packetTable_=new QTableWidget(0,8);
         packetTable_->setHorizontalHeaderLabels(
-          {"VCID","Master span","Bytes","Inner APID?","Classification","CRC","Frame count"});
+          {"VCID","Master span","Bytes","Inner APID?","Classification","CRC","FEC evidence","Frame count"});
         packetTable_->verticalHeader()->hide();
         packetTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
         packetTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -416,7 +416,7 @@ private:
                 QString("%1-%2").arg(p.firstMaster).arg(p.lastMaster),
                 QString::number(p.bytes.size()),
                 p.apid<0?"(opaque)":QString("0x%1").arg(p.apid,3,16,QChar('0')),
-                p.classification,p.crcStatus,QString::number(p.contributingFrames)};
+                p.classification,p.crcStatus,p.fecEvidence,QString::number(p.contributingFrames)};
             for(int j=0;j<columns.size();++j)
                 packetTable_->setItem(i,j,new QTableWidgetItem(columns[j]));
         }
