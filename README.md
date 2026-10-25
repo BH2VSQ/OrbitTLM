@@ -84,3 +84,11 @@ Source tables may contain malformed ranges. Invalid definitions are not silently
 - **历史会话 / 导出**：保留 SQLite 重开与已有 CLI/CSV/JSON/四元数导出，BY04 不会错误使用 ASRTU-1 字段表。
 
 UI 的 QtTest 启动及标签可见性测试纳入 Linux/Windows CI。Linux 离屏测试在支持绘制的环境会附带 `OrbitTLM-UI-preview.png` 供审阅。
+
+## Windows 下载包及 Qt DLL
+
+从 GitHub Actions 下载 **OrbitTLM-windows-x64**，解压 OrbitTLM-Windows-x64.zip 后运行 **OrbitTLM.exe**。命令行程序是 OrbitTLM-cli.exe。请保留应用目录中的 Qt6*.dll、platforms/、sqldrivers/、protocols/，不要单独移动 exe。
+
+orbit_ui_tests.exe 和 orbit_tests.exe 是开发阶段的 QtTest/CTest 自动化测试程序，前者依赖 Qt6Test.dll，**不是正式应用入口**。早期的 Windows CI 压缩包误将整个 build/Release 收进去，导致测试文件出现在用户下载包。现采用独立 staging 目录，只包含正式应用、CLI、随附字段库及部署后的 Qt 运行库，并对 ZIP 解包结果执行依赖检查。
+
+如果需要自行开发或调试测试程序，在具备 Qt 6 Test 模块的构建环境运行 cmake --build build --config Release 和 ctest --test-dir build -C Release --output-on-failure，无需在用户下载包中启动测试程序。
