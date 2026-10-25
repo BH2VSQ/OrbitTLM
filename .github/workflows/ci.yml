@@ -22,7 +22,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: OrbitTLM-linux
-          path: build/OrbitTLM
+          path: |
+            build/OrbitTLM
+            build/OrbitTLM-cli
 
   windows:
     runs-on: windows-2022
