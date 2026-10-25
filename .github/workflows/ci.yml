@@ -53,11 +53,80 @@ jobs:
         run: cmake --build build --config Release --parallel 2
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
-      - name: Deploy Qt runtime
+      - name: Package distributable Windows application
         shell: pwsh
         run: |
-          & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --release --no-translations "build\Release\OrbitTLM.exe"
-          Compress-Archive -Path "build\Release\*" -DestinationPath "OrbitTLM-Windows-x64.zip"
+          $ErrorActionPreference = 'Stop'
+          $release = Join-Path $PWD "build\Release"
+          $stage = Join-Path $PWD "dist\OrbitTLM"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+          # CTest executables remain in build/Release for CI only.
+          # Copy an explicit allowlist instead of publishing the entire build directory.
+          Copy-Item (Join-Path $release "OrbitTLM.exe") $stage
+          Copy-Item (Join-Path $release "OrbitTLM-cli.exe") $stage
+          $catalog = Join-Path $release "protocols\asrtu1"
+          if (-not (Test-Path $catalog)) { throw "Missing packaged ASRTU-1 field catalog: $catalog" }
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage "protocols") | Out-Null
+          Copy-Item $catalog (Join-Path $stage "protocols\asrtu1") -Recurse
+
+          $deploy = Join-Path $env:QT_ROOT_DIR "bin\windeployqt.exe"
+          if (-not (Test-Path $deploy)) { throw "windeployqt.exe missing in Qt installation" }
+          & $deploy --release --no-translations --dir $stage (Join-Path $stage "OrbitTLM.exe")
+          if ($LASTEXITCODE -ne 0) { throw "windeployqt failed for GUI" }
+          & $deploy --release --no-translations --dir $stage (Join-Path $stage "OrbitTLM-cli.exe")
+          if ($LASTEXITCODE -ne 0) { throw "windeployqt failed for CLI" }
+
+          # Runtime dependency and telemetry-catalog checks.
+          $required = @(
+            "OrbitTLM.exe", "OrbitTLM-cli.exe",
+            "Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll",
+            "Qt6Charts.dll", "Qt6Network.dll", "Qt6Sql.dll",
+            "platforms\qwindows.dll", "sqldrivers\qsqlite.dll",
+            "protocols\asrtu1\SAT-S3.json"
+          )
+          foreach ($relative in $required) {
+            $target = Join-Path $stage $relative
+            if (-not (Test-Path $target)) { throw "Windows package is missing required file: $relative" }
+          }
+          $forbidden = @("orbit_ui_tests.exe", "orbit_tests.exe", "Qt6Test.dll")
+          foreach ($name in $forbidden) {
+            if (Test-Path (Join-Path $stage $name)) { throw "Developer test binary leaked into Windows package: $name" }
+          }
+          # CLI dependency check against the staged files, not the Qt development environment.
+          $savedPath = $env:PATH
+          try {
+            $env:PATH = "$stage;$env:SystemRoot\System32;$env:SystemRoot"
+            & (Join-Path $stage "OrbitTLM-cli.exe") --help | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Packaged CLI startup smoke test failed" }
+          } finally { $env:PATH = $savedPath }
+
+          @'
+          OrbitTLM - 卫星遥测回放工作台
+
+          请运行 OrbitTLM.exe（正式桌面程序）。
+          如需离线批量导出，请运行 OrbitTLM-cli.exe。
+          orbit_ui_tests.exe / orbit_tests.exe 属于 CI 测试工具，不在此用户安装包中。
+          请完整解压后运行，勿单独移动 exe 或删除 Qt DLL、plugins、protocols 目录。
+          '@ | Set-Content -Path (Join-Path $stage "使用说明.txt") -Encoding utf8
+
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath "OrbitTLM-Windows-x64.zip" -Force
+
+      - name: Verify Windows ZIP excludes developer test programs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $PWD "OrbitTLM-Windows-x64.zip"
+          $check = Join-Path $PWD "dist\verify"
+          Expand-Archive -Path $zip -DestinationPath $check -Force
+          foreach ($name in @("OrbitTLM.exe", "OrbitTLM-cli.exe",
+                "Qt6Core.dll", "platforms\qwindows.dll", "sqldrivers\qsqlite.dll",
+                "protocols\asrtu1\SAT-S3.json")) {
+            if (-not (Test-Path (Join-Path $check $name))) { throw "ZIP verification failed: $name" }
+          }
+          foreach ($name in @("orbit_ui_tests.exe", "orbit_tests.exe", "Qt6Test.dll")) {
+            if (Test-Path (Join-Path $check $name)) { throw "Unexpected CI test artifact: $name" }
+          }
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:
