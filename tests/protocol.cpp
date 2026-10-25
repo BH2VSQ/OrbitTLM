@@ -2,6 +2,8 @@
 #include "schema.h"
 #include "ssdv.h"
 #include "transport.h"
+#include "business.h"
+#include <QCoreApplication>
 #include <QtTest/QtTest>
 #include <QFile>
 #include <QTemporaryDir>
@@ -238,6 +240,99 @@ private slots:
         QCOMPARE(packets[0].opaqueSuffixBytes,2);
         QCOMPARE(packets[0].data,QByteArray(1,char(0x42)));
         QCOMPARE(packets[0].integrity,QString("not_crc_verified"));
+    }
+    void all27AsrtuCatalogPacketsLoad(){
+        BusinessCatalog catalog;QString error;
+        const QString folder=QCoreApplication::applicationDirPath()+"/protocols/asrtu1";
+        QVERIFY2(catalog.loadDirectory(folder,&error),qPrintable(error));
+        QCOMPARE(catalog.packetKinds(),27);
+        QVERIFY(catalog.fieldDefinitions()>1600);
+    }
+    void satelliteS3QuaternionFollowsPublishedSignedScale(){
+        BusinessCatalog catalog;QString err;
+        QVERIFY2(catalog.loadDirectory(QCoreApplication::applicationDirPath()+"/protocols/asrtu1",&err),
+                 qPrintable(err));
+        QByteArray raw(200,char(0));
+        raw[0]=char(0xF0);raw[1]=char(0x03);
+        const int entries[4]={10000,-5000,2500,0};
+        for(int i=0;i<4;++i){
+            const quint32 bits=qToBigEndian(quint32(entries[i]));
+            memcpy(raw.data()+12+4*i,&bits,4);
+        }
+        ApplicationPacket packet;
+        packet.bytes=raw;packet.satellite="ASRTU-1";
+        packet.fecEvidence="log_fec_reported";
+        packet.timestampBasis="logger_local_unverified";
+        const auto result=catalog.decode(packet);
+        QCOMPARE(result.packetName,QString("SAT-S3"));
+        QCOMPARE(result.identification,QString("native_type_prefix"));
+        QVector<QString> qs(4);
+        for(const auto &x:result.fields)
+            for(int i=0;i<4;++i)if(x.nameCn==QString("解算四元数q%1").arg(i)) {
+                QCOMPARE(x.status,QString("table_formula"));
+                qs[i]=x.value;
+            }
+        QCOMPARE(qs,QVector<QString>({"1","-0.5","0.25","0"}));
+        QTemporaryDir tmp;QVERIFY(tmp.isValid());
+        const auto path=tmp.filePath("quaternions.csv");
+        QVERIFY2(BusinessCatalog::exportQuaternionCsv(path,{result},&err),qPrintable(err));
+        QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));
+        const QByteArray csv=file.readAll();
+        QVERIFY(csv.contains("SAT-S3"));
+        QVERIFY(csv.contains("not_crc_verified"));
+        QVERIFY(csv.contains("1,-0.5,0.25,0"));
+    }
+    void legacyWrappedBusinessPacketIsRecognizedWithoutSpacePacket(){
+        BusinessCatalog catalog;QString err;
+        QVERIFY2(catalog.loadDirectory(QCoreApplication::applicationDirPath()+"/protocols/asrtu1",&err),
+                 qPrintable(err));
+        QByteArray body(200,char(0));body[0]=char(0xF0);body[1]=char(0x03);
+        QByteArray envelope=QByteArray::fromHex("08f0fba100bf03")+body;
+        ApplicationPacket packet;packet.bytes=envelope;packet.satellite="ASRTU-1";
+        const auto p=catalog.decode(packet);
+        QCOMPARE(p.packetName,QString("SAT-S3"));
+        QCOMPARE(p.identification,QString("legacy_kiss_envelope_candidate"));
+        QVERIFY(p.fields.size()>20);
+        QCOMPARE(p.transport.integrity,QString("not_crc_verified"));
+    }
+    void bitFieldAndLinearEngineeringFormula(){
+        BusinessCatalog catalog;QString err;
+        QVERIFY2(catalog.loadDirectory(QCoreApplication::applicationDirPath()+"/protocols/asrtu1",&err),
+                 qPrintable(err));
+        QByteArray body(220,char(0));body[0]=char(0xAA);body[1]=char(0x00);
+        // ZGK-S0 field 91.7.16: F=-0.003323*SX+56.08
+        body[91]=char(0x27);body[92]=char(0x10); // 10000 signed
+        ApplicationPacket frame;frame.bytes=body;frame.satellite="ASRTU-1";
+        const auto result=catalog.decode(frame);
+        QCOMPARE(result.packetName,QString("ZGK-S0"));
+        bool found=false;
+        for(const auto &field:result.fields)
+            if(field.bits=="0091.7.16") {
+                found=true;
+                QCOMPARE(field.status,QString("table_formula"));
+                QVERIFY(std::abs(field.value.toDouble()-22.85)<1e-8);
+            }
+        QVERIFY(found);
+        // One-bit PDB switch is at byte 12, bit 7.
+        QByteArray pdb(220,char(0));pdb[0]=char(0x04);pdb[1]=char(0);pdb[12]=char(0x80);
+        frame.bytes=pdb;
+        const auto power=catalog.decode(frame);
+        QCOMPARE(power.packetName,QString("PDB-S0"));
+        bool bitFound=false;
+        for(const auto &field:power.fields)if(field.bits=="0012.7.1"){
+            bitFound=true;QVERIFY(field.value.contains("开"));
+        }
+        QVERIFY(bitFound);
+    }
+    void outOfRangeFieldsNeverReadBeyondPayload(){
+        BusinessCatalog catalog;QString err;
+        QVERIFY2(catalog.loadDirectory(QCoreApplication::applicationDirPath()+"/protocols/asrtu1",&err),
+                 qPrintable(err));
+        ApplicationPacket sample;sample.bytes=QByteArray::fromHex("f003");
+        const auto decoded=catalog.decode(sample);
+        QCOMPARE(decoded.packetName,QString("SAT-S3"));
+        QVERIFY(decoded.skippedFields>0);
+        QCOMPARE(decoded.transport.integrity,QString("not_crc_verified"));
     }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
