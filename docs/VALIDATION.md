@@ -8,9 +8,9 @@
 | Missing VC frames / malformed escape | incomplete payload discarded from reconstructed output | tested; input raw TM bytes preserved |
 | Application CRC | **intentionally not implemented** | real ASRTU-1 parameters unverified and not necessary to preserve KISS packets |
 | Optional inner Space Packet-shaped header | candidate only; 0/2/4 byte suffix tolerated but unverified | never required for KISS reconstruction |
-| Telemetry schema / engineering values | extensible, not full mission implementation | subsystem field definitions require validation |
+| ASRTU-1 published telemetry catalog | 27 packet kinds / 2,067 definitions loaded offline | native + candidate legacy envelope, engineering expressions, all fields exposed; real on-air samples require validation |
 | Qt replay and SQLite | implemented | CI compilation and SQL tests; manual GUI validation remains |
-| Attitude quaternion preview | experimental candidate only | no verified quaternion reference-frame semantics |
+| Quaternion series | SAT-S3 signed-int32 q0..q3 /10000 exported; experimental candidate kept separate | application CRC and physical attitude coordinate convention unverified |
 | BY04/8104 | framework and optional schema supported | mission-specific field validation pending |
 | SSDV | packet candidate reconstruction and optional external decoder | not an authoritative image CRC test |
 | TCP live receive | basic 223-byte record stream | field hardware tests pending |
@@ -68,3 +68,11 @@ OrbitTLM-cli --satellite ASRTU-1 --log decoder.log --bin SSDV_received_frames223
   correctness of all application bytes.
 - The exact satellite-specific telemetry field map and onboard UTC epoch must
   be verified before physical engineering values are labeled authoritative.
+
+## 27-packet catalog verification
+
+- All defined subsystem packets are loaded from the versioned files distributed with the executable.
+- A regression test visits every packet kind with synthetic telemetry bytes to check bit extraction, boundary safety and formula coverage.
+- Dedicated tests exercise the SAT-S3 signed quaternion field scaling, ZGK-S0 affine conversion, PDB status bits, the native two-byte subtype header and the legacy seven-byte KISS envelope.
+- Unsupported/ambiguous source formulas are reported explicitly; malformed bit positions remain visible as invalid instead of being silently repaired.
+- These are schema/synthetic regressions. An on-air engineering-field verification still requires actual matching KISS packets and known-good reference values. Packets from unrelated APIDs or subtypes are correctly retained as unknown rather than force-decoded.
