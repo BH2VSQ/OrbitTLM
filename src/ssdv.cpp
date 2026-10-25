@@ -3,14 +3,21 @@
 #include <QSaveFile>
 namespace orbit {
 QVector<ImagePacket> ImageTools::candidates(const QVector<Frame> &frames,int apid){
+    return candidatesFromKiss(Transport::reassemble(frames),apid);
+}
+QVector<ImagePacket> ImageTools::candidatesFromKiss(
+        const QVector<ApplicationPacket> &packets,int apid){
     QVector<ImagePacket> out;
     QByteArray stream;
     int lastSequence=-1;
-    for(const Frame &f:frames){
-        if(f.apid!=apid || !f.complete || f.quality!="log_fec_reported")continue;
-        if(lastSequence>=0 && (lastSequence+1)%16384 != f.sequence)stream.clear();
-        lastSequence=f.sequence;
-        stream+=f.payload;
+    for(const auto &packet:packets){
+        // Never stitch arbitrary 223-byte TM regions. The application KISS
+        // stream must be reconstructed before image data is consumed.
+        if(packet.apid!=apid || packet.fecEvidence!="log_fec_reported" ||
+           packet.classification!="ccsds_space_packet_candidate")continue;
+        if(lastSequence>=0 && (lastSequence+1)%16384!=packet.sequence)stream.clear();
+        lastSequence=packet.sequence;
+        stream+=packet.data;
         while(stream.size()>=256){
             const int pos=stream.indexOf(char(0x55));
             if(pos<0){stream.clear();break;}
