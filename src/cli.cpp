@@ -86,6 +86,7 @@ int main(int argc,char **argv){
         return 8;
     }
 
+    if(args.isSet("sqlite")){
         Database db;
         if(!db.open(args.value("sqlite"),&reason)||
            !db.save(sat+" batch import",frames,&reason)){
