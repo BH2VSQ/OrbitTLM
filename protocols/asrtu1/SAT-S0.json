@@ -1,0 +1,862 @@
+{
+ "packet": "SAT-S0",
+ "main_type": 240,
+ "sub_type": 0,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "SAT-C00000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型",
+   "formula": "F={UX|F0H(卫星平台)}",
+   "name_en": "Telemetry Main Type"
+  },
+  {
+   "id": "SAT-C00001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|00H(第0类遥测)}",
+   "name_en": "Telemetry Sub Type"
+  },
+  {
+   "id": "SAT-C00002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=UX<s>",
+   "name_en": "OBC Time Accumulated Seconds Integer"
+  },
+  {
+   "id": "SAT-C00006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=UX<ms>",
+   "name_en": "OBC Time Seconds Fraction"
+  },
+  {
+   "id": "SAT-C00008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=UX<s>",
+   "name_en": "UTC Time Accumulated Seconds"
+  },
+  {
+   "id": "SAT-C00012.7.1",
+   "bits": "0012.7.1",
+   "name_cn": "配电开关08:GNSS板",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 08: GNSS Board"
+  },
+  {
+   "id": "SAT-C00012.6.1",
+   "bits": "0012.6.1",
+   "name_cn": "配电开关07:无",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 07: None"
+  },
+  {
+   "id": "SAT-C00012.5.1",
+   "bits": "0012.5.1",
+   "name_cn": "配电开关06:无",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 06: None"
+  },
+  {
+   "id": "SAT-C00012.4.1",
+   "bits": "0012.4.1",
+   "name_cn": "配电开关05:时空表",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 05: Space-Time Table"
+  },
+  {
+   "id": "SAT-C00012.3.1",
+   "bits": "0012.3.1",
+   "name_cn": "配电开关04:导航增强",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 04: Navigation Enhancement"
+  },
+  {
+   "id": "SAT-C00012.2.1",
+   "bits": "0012.2.1",
+   "name_cn": "配电开关03:数传通道",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 03: Data Transmission Channel"
+  },
+  {
+   "id": "SAT-C00012.1.1",
+   "bits": "0012.1.1",
+   "name_cn": "配电开关02:数传基带",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 02: Data Transmission Baseband"
+  },
+  {
+   "id": "SAT-C00012.0.1",
+   "bits": "0012.0.1",
+   "name_cn": "配电开关01:存储板",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 01: Storage Board"
+  },
+  {
+   "id": "SAT-C00013.7.1",
+   "bits": "0013.7.1",
+   "name_cn": "配电开关16:飞轮S",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 16: Flywheel S"
+  },
+  {
+   "id": "SAT-C00013.6.1",
+   "bits": "0013.6.1",
+   "name_cn": "配电开关15:飞轮Z",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 15: Flywheel Z"
+  },
+  {
+   "id": "SAT-C00013.5.1",
+   "bits": "0013.5.1",
+   "name_cn": "配电开关14:飞轮Y",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 14: Flywheel Y"
+  },
+  {
+   "id": "SAT-C00013.4.1",
+   "bits": "0013.4.1",
+   "name_cn": "配电开关13:飞轮X",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 13: Flywheel X"
+  },
+  {
+   "id": "SAT-C00013.3.1",
+   "bits": "0013.3.1",
+   "name_cn": "配电开关12:太阳敏感器",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 12: Sun Sensor"
+  },
+  {
+   "id": "SAT-C00013.2.1",
+   "bits": "0013.2.1",
+   "name_cn": "配电开关11:增阻球电磁阀2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 11: Throttle Ball Solenoid Valve 2"
+  },
+  {
+   "id": "SAT-C00013.1.1",
+   "bits": "0013.1.1",
+   "name_cn": "配电开关10:增阻球电磁阀1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 10: Throttle Ball Solenoid Valve 1"
+  },
+  {
+   "id": "SAT-C00013.0.1",
+   "bits": "0013.0.1",
+   "name_cn": "配电开关09:增阻球熔断",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 09: Throttle Ball Fuse"
+  },
+  {
+   "id": "SAT-C00014.7.1",
+   "bits": "0014.7.1",
+   "name_cn": "配电开关24:高分相机遮光罩热刀2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 24: High-Resolution Camera Shading Hood Hot Knife 2"
+  },
+  {
+   "id": "SAT-C00014.6.1",
+   "bits": "0014.6.1",
+   "name_cn": "配电开关23:太阳翼展开热刀2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 23: Solar Wing Deployment Hot Knife 2"
+  },
+  {
+   "id": "SAT-C00014.5.1",
+   "bits": "0014.5.1",
+   "name_cn": "配电开关22:太阳翼展开热刀1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 22: Solar Wing Deployment Hot Knife 1"
+  },
+  {
+   "id": "SAT-C00014.4.1",
+   "bits": "0014.4.1",
+   "name_cn": "配电开关21:光电传感器控制板",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 21: Photoelectric Sensor Control Board"
+  },
+  {
+   "id": "SAT-C00014.3.1",
+   "bits": "0014.3.1",
+   "name_cn": "配电开关20:MEMS惯组",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 20: MEMS Inertial Unit"
+  },
+  {
+   "id": "SAT-C00014.2.1",
+   "bits": "0014.2.1",
+   "name_cn": "配电开关19:CMOS相机",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 19: CMOS Camera"
+  },
+  {
+   "id": "SAT-C00014.1.1",
+   "bits": "0014.1.1",
+   "name_cn": "配电开关18:高分相机遮光罩热刀1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 18: High-Resolution Camera Shading Hood Hot Knife 1"
+  },
+  {
+   "id": "SAT-C00014.0.1",
+   "bits": "0014.0.1",
+   "name_cn": "配电开关17:高分相机",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Power Distribution Switch 17: High-Resolution Camera"
+  },
+  {
+   "id": "SAT-C00015.7.1",
+   "bits": "0015.7.1",
+   "name_cn": "热控开关08:加热带8",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 08: Heating Belt 8"
+  },
+  {
+   "id": "SAT-C00015.6.1",
+   "bits": "0015.6.1",
+   "name_cn": "热控开关07:加热带7",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 07: Heating Belt 7"
+  },
+  {
+   "id": "SAT-C00015.5.1",
+   "bits": "0015.5.1",
+   "name_cn": "热控开关06:加热带6",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 06: Heating Belt 6"
+  },
+  {
+   "id": "SAT-C00015.4.1",
+   "bits": "0015.4.1",
+   "name_cn": "热控开关05:加热带5",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 05: Heating Belt 5"
+  },
+  {
+   "id": "SAT-C00015.3.1",
+   "bits": "0015.3.1",
+   "name_cn": "热控开关04:加热带4",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 04: Heating Belt 4"
+  },
+  {
+   "id": "SAT-C00015.2.1",
+   "bits": "0015.2.1",
+   "name_cn": "热控开关03:加热带3",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 03: Heating Belt 3"
+  },
+  {
+   "id": "SAT-C00015.1.1",
+   "bits": "0015.1.1",
+   "name_cn": "热控开关02:加热带2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 02: Heating Belt 2"
+  },
+  {
+   "id": "SAT-C00015.0.1",
+   "bits": "0015.0.1",
+   "name_cn": "热控开关01:加热带1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 01: Heating Belt 1"
+  },
+  {
+   "id": "SAT-C00016.7.1",
+   "bits": "0016.7.1",
+   "name_cn": "热控开关16:光纤陀螺",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 16: Fiber Optic Gyroscope"
+  },
+  {
+   "id": "SAT-C00016.6.1",
+   "bits": "0016.6.1",
+   "name_cn": "热控开关15:磁强计",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 15: Magnetometer"
+  },
+  {
+   "id": "SAT-C00016.5.1",
+   "bits": "0016.5.1",
+   "name_cn": "热控开关14:星敏感器Y",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 14: Star Sensor Y"
+  },
+  {
+   "id": "SAT-C00016.4.1",
+   "bits": "0016.4.1",
+   "name_cn": "热控开关13:星敏感器Z",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 13: Star Sensor Z"
+  },
+  {
+   "id": "SAT-C00016.3.1",
+   "bits": "0016.3.1",
+   "name_cn": "热控开关12:加热带12",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 12: Heating Belt 12"
+  },
+  {
+   "id": "SAT-C00016.2.1",
+   "bits": "0016.2.1",
+   "name_cn": "热控开关11:加热带11",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 11: Heating Belt 11"
+  },
+  {
+   "id": "SAT-C00016.1.1",
+   "bits": "0016.1.1",
+   "name_cn": "热控开关10:加热带10",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 10: Heating Belt 10"
+  },
+  {
+   "id": "SAT-C00016.0.1",
+   "bits": "0016.0.1",
+   "name_cn": "热控开关09:加热带9",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 09: Heating Belt 9"
+  },
+  {
+   "id": "SAT-C00017.7.1",
+   "bits": "0017.7.1",
+   "name_cn": "热控开关24:磁力矩器备份",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 24: Magnetic Torque Device Backup"
+  },
+  {
+   "id": "SAT-C00017.6.1",
+   "bits": "0017.6.1",
+   "name_cn": "热控开关23:磁力矩器主份",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 23: Magnetic Torque Device Main"
+  },
+  {
+   "id": "SAT-C00017.5.1",
+   "bits": "0017.5.1",
+   "name_cn": "热控开关22:天线展开4",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 22: Antenna Deployment 4"
+  },
+  {
+   "id": "SAT-C00017.4.1",
+   "bits": "0017.4.1",
+   "name_cn": "热控开关21:天线展开3",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 21: Antenna Deployment 3"
+  },
+  {
+   "id": "SAT-C00017.3.1",
+   "bits": "0017.3.1",
+   "name_cn": "热控开关20:天线展开2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 20: Antenna Deployment 2"
+  },
+  {
+   "id": "SAT-C00017.2.1",
+   "bits": "0017.2.1",
+   "name_cn": "热控开关19:天线展开1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 19: Antenna Deployment 1"
+  },
+  {
+   "id": "SAT-C00017.1.1",
+   "bits": "0017.1.1",
+   "name_cn": "热控开关18:加热带14",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 18: Heating Belt 14"
+  },
+  {
+   "id": "SAT-C00017.0.1",
+   "bits": "0017.0.1",
+   "name_cn": "热控开关17:加热带13",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Thermal Control Switch 17: Heating Belt 13"
+  },
+  {
+   "id": "SAT-C00018.7.16",
+   "bits": "0018.7.16",
+   "name_cn": "12V母线电压",
+   "formula": "F=SX<mV>",
+   "name_en": "12V Bus Voltage"
+  },
+  {
+   "id": "SAT-C00020.7.16",
+   "bits": "0020.7.16",
+   "name_cn": "5V母线电压",
+   "formula": "F=SX<mV>",
+   "name_en": "5V Bus Voltage"
+  },
+  {
+   "id": "SAT-C00022.7.16",
+   "bits": "0022.7.16",
+   "name_cn": "3.3V母线电压",
+   "formula": "F=SX<mV>",
+   "name_en": "3.3V Bus Voltage"
+  },
+  {
+   "id": "SAT-C00024.7.16",
+   "bits": "0024.7.16",
+   "name_cn": "12V母线电流",
+   "formula": "F=SX<mA>",
+   "name_en": "12V Bus Current"
+  },
+  {
+   "id": "SAT-C00026.7.16",
+   "bits": "0026.7.16",
+   "name_cn": "5V母线电流",
+   "formula": "F=SX<mA>",
+   "name_en": "5V Bus Current"
+  },
+  {
+   "id": "SAT-C00028.7.16",
+   "bits": "0028.7.16",
+   "name_cn": "3.3V母线电流",
+   "formula": "F=SX<mA>",
+   "name_en": "3.3V Bus Current"
+  },
+  {
+   "id": "SAT-C00030.7.16",
+   "bits": "0030.7.16",
+   "name_cn": "分阵1电压",
+   "formula": "F=UX<mV>",
+   "name_en": "Sub-array1 Voltage"
+  },
+  {
+   "id": "SAT-C00032.7.16",
+   "bits": "0032.7.16",
+   "name_cn": "分阵2电压",
+   "formula": "F=UX<mV>",
+   "name_en": "Sub-array2 Voltage"
+  },
+  {
+   "id": "SAT-C00034.7.16",
+   "bits": "0034.7.16",
+   "name_cn": "分阵3电压",
+   "formula": "F=UX<mV>",
+   "name_en": "Sub-array3 Voltage"
+  },
+  {
+   "id": "SAT-C00036.7.16",
+   "bits": "0036.7.16",
+   "name_cn": "MPPT1电压",
+   "formula": "F=SX<mV>",
+   "name_en": "MPPT1 Voltage"
+  },
+  {
+   "id": "SAT-C00038.7.16",
+   "bits": "0038.7.16",
+   "name_cn": "MPPT2电压",
+   "formula": "F=SX<mV>",
+   "name_en": "MPPT2 Voltage"
+  },
+  {
+   "id": "SAT-C00040.7.16",
+   "bits": "0040.7.16",
+   "name_cn": "MPPT3电压",
+   "formula": "F=SX<mV>",
+   "name_en": "MPPT3 Voltage"
+  },
+  {
+   "id": "SAT-C00042.7.16",
+   "bits": "0042.7.16",
+   "name_cn": "MPPT1电流",
+   "formula": "F=SX<mA>",
+   "name_en": "MPPT1 Current"
+  },
+  {
+   "id": "SAT-C00044.7.16",
+   "bits": "0044.7.16",
+   "name_cn": "MPPT2电流",
+   "formula": "F=SX<mA>",
+   "name_en": "MPPT2 Current"
+  },
+  {
+   "id": "SAT-C00046.7.16",
+   "bits": "0046.7.16",
+   "name_cn": "MPPT3电流",
+   "formula": "F=SX<mA>",
+   "name_en": "MPPT3 Current"
+  },
+  {
+   "id": "SAT-C00048.7.16",
+   "bits": "0048.7.16",
+   "name_cn": "充电器1电压",
+   "formula": "F=UX<mV>",
+   "name_en": "Charger1 Voltage"
+  },
+  {
+   "id": "SAT-C00050.7.16",
+   "bits": "0050.7.16",
+   "name_cn": "充电器2电压",
+   "formula": "F=UX<mV>",
+   "name_en": "Charger2 Voltage"
+  },
+  {
+   "id": "SAT-C00052.7.16",
+   "bits": "0052.7.16",
+   "name_cn": "充电器1电流",
+   "formula": "F=SX<mA>",
+   "name_en": "Charger1 Current"
+  },
+  {
+   "id": "SAT-C00054.7.16",
+   "bits": "0054.7.16",
+   "name_cn": "充电器2电流",
+   "formula": "F=SX<mA>",
+   "name_en": "Charger2 Current"
+  },
+  {
+   "id": "SAT-C00056.7.16",
+   "bits": "0056.7.16",
+   "name_cn": "接收遥控指令计数",
+   "formula": "F=UX",
+   "name_en": "Receive Remote Command Count"
+  },
+  {
+   "id": "SAT-C00058.7.16",
+   "bits": "0058.7.16",
+   "name_cn": "执行遥控指令计数",
+   "formula": "F=UX",
+   "name_en": "Execute Remote Command Count"
+  },
+  {
+   "id": "SAT-C00060.7.32",
+   "bits": "0060.7.32",
+   "name_cn": "最近一条执行指令",
+   "formula": "F=HX",
+   "name_en": "Most Recent Executed Command"
+  },
+  {
+   "id": "SAT-C00064.7.32",
+   "bits": "0064.7.32",
+   "name_cn": "最近一条延时遥控指令",
+   "formula": "F=HX",
+   "name_en": "Most Recent Delayed Remote Command"
+  },
+  {
+   "id": "SAT-C00068.7.32",
+   "bits": "0068.7.32",
+   "name_cn": "最近一条延时遥控指令执行时刻",
+   "formula": "F=X<s>",
+   "name_en": "Most Recent Delayed Remote Command Execution Time"
+  },
+  {
+   "id": "SAT-C00072.7.8",
+   "bits": "0072.7.8",
+   "name_cn": "MAX14830_1自检值",
+   "formula": "F=HX",
+   "name_en": "MAX14830_1 Self-Test Value"
+  },
+  {
+   "id": "SAT-C00073.7.8",
+   "bits": "0073.7.8",
+   "name_cn": "MAX14830_2自检值",
+   "formula": "F=HX",
+   "name_en": "MAX14830_2 Self-Test Value"
+  },
+  {
+   "id": "SAT-C00074.7.16",
+   "bits": "0074.7.16",
+   "name_cn": "配电执行指令计数",
+   "formula": "F=UX",
+   "name_en": "Power Distribution Execute Command Count"
+  },
+  {
+   "id": "SAT-C00076.7.16",
+   "bits": "0076.7.16",
+   "name_cn": "热控执行指令计数",
+   "formula": "F=UX",
+   "name_en": "Thermal Control Execute Command Count"
+  },
+  {
+   "id": "SAT-C00078.7.8",
+   "bits": "0078.7.8",
+   "name_cn": "测试模式标志",
+   "formula": "F={UX|1H(测试模式),0H(非测试模式)}",
+   "name_en": "Test Mode Flag"
+  },
+  {
+   "id": "SAT-C00079.7.32",
+   "bits": "0079.7.32",
+   "name_cn": "测试模式剩余时间",
+   "formula": "F=UX<s>",
+   "name_en": "Test Mode Remaining Time"
+  },
+  {
+   "id": "SAT-C00083.7.16",
+   "bits": "0083.7.16",
+   "name_cn": "姿态工作模式",
+   "formula": "F={UX|1111H(安全模式),2222H(三轴对日),3333H(单轴对日),4444H(速率阻尼),5555H(飞轮卸载),6666H(指令模式),7777H(主相机对目标),8888H(主相机对地心),9999H(小相机对目标),AAAAH(小相机对地心),BBBBH(X螺旋对目标),CCCCH(X螺旋对地心),DDDDH(X微带对目标),EEEEH(X微带对地心)}",
+   "name_en": "Attitude Working Mode"
+  },
+  {
+   "id": "SAT-C00085.7.32",
+   "bits": "0085.7.32",
+   "name_cn": "进入姿控程序次数",
+   "formula": "F=UX",
+   "name_en": "Enter Attitude Control Program Count"
+  },
+  {
+   "id": "SAT-C00089.7.32",
+   "bits": "0089.7.32",
+   "name_cn": "准备读取上注文件大小设置值",
+   "formula": "F=UX<Bytes>",
+   "name_en": "Prepare to Read Upload File Size Setting"
+  },
+  {
+   "id": "SAT-C00093.7.32",
+   "bits": "0093.7.32",
+   "name_cn": "测控中的上注文件大小",
+   "formula": "F=UX<Bytes>",
+   "name_en": "Upload File Size in Telemetry and Control"
+  },
+  {
+   "id": "SAT-C00097.7.8",
+   "bits": "0097.7.8",
+   "name_cn": "上注读取状态",
+   "formula": "F={UX|0H(未启动),1H(初始化：设置待操作文件),2H(初始化：设置目标nID),3H(正在读取),4H(读取完成),5H(地面命令中止读取),11H(错误:文件未清空),12H(错误:文件号不一致),13H(错误:文件大小不一致),14H(错误:文件系统异常),15H(错误:传输CRC错误)}",
+   "name_en": "Upload Read Status"
+  },
+  {
+   "id": "SAT-C00098.7.32",
+   "bits": "0098.7.32",
+   "name_cn": "星务已从测控读取到的上注文件大小",
+   "formula": "F=UX<Bytes>",
+   "name_en": "Starware Upload File Size Read from Telemetry and Control"
+  },
+  {
+   "id": "SAT-C00102.7.8",
+   "bits": "0102.7.8",
+   "name_cn": "星务待操作文件号",
+   "formula": "F=UX",
+   "name_en": "Starware Pending Operation File Number"
+  },
+  {
+   "id": "SAT-C00103.7.8",
+   "bits": "0103.7.8",
+   "name_cn": "测控待操作文件号",
+   "formula": "F=UX",
+   "name_en": "Telemetry and Control Pending Operation File Number"
+  },
+  {
+   "id": "SAT-C00104.7.32",
+   "bits": "0104.7.32",
+   "name_cn": "SD卡中上注文件大小",
+   "formula": "F=UX<Bytes>",
+   "name_en": "Upload File Size in SD Card"
+  },
+  {
+   "id": "SAT-C00108.7.32",
+   "bits": "0108.7.32",
+   "name_cn": "FLASH剩余上注大小",
+   "formula": "F=UX<Bytes>",
+   "name_en": "Remaining Upload Size in FLASH"
+  },
+  {
+   "id": "SAT-C00112.7.32",
+   "bits": "0112.7.32",
+   "name_cn": "SD卡中存储的CRC32值",
+   "formula": "F=HX",
+   "name_en": "CRC32 Value Stored in SD Card"
+  },
+  {
+   "id": "SAT-C00116.7.32",
+   "bits": "0116.7.32",
+   "name_cn": "测控至OBCCRC32值",
+   "formula": "F=HX",
+   "name_en": "Telemetry and Control to OBC CRC32 Value"
+  },
+  {
+   "id": "SAT-C00120.7.32",
+   "bits": "0120.7.32",
+   "name_cn": "OBC计算SD卡中CRC32时的偏移地址",
+   "formula": "F=HX",
+   "name_en": "OBC SD Card CRC32 Calculation Offset Address"
+  },
+  {
+   "id": "SAT-C00124.7.32",
+   "bits": "0124.7.32",
+   "name_cn": "OBC计算SD卡中的CRC32值",
+   "formula": "F=HX",
+   "name_en": "OBC SD Card CRC32 Calculation Value"
+  },
+  {
+   "id": "SAT-C00128.7.32",
+   "bits": "0128.7.32",
+   "name_cn": "对轨道系欧拉角1",
+   "formula": "F=SX/10000",
+   "name_en": "Orbit Frame Euler Angle 1"
+  },
+  {
+   "id": "SAT-C00132.7.32",
+   "bits": "0132.7.32",
+   "name_cn": "对轨道系欧拉角2",
+   "formula": "F=SX/10000",
+   "name_en": "Orbit Frame Euler Angle 2"
+  },
+  {
+   "id": "SAT-C00136.7.32",
+   "bits": "0136.7.32",
+   "name_cn": "对轨道系欧拉角3",
+   "formula": "F=SX/10000",
+   "name_en": "Orbit Frame Euler Angle 3"
+  },
+  {
+   "id": "SAT-C00140.7.32",
+   "bits": "0140.7.32",
+   "name_cn": "解算角速度X",
+   "formula": "F=SX/10000",
+   "name_en": "Calculated Angular Velocity X"
+  },
+  {
+   "id": "SAT-C00144.7.32",
+   "bits": "0144.7.32",
+   "name_cn": "解算角速度Y",
+   "formula": "F=SX/10000",
+   "name_en": "Calculated Angular Velocity Y"
+  },
+  {
+   "id": "SAT-C00148.7.32",
+   "bits": "0148.7.32",
+   "name_cn": "解算角速度Z",
+   "formula": "F=SX/10000",
+   "name_en": "Calculated Angular Velocity Z"
+  },
+  {
+   "id": "SAT-C00152.7.32",
+   "bits": "0152.7.32",
+   "name_cn": "解算磁场X",
+   "formula": "F=SX/100000000",
+   "name_en": "Calculated Magnetic Field X"
+  },
+  {
+   "id": "SAT-C00156.7.32",
+   "bits": "0156.7.32",
+   "name_cn": "解算磁场Y",
+   "formula": "F=SX/100000000",
+   "name_en": "Calculated Magnetic Field Y"
+  },
+  {
+   "id": "SAT-C00160.7.32",
+   "bits": "0160.7.32",
+   "name_cn": "解算磁场Z",
+   "formula": "F=SX/100000000",
+   "name_en": "Calculated Magnetic Field Z"
+  },
+  {
+   "id": "SAT-C00164.7.32",
+   "bits": "0164.7.32",
+   "name_cn": "半长轴",
+   "formula": "F=UX*0.1<m>",
+   "name_en": "Semi-Major Axis"
+  },
+  {
+   "id": "SAT-C00168.7.32",
+   "bits": "0168.7.32",
+   "name_cn": "偏心率",
+   "formula": "F=UX*0.003/134217728",
+   "name_en": "Eccentricity"
+  },
+  {
+   "id": "SAT-C00172.7.32",
+   "bits": "0172.7.32",
+   "name_cn": "轨道倾角",
+   "formula": "F=UX*180/1073741824<deg>",
+   "name_en": "Orbital Inclination"
+  },
+  {
+   "id": "SAT-C00176.7.32",
+   "bits": "0176.7.32",
+   "name_cn": "升交点赤经",
+   "formula": "F=UX*180/1073741824<deg>",
+   "name_en": "Right Ascension of Ascending Node"
+  },
+  {
+   "id": "SAT-C00180.7.32",
+   "bits": "0180.7.32",
+   "name_cn": "近地点角距",
+   "formula": "F=UX*180/1073741824<deg>",
+   "name_en": "Argument of Perigee"
+  },
+  {
+   "id": "SAT-C00184.7.32",
+   "bits": "0184.7.32",
+   "name_cn": "平近点角",
+   "formula": "F=UX*180/1073741824<deg>",
+   "name_en": "Mean Anomaly"
+  },
+  {
+   "id": "SAT-C00188.7.8",
+   "bits": "0188.7.8",
+   "name_cn": "FLASH状态",
+   "formula": "F={UX|1H(FLASH1),0H(FLASH0)}",
+   "name_en": "FLASH Status"
+  },
+  {
+   "id": "SAT-C00189.7.8",
+   "bits": "0189.7.8",
+   "name_cn": "当班机状态",
+   "formula": "F={UX|AAH(A机当班),BBH(B机当班)}",
+   "name_en": "Current Onboard Status"
+  },
+  {
+   "id": "SAT-C00190.7.32",
+   "bits": "0190.7.32",
+   "name_cn": "复位次数",
+   "formula": "F=UX",
+   "name_en": "Reset Count"
+  },
+  {
+   "id": "SAT-C00194.7.8",
+   "bits": "0194.7.8",
+   "name_cn": "3.3V温度",
+   "formula": "F=SX",
+   "name_en": "3.3V Temperature"
+  },
+  {
+   "id": "SAT-C00195.7.8",
+   "bits": "0195.7.8",
+   "name_cn": "5V温度",
+   "formula": "F=SX",
+   "name_en": "5V Temperature"
+  },
+  {
+   "id": "SAT-C00196.7.8",
+   "bits": "0196.7.8",
+   "name_cn": "12V温度",
+   "formula": "F=SX",
+   "name_en": "12V Temperature"
+  },
+  {
+   "id": "SAT-C00197.7.8",
+   "bits": "0197.7.8",
+   "name_cn": "MPPT1温度",
+   "formula": "F=SX",
+   "name_en": "MPPT1 Temperature"
+  },
+  {
+   "id": "SAT-C00198.7.8",
+   "bits": "0198.7.8",
+   "name_cn": "MPPT2温度",
+   "formula": "F=SX",
+   "name_en": "MPPT2 Temperature"
+  },
+  {
+   "id": "SAT-C00199.7.8",
+   "bits": "0199.7.8",
+   "name_cn": "MPPT3温度",
+   "formula": "F=SX",
+   "name_en": "MPPT3 Temperature"
+  },
+  {
+   "id": "SAT-C00200.7.8",
+   "bits": "0200.7.8",
+   "name_cn": "帧尾CBH",
+   "formula": "F=HX",
+   "name_en": "Frame Tail CBH"
+  }
+ ]
+}

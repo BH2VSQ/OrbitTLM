@@ -1,0 +1,449 @@
+{
+ "packet": "SAT-S4",
+ "main_type": 240,
+ "sub_type": 4,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "SAT-C40000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型",
+   "formula": "F={UX|F0H(卫星平台)}",
+   "name_en": "Telemetry Main Type"
+  },
+  {
+   "id": "SAT-C40001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|03H(第3类遥测)}",
+   "name_en": "Telemetry Sub Type"
+  },
+  {
+   "id": "SAT-C40002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=X<s>",
+   "name_en": "OBC Time Accumulated Seconds Integer"
+  },
+  {
+   "id": "SAT-C40006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=X<ms>",
+   "name_en": "OBC Time Seconds Fraction"
+  },
+  {
+   "id": "SAT-C40008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=X<s>",
+   "name_en": "UTC Time Accumulated Seconds"
+  },
+  {
+   "id": "SAT-C40012.7.32",
+   "bits": "0012.7.32",
+   "name_cn": "FRAM:上电初始时间",
+   "formula": "F=X<s>",
+   "name_en": "FRAM: Power-On Initial Time"
+  },
+  {
+   "id": "SAT-C40016.7.8",
+   "bits": "0016.7.8",
+   "name_cn": "上电初始时间来源",
+   "formula": "F=HX",
+   "name_en": "Power-On Initial Time Source"
+  },
+  {
+   "id": "SAT-C40017.7.32",
+   "bits": "0017.7.32",
+   "name_cn": "天线/遮光罩热刀使能(只有0XABED5CFA为使能)",
+   "formula": "F=HX",
+   "name_en": "Antenna/Shading Hood Hot Knife Enable (Only 0xABED5CFA is Enabled)"
+  },
+  {
+   "id": "SAT-C40021.7.8",
+   "bits": "0021.7.8",
+   "name_cn": "天线/遮光罩热刀来源",
+   "formula": "F=HX",
+   "name_en": "Antenna/Shading Hood Hot Knife Source"
+  },
+  {
+   "id": "SAT-C40022.7.32",
+   "bits": "0022.7.32",
+   "name_cn": "太阳翼热刀使能(只有0XABED5CFA为使能)",
+   "formula": "F=HX",
+   "name_en": "Solar Wing Hot Knife Enable (Only 0xABED5CFA is Enabled)"
+  },
+  {
+   "id": "SAT-C40026.7.8",
+   "bits": "0026.7.8",
+   "name_cn": "太阳翼热刀使能来源",
+   "formula": "F=HX",
+   "name_en": "Solar Wing Hot Knife Enable Source"
+  },
+  {
+   "id": "SAT-C40027.7.32",
+   "bits": "0027.7.32",
+   "name_cn": "飞行程序延时使能(只有0XABED5CFA为使能)",
+   "formula": "F=HX",
+   "name_en": "Flight Program Delay Enable (Only 0xABED5CFA is Enabled)"
+  },
+  {
+   "id": "SAT-C40031.7.8",
+   "bits": "0031.7.8",
+   "name_cn": "飞行程序延时使能来源",
+   "formula": "F=HX",
+   "name_en": "Flight Program Delay Enable Source"
+  },
+  {
+   "id": "SAT-C40032.7.32",
+   "bits": "0032.7.32",
+   "name_cn": "飞行程序延时使能(只有0XABED5CFA为使能)",
+   "formula": "F=UX",
+   "name_en": "Flight Program Delay Enable (Only 0xABED5CFA is Enabled)"
+  },
+  {
+   "id": "SAT-C40036.7.8",
+   "bits": "0036.7.8",
+   "name_cn": "飞行程序延时使能来源",
+   "formula": "F=HX",
+   "name_en": "Flight Program Delay Enable Source"
+  },
+  {
+   "id": "SAT-C40037.7.32",
+   "bits": "0037.7.32",
+   "name_cn": "星敏Y安装矩阵C00",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Matrix C00"
+  },
+  {
+   "id": "SAT-C40041.7.32",
+   "bits": "0041.7.32",
+   "name_cn": "星敏Y安装矩阵C01",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Matrix C01"
+  },
+  {
+   "id": "SAT-C40045.7.32",
+   "bits": "0045.7.32",
+   "name_cn": "星敏Y安装矩阵C02",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Matrix C02"
+  },
+  {
+   "id": "SAT-C40049.7.32",
+   "bits": "0049.7.32",
+   "name_cn": "星敏Y安装矩阵C10",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Matrix C10"
+  },
+  {
+   "id": "SAT-C40053.7.32",
+   "bits": "0053.7.32",
+   "name_cn": "星敏Y安装矩阵C11",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Matrix C11"
+  },
+  {
+   "id": "SAT-C40057.7.32",
+   "bits": "0057.7.32",
+   "name_cn": "星敏Y安装矩阵C12",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Matrix C12"
+  },
+  {
+   "id": "SAT-C40061.7.32",
+   "bits": "0061.7.32",
+   "name_cn": "星敏Y安装矩阵C20",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Matrix C20"
+  },
+  {
+   "id": "SAT-C40065.7.32",
+   "bits": "0065.7.32",
+   "name_cn": "星敏Y安装矩阵C21",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Matrix C21"
+  },
+  {
+   "id": "SAT-C40069.7.32",
+   "bits": "0069.7.32",
+   "name_cn": "星敏Y安装矩阵C22",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Matrix C22"
+  },
+  {
+   "id": "SAT-C40073.7.8",
+   "bits": "0073.7.8",
+   "name_cn": "星敏Y安装矩阵数据来源",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Y Installation Matrix Data Source"
+  },
+  {
+   "id": "SAT-C40074.7.32",
+   "bits": "0074.7.32",
+   "name_cn": "星敏Z安装矩阵C00",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Matrix C00"
+  },
+  {
+   "id": "SAT-C40078.7.32",
+   "bits": "0078.7.32",
+   "name_cn": "星敏Z安装矩阵C01",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Matrix C01"
+  },
+  {
+   "id": "SAT-C40082.7.32",
+   "bits": "0082.7.32",
+   "name_cn": "星敏Z安装矩阵C02",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Matrix C02"
+  },
+  {
+   "id": "SAT-C40086.7.32",
+   "bits": "0086.7.32",
+   "name_cn": "星敏Z安装矩阵C10",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Matrix C10"
+  },
+  {
+   "id": "SAT-C40090.7.32",
+   "bits": "0090.7.32",
+   "name_cn": "星敏Z安装矩阵C11",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Matrix C11"
+  },
+  {
+   "id": "SAT-C40094.7.32",
+   "bits": "0094.7.32",
+   "name_cn": "星敏Z安装矩阵C12",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Matrix C12"
+  },
+  {
+   "id": "SAT-C40098.7.32",
+   "bits": "0098.7.32",
+   "name_cn": "星敏Z安装矩阵C20",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Matrix C20"
+  },
+  {
+   "id": "SAT-C40102.7.32",
+   "bits": "0102.7.32",
+   "name_cn": "星敏Z安装矩阵C21",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Matrix C21"
+  },
+  {
+   "id": "SAT-C40106.7.32",
+   "bits": "0106.7.32",
+   "name_cn": "星敏Z安装矩阵C22",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Matrix C22"
+  },
+  {
+   "id": "SAT-C40110.7.8",
+   "bits": "0110.7.8",
+   "name_cn": "光纤陀螺安装矩阵数据来源",
+   "formula": "F=HX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix Data Source"
+  },
+  {
+   "id": "SAT-C40111.7.32",
+   "bits": "0111.7.32",
+   "name_cn": "光纤陀螺安装矩阵C00",
+   "formula": "F=FX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix C00"
+  },
+  {
+   "id": "SAT-C40115.7.32",
+   "bits": "0115.7.32",
+   "name_cn": "光纤陀螺安装矩阵C01",
+   "formula": "F=FX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix C01"
+  },
+  {
+   "id": "SAT-C40119.7.32",
+   "bits": "0119.7.32",
+   "name_cn": "光纤陀螺安装矩阵C02",
+   "formula": "F=FX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix C02"
+  },
+  {
+   "id": "SAT-C40123.7.32",
+   "bits": "0123.7.32",
+   "name_cn": "光纤陀螺安装矩阵C10",
+   "formula": "F=FX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix C10"
+  },
+  {
+   "id": "SAT-C40127.7.32",
+   "bits": "0127.7.32",
+   "name_cn": "光纤陀螺安装矩阵C11",
+   "formula": "F=FX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix C11"
+  },
+  {
+   "id": "SAT-C40131.7.32",
+   "bits": "0131.7.32",
+   "name_cn": "光纤陀螺安装矩阵C12",
+   "formula": "F=FX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix C12"
+  },
+  {
+   "id": "SAT-C40135.7.32",
+   "bits": "0135.7.32",
+   "name_cn": "光纤陀螺安装矩阵C20",
+   "formula": "F=FX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix C20"
+  },
+  {
+   "id": "SAT-C40139.7.32",
+   "bits": "0139.7.32",
+   "name_cn": "光纤陀螺安装矩阵C21",
+   "formula": "F=FX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix C21"
+  },
+  {
+   "id": "SAT-C40143.7.32",
+   "bits": "0143.7.32",
+   "name_cn": "光纤陀螺安装矩阵C22",
+   "formula": "F=FX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix C22"
+  },
+  {
+   "id": "SAT-C40147.7.8",
+   "bits": "0147.7.8",
+   "name_cn": "光纤陀螺安装矩阵数据来源",
+   "formula": "F=HX",
+   "name_en": "Fiber Optic Gyroscope Installation Matrix Data Source"
+  },
+  {
+   "id": "SAT-C40148.7.32",
+   "bits": "0148.7.32",
+   "name_cn": "太敏安装矩阵C00",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Installation Matrix C00"
+  },
+  {
+   "id": "SAT-C40152.7.32",
+   "bits": "0152.7.32",
+   "name_cn": "太敏安装矩阵C01",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Installation Matrix C01"
+  },
+  {
+   "id": "SAT-C40156.7.32",
+   "bits": "0156.7.32",
+   "name_cn": "太敏安装矩阵C02",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Installation Matrix C02"
+  },
+  {
+   "id": "SAT-C40160.7.32",
+   "bits": "0160.7.32",
+   "name_cn": "太敏安装矩阵C10",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Installation Matrix C10"
+  },
+  {
+   "id": "SAT-C40164.7.32",
+   "bits": "0164.7.32",
+   "name_cn": "太敏安装矩阵C11",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Installation Matrix C11"
+  },
+  {
+   "id": "SAT-C40168.7.32",
+   "bits": "0168.7.32",
+   "name_cn": "太敏安装矩阵C12",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Installation Matrix C12"
+  },
+  {
+   "id": "SAT-C40172.7.32",
+   "bits": "0172.7.32",
+   "name_cn": "太敏安装矩阵C20",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Installation Matrix C20"
+  },
+  {
+   "id": "SAT-C40176.7.32",
+   "bits": "0176.7.32",
+   "name_cn": "太敏安装矩阵C21",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Installation Matrix C21"
+  },
+  {
+   "id": "SAT-C40180.7.32",
+   "bits": "0180.7.32",
+   "name_cn": "太敏安装矩阵C22",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Installation Matrix C22"
+  },
+  {
+   "id": "SAT-C40184.7.8",
+   "bits": "0184.7.8",
+   "name_cn": "太敏安装矩阵数据来源",
+   "formula": "F=HX",
+   "name_en": "Sun Sensor Installation Matrix Data Source"
+  },
+  {
+   "id": "SAT-C40185.7.32",
+   "bits": "0185.7.32",
+   "name_cn": "磁力矩器最大磁矩1",
+   "formula": "F=FX",
+   "name_en": "Magnetic Torque Device Maximum Magnetic Moment 1"
+  },
+  {
+   "id": "SAT-C40189.7.32",
+   "bits": "0189.7.32",
+   "name_cn": "磁力矩器最大磁矩2",
+   "formula": "F=FX",
+   "name_en": "Magnetic Torque Device Maximum Magnetic Moment 2"
+  },
+  {
+   "id": "SAT-C40193.7.32",
+   "bits": "0193.7.32",
+   "name_cn": "磁力矩器最大磁矩3",
+   "formula": "F=FX",
+   "name_en": "Magnetic Torque Device Maximum Magnetic Moment 3"
+  },
+  {
+   "id": "SAT-C40197.7.32",
+   "bits": "0197.7.32",
+   "name_cn": "磁力矩器最大磁矩4",
+   "formula": "F=FX",
+   "name_en": "Magnetic Torque Device Maximum Magnetic Moment 4"
+  },
+  {
+   "id": "SAT-C40201.7.32",
+   "bits": "0201.7.32",
+   "name_cn": "磁力矩器最大磁矩5",
+   "formula": "F=FX",
+   "name_en": "Magnetic Torque Device Maximum Magnetic Moment 5"
+  },
+  {
+   "id": "SAT-C40205.7.32",
+   "bits": "0205.7.32",
+   "name_cn": "磁力矩器最大磁矩6",
+   "formula": "F=FX",
+   "name_en": "Magnetic Torque Device Maximum Magnetic Moment 6"
+  },
+  {
+   "id": "SAT-C40209.7.8",
+   "bits": "0209.7.8",
+   "name_cn": "磁力矩器最大磁矩数据来源",
+   "formula": "F=HX",
+   "name_en": "Magnetic Torque Device Maximum Magnetic Moment Data Source"
+  },
+  {
+   "id": "SAT-C40210.7.8",
+   "bits": "0210.7.8",
+   "name_cn": "帧尾CBH",
+   "formula": "F=HX",
+   "name_en": "Frame Tail CBH"
+  }
+ ]
+}

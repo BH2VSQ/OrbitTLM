@@ -1,0 +1,421 @@
+{
+ "packet": "SAT-S2",
+ "main_type": 240,
+ "sub_type": 2,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "SAT-C20000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型",
+   "formula": "F={UX|F0H(卫星平台)}",
+   "name_en": "Telemetry Main Type"
+  },
+  {
+   "id": "SAT-C20001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|02H(第2类遥测)}",
+   "name_en": "Telemetry Sub Type"
+  },
+  {
+   "id": "SAT-C20002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=UX<s>",
+   "name_en": "OBC Time Accumulated Seconds Integer"
+  },
+  {
+   "id": "SAT-C20006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=UX<ms>",
+   "name_en": "OBC Time Seconds Fraction"
+  },
+  {
+   "id": "SAT-C20008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=UX<s>",
+   "name_en": "UTC Time Accumulated Seconds"
+  },
+  {
+   "id": "SAT-C20012.7.32",
+   "bits": "0012.7.32",
+   "name_cn": "飞轮X转速",
+   "formula": "F=SX/10000<rpm>",
+   "name_en": "Flywheel X Rotational Speed"
+  },
+  {
+   "id": "SAT-C20016.7.32",
+   "bits": "0016.7.32",
+   "name_cn": "飞轮Y转速",
+   "formula": "F=SX/10000<rpm>",
+   "name_en": "Flywheel Y Rotational Speed"
+  },
+  {
+   "id": "SAT-C20020.7.32",
+   "bits": "0020.7.32",
+   "name_cn": "飞轮Z转速",
+   "formula": "F=SX/10000<rpm>",
+   "name_en": "Flywheel Z Rotational Speed"
+  },
+  {
+   "id": "SAT-C20024.7.32",
+   "bits": "0024.7.32",
+   "name_cn": "飞轮S转速",
+   "formula": "F=SX/10000<rpm>",
+   "name_en": "Flywheel S Rotational Speed"
+  },
+  {
+   "id": "SAT-C20028.7.32",
+   "bits": "0028.7.32",
+   "name_cn": "星敏Yq0",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Quaternion q0"
+  },
+  {
+   "id": "SAT-C20032.7.32",
+   "bits": "0032.7.32",
+   "name_cn": "星敏Yq1",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Quaternion q1"
+  },
+  {
+   "id": "SAT-C20036.7.32",
+   "bits": "0036.7.32",
+   "name_cn": "星敏Yq2",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Quaternion q2"
+  },
+  {
+   "id": "SAT-C20040.7.32",
+   "bits": "0040.7.32",
+   "name_cn": "星敏Yq3",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Quaternion q3"
+  },
+  {
+   "id": "SAT-C20044.7.32",
+   "bits": "0044.7.32",
+   "name_cn": "星敏Y角速度X",
+   "formula": "F=SX*180/3373259368.5889<deg/s>",
+   "name_en": "Star Sensor Y Angular Velocity X"
+  },
+  {
+   "id": "SAT-C20048.7.32",
+   "bits": "0048.7.32",
+   "name_cn": "星敏Y角速度Y",
+   "formula": "F=SX*180/3373259368.5889<deg/s>",
+   "name_en": "Star Sensor Y Angular Velocity Y"
+  },
+  {
+   "id": "SAT-C20052.7.32",
+   "bits": "0052.7.32",
+   "name_cn": "星敏Y角速度Z",
+   "formula": "F=SX*180/3373259368.5889<deg/s>",
+   "name_en": "Star Sensor Y Angular Velocity Z"
+  },
+  {
+   "id": "SAT-C20056.7.8",
+   "bits": "0056.7.8",
+   "name_cn": "星敏Y识别星个数",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Y Number of Identified Stars"
+  },
+  {
+   "id": "SAT-C20057.7.8",
+   "bits": "0057.7.8",
+   "name_cn": "星敏Y姿态有效性标志",
+   "formula": "F={UX|1H(有效),0H(无效)}",
+   "name_en": "Star Sensor Y Attitude Validity Flag"
+  },
+  {
+   "id": "SAT-C20058.7.8",
+   "bits": "0058.7.8",
+   "name_cn": "星敏Y成像器件温度",
+   "formula": "F=SX",
+   "name_en": "Star Sensor Y Imaging Device Temperature"
+  },
+  {
+   "id": "SAT-C20059.7.32",
+   "bits": "0059.7.32",
+   "name_cn": "星敏Zq0",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Quaternion q0"
+  },
+  {
+   "id": "SAT-C20063.7.32",
+   "bits": "0063.7.32",
+   "name_cn": "星敏Zq1",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Quaternion q1"
+  },
+  {
+   "id": "SAT-C20067.7.32",
+   "bits": "0067.7.32",
+   "name_cn": "星敏Zq2",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Quaternion q2"
+  },
+  {
+   "id": "SAT-C20071.7.32",
+   "bits": "0071.7.32",
+   "name_cn": "星敏Zq3",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Quaternion q3"
+  },
+  {
+   "id": "SAT-C20075.7.32",
+   "bits": "0075.7.32",
+   "name_cn": "星敏Z角速度X",
+   "formula": "F=SX*180/3373259368.5889<deg/s>",
+   "name_en": "Star Sensor Z Angular Velocity X"
+  },
+  {
+   "id": "SAT-C20079.7.32",
+   "bits": "0079.7.32",
+   "name_cn": "星敏Z角速度Y",
+   "formula": "F=SX*180/3373259368.5889<deg/s>",
+   "name_en": "Star Sensor Z Angular Velocity Y"
+  },
+  {
+   "id": "SAT-C20083.7.32",
+   "bits": "0083.7.32",
+   "name_cn": "星敏Z角速度Z",
+   "formula": "F=SX*180/3373259368.5889<deg/s>",
+   "name_en": "Star Sensor Z Angular Velocity Z"
+  },
+  {
+   "id": "SAT-C20087.7.8",
+   "bits": "0087.7.8",
+   "name_cn": "星敏Z识别星个数",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Z Number of Identified Stars"
+  },
+  {
+   "id": "SAT-C20088.7.8",
+   "bits": "0088.7.8",
+   "name_cn": "星敏Z姿态有效性标志",
+   "formula": "F={UX|1H(有效),0H(无效)}",
+   "name_en": "Star Sensor Z Attitude Validity Flag"
+  },
+  {
+   "id": "SAT-C20089.7.8",
+   "bits": "0089.7.8",
+   "name_cn": "星敏Z成像器件温度",
+   "formula": "F=SX",
+   "name_en": "Star Sensor Z Imaging Device Temperature"
+  },
+  {
+   "id": "SAT-C20090.7.32",
+   "bits": "0090.7.32",
+   "name_cn": "光纤陀螺角速度X",
+   "formula": "F=SX/10000<deg/s>",
+   "name_en": "Fiber Optic Gyroscope Angular Velocity X"
+  },
+  {
+   "id": "SAT-C20094.7.32",
+   "bits": "0094.7.32",
+   "name_cn": "光纤陀螺角速度Y",
+   "formula": "F=SX/10000<deg/s>",
+   "name_en": "Fiber Optic Gyroscope Angular Velocity Y"
+  },
+  {
+   "id": "SAT-C20098.7.32",
+   "bits": "0098.7.32",
+   "name_cn": "光纤陀螺角速度Z",
+   "formula": "F=SX/10000<deg/s>",
+   "name_en": "Fiber Optic Gyroscope Angular Velocity Z"
+  },
+  {
+   "id": "SAT-C20102.7.32",
+   "bits": "0102.7.32",
+   "name_cn": "太敏alpha角",
+   "formula": "F=SX/10000<deg>",
+   "name_en": "Sun Sensor Alpha Angle"
+  },
+  {
+   "id": "SAT-C20106.7.32",
+   "bits": "0106.7.32",
+   "name_cn": "太敏beta角",
+   "formula": "F=SX/10000<deg>",
+   "name_en": "Sun Sensor Beta Angle"
+  },
+  {
+   "id": "SAT-C20110.7.32",
+   "bits": "0110.7.32",
+   "name_cn": "GPS位置X",
+   "formula": "F=SX*0.1<m>",
+   "name_en": "GPS Position X"
+  },
+  {
+   "id": "SAT-C20114.7.32",
+   "bits": "0114.7.32",
+   "name_cn": "GPS位置Y",
+   "formula": "F=SX*0.1<m>",
+   "name_en": "GPS Position Y"
+  },
+  {
+   "id": "SAT-C20118.7.32",
+   "bits": "0118.7.32",
+   "name_cn": "GPS位置Z",
+   "formula": "F=SX*0.1<m>",
+   "name_en": "GPS Position Z"
+  },
+  {
+   "id": "SAT-C20122.7.32",
+   "bits": "0122.7.32",
+   "name_cn": "GPS速度X",
+   "formula": "F=SX*0.01<m/s>",
+   "name_en": "GPS Velocity X"
+  },
+  {
+   "id": "SAT-C20126.7.32",
+   "bits": "0126.7.32",
+   "name_cn": "GPS速度Y",
+   "formula": "F=SX*0.01<m/s>",
+   "name_en": "GPS Velocity Y"
+  },
+  {
+   "id": "SAT-C20130.7.32",
+   "bits": "0130.7.32",
+   "name_cn": "GPS速度Z",
+   "formula": "F=SX*0.01<m/s>",
+   "name_en": "GPS Velocity Z"
+  },
+  {
+   "id": "SAT-C20134.7.16",
+   "bits": "0134.7.16",
+   "name_cn": "磁强计X轴强度",
+   "formula": "F=SX/15000<Gauss>",
+   "name_en": "Magnetometer X-axis Intensity"
+  },
+  {
+   "id": "SAT-C20136.7.16",
+   "bits": "0136.7.16",
+   "name_cn": "磁强计Y轴强度",
+   "formula": "F=SX/15000<Gauss>",
+   "name_en": "Magnetometer Y-axis Intensity"
+  },
+  {
+   "id": "SAT-C20138.7.16",
+   "bits": "0138.7.16",
+   "name_cn": "磁强计Z轴强度",
+   "formula": "F=SX/15000<Gauss>",
+   "name_en": "Magnetometer Z-axis Intensity"
+  },
+  {
+   "id": "SAT-C20140.7.32",
+   "bits": "0140.7.32",
+   "name_cn": "MEMS陀螺X轴角速度",
+   "formula": "F=SX/10000<deg/s>",
+   "name_en": "MEMS Gyroscope X-axis Angular Velocity"
+  },
+  {
+   "id": "SAT-C20144.7.32",
+   "bits": "0144.7.32",
+   "name_cn": "MEMS陀螺Y轴角速度",
+   "formula": "F=SX/10000<deg/s>",
+   "name_en": "MEMS Gyroscope Y-axis Angular Velocity"
+  },
+  {
+   "id": "SAT-C20148.7.32",
+   "bits": "0148.7.32",
+   "name_cn": "MEMS陀螺Z轴角速度",
+   "formula": "F=SX/10000<deg/s>",
+   "name_en": "MEMS Gyroscope Z-axis Angular Velocity"
+  },
+  {
+   "id": "SAT-C20152.7.32",
+   "bits": "0152.7.32",
+   "name_cn": "MEMS陀螺X轴加速度",
+   "formula": "F=SX/10000<m/s2>",
+   "name_en": "MEMS Gyroscope X-axis Acceleration"
+  },
+  {
+   "id": "SAT-C20156.7.32",
+   "bits": "0156.7.32",
+   "name_cn": "MEMS陀螺Y轴加速度",
+   "formula": "F=SX/10000<m/s2>",
+   "name_en": "MEMS Gyroscope Y-axis Acceleration"
+  },
+  {
+   "id": "SAT-C20160.7.32",
+   "bits": "0160.7.32",
+   "name_cn": "MEMS陀螺Z轴加速度",
+   "formula": "F=SX/10000<m/s2>",
+   "name_en": "MEMS Gyroscope Z-axis Acceleration"
+  },
+  {
+   "id": "SAT-C20164.7.32",
+   "bits": "0164.7.32",
+   "name_cn": "对目标偏差四元数q0",
+   "formula": "F=SX/10000",
+   "name_en": "Target Deviation Quaternion q0"
+  },
+  {
+   "id": "SAT-C20168.7.32",
+   "bits": "0168.7.32",
+   "name_cn": "对目标偏差四元数q1",
+   "formula": "F=SX/10000",
+   "name_en": "Target Deviation Quaternion q1"
+  },
+  {
+   "id": "SAT-C20172.7.32",
+   "bits": "0172.7.32",
+   "name_cn": "对目标偏差四元数q2",
+   "formula": "F=SX/10000",
+   "name_en": "Target Deviation Quaternion q2"
+  },
+  {
+   "id": "SAT-C20176.7.32",
+   "bits": "0176.7.32",
+   "name_cn": "对目标偏差四元数q3",
+   "formula": "F=SX/10000",
+   "name_en": "Target Deviation Quaternion q3"
+  },
+  {
+   "id": "SAT-C20180.7.32",
+   "bits": "0180.7.32",
+   "name_cn": "期望四元数q0",
+   "formula": "F=SX/10000",
+   "name_en": "Desired Quaternion q0"
+  },
+  {
+   "id": "SAT-C20184.7.32",
+   "bits": "0184.7.32",
+   "name_cn": "期望四元数q1",
+   "formula": "F=SX/10000",
+   "name_en": "Desired Quaternion q1"
+  },
+  {
+   "id": "SAT-C20188.7.32",
+   "bits": "0188.7.32",
+   "name_cn": "期望四元数q2",
+   "formula": "F=SX/10000",
+   "name_en": "Desired Quaternion q2"
+  },
+  {
+   "id": "SAT-C20192.7.32",
+   "bits": "0192.7.32",
+   "name_cn": "期望四元数q3",
+   "formula": "F=SX/10000",
+   "name_en": "Desired Quaternion q3"
+  },
+  {
+   "id": "SAT-C20196.7.32",
+   "bits": "0196.7.32",
+   "name_cn": "待执行延时指令计数",
+   "formula": "F=UX",
+   "name_en": "Pending Delayed Command Count"
+  },
+  {
+   "id": "SAT-C20200.7.8",
+   "bits": "0200.7.8",
+   "name_cn": "帧尾",
+   "formula": "F=UX",
+   "name_en": "Frame Tail"
+  }
+ ]
+}

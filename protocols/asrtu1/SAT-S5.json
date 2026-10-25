@@ -1,0 +1,449 @@
+{
+ "packet": "SAT-S5",
+ "main_type": 240,
+ "sub_type": 5,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "SAT-C50000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型",
+   "formula": "F={UX|F0H(卫星平台)}",
+   "name_en": "Telemetry Main Type"
+  },
+  {
+   "id": "SAT-C50001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|05H(第5类遥测)}",
+   "name_en": "Telemetry Sub Type"
+  },
+  {
+   "id": "SAT-C50002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=X<s>",
+   "name_en": "OBC Time Accumulated Seconds Integer"
+  },
+  {
+   "id": "SAT-C50006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=X<ms>",
+   "name_en": "OBC Time Seconds Fraction"
+  },
+  {
+   "id": "SAT-C50008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=X<s>",
+   "name_en": "UTC Time Accumulated Seconds"
+  },
+  {
+   "id": "SAT-C50012.7.32",
+   "bits": "0012.7.32",
+   "name_cn": "磁强计安装矩阵C00",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Installation Matrix C00"
+  },
+  {
+   "id": "SAT-C50016.7.32",
+   "bits": "0016.7.32",
+   "name_cn": "磁强计安装矩阵C01",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Installation Matrix C01"
+  },
+  {
+   "id": "SAT-C50020.7.32",
+   "bits": "0020.7.32",
+   "name_cn": "磁强计安装矩阵C02",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Installation Matrix C02"
+  },
+  {
+   "id": "SAT-C50024.7.32",
+   "bits": "0024.7.32",
+   "name_cn": "磁强计安装矩阵C10",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Installation Matrix C10"
+  },
+  {
+   "id": "SAT-C50028.7.32",
+   "bits": "0028.7.32",
+   "name_cn": "磁强计安装矩阵C11",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Installation Matrix C11"
+  },
+  {
+   "id": "SAT-C50032.7.32",
+   "bits": "0032.7.32",
+   "name_cn": "磁强计安装矩阵C12",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Installation Matrix C12"
+  },
+  {
+   "id": "SAT-C50036.7.32",
+   "bits": "0036.7.32",
+   "name_cn": "磁强计安装矩阵C20",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Installation Matrix C20"
+  },
+  {
+   "id": "SAT-C50040.7.32",
+   "bits": "0040.7.32",
+   "name_cn": "磁强计安装矩阵C21",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Installation Matrix C21"
+  },
+  {
+   "id": "SAT-C50044.7.32",
+   "bits": "0044.7.32",
+   "name_cn": "磁强计安装矩阵C22",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Installation Matrix C22"
+  },
+  {
+   "id": "SAT-C50048.7.8",
+   "bits": "0048.7.8",
+   "name_cn": "磁强计安装矩阵数据来源",
+   "formula": "F=HX",
+   "name_en": "Magnetometer Installation Matrix Data Source"
+  },
+  {
+   "id": "SAT-C50049.7.32",
+   "bits": "0049.7.32",
+   "name_cn": "星敏Y安装四元数Q0",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Quaternion Q0"
+  },
+  {
+   "id": "SAT-C50053.7.32",
+   "bits": "0053.7.32",
+   "name_cn": "星敏Y安装四元数Q1",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Quaternion Q1"
+  },
+  {
+   "id": "SAT-C50057.7.32",
+   "bits": "0057.7.32",
+   "name_cn": "星敏Y安装四元数Q2",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Quaternion Q2"
+  },
+  {
+   "id": "SAT-C50061.7.32",
+   "bits": "0061.7.32",
+   "name_cn": "星敏Y安装四元数Q3",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Y Installation Quaternion Q3"
+  },
+  {
+   "id": "SAT-C50065.7.8",
+   "bits": "0065.7.8",
+   "name_cn": "星敏Y安装四元数数据来源",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Y Installation Quaternion Data Source"
+  },
+  {
+   "id": "SAT-C50066.7.32",
+   "bits": "0066.7.32",
+   "name_cn": "星敏Z安装四元数Q0",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Quaternion Q0"
+  },
+  {
+   "id": "SAT-C50070.7.32",
+   "bits": "0070.7.32",
+   "name_cn": "星敏Z安装四元数Q1",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Quaternion Q1"
+  },
+  {
+   "id": "SAT-C50074.7.32",
+   "bits": "0074.7.32",
+   "name_cn": "星敏Z安装四元数Q2",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Quaternion Q2"
+  },
+  {
+   "id": "SAT-C50078.7.32",
+   "bits": "0078.7.32",
+   "name_cn": "星敏Z安装四元数Q3",
+   "formula": "F=FX",
+   "name_en": "Star Sensor Z Installation Quaternion Q3"
+  },
+  {
+   "id": "SAT-C50082.7.8",
+   "bits": "0082.7.8",
+   "name_cn": "星敏Z安装四元数数据来源",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Z Installation Quaternion Data Source"
+  },
+  {
+   "id": "SAT-C50083.7.32",
+   "bits": "0083.7.32",
+   "name_cn": "单轴转三轴姿态有效计数上限",
+   "formula": "F=FX",
+   "name_en": "Single-axis to Three-axis Attitude Valid Count Upper Limit"
+  },
+  {
+   "id": "SAT-C50087.7.32",
+   "bits": "0087.7.32",
+   "name_cn": "太敏超视场及太阳角大于60度计数上限",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Out-of-FOV and Sun Angle Greater than 60 Degrees Count Upper Limit"
+  },
+  {
+   "id": "SAT-C50091.7.32",
+   "bits": "0091.7.32",
+   "name_cn": "实现对日后转为三轴对日间隔",
+   "formula": "F=FX",
+   "name_en": "Interval After Sun-pointing Transition to Three-axis Sun-pointing"
+  },
+  {
+   "id": "SAT-C50095.7.32",
+   "bits": "0095.7.32",
+   "name_cn": "整星角动量开始消旋阈值（上限）",
+   "formula": "F=FX",
+   "name_en": "Total Angular Momentum Start Despin Threshold (Upper Limit)"
+  },
+  {
+   "id": "SAT-C50099.7.32",
+   "bits": "0099.7.32",
+   "name_cn": "关飞轮进消旋转速",
+   "formula": "F=FX",
+   "name_en": "Flywheel Shut-off Despin Rotational Speed"
+  },
+  {
+   "id": "SAT-C50103.7.32",
+   "bits": "0103.7.32",
+   "name_cn": "整星角速度结束消旋阈值（下限）",
+   "formula": "F=FX",
+   "name_en": "Total Angular Velocity End Despin Threshold (Lower Limit)"
+  },
+  {
+   "id": "SAT-C50107.7.32",
+   "bits": "0107.7.32",
+   "name_cn": "飞轮卸载阈值转速",
+   "formula": "F=FX",
+   "name_en": "Flywheel Unload Threshold Rotational Speed"
+  },
+  {
+   "id": "SAT-C50111.7.32",
+   "bits": "0111.7.32",
+   "name_cn": "飞轮标称转速",
+   "formula": "F=FX",
+   "name_en": "Flywheel Nominal Rotational Speed"
+  },
+  {
+   "id": "SAT-C50115.7.32",
+   "bits": "0115.7.32",
+   "name_cn": "母线电压阈值11.6V",
+   "formula": "F=FX",
+   "name_en": "Bus Voltage Threshold 11.6V"
+  },
+  {
+   "id": "SAT-C50119.7.32",
+   "bits": "0119.7.32",
+   "name_cn": "母线电压阈值11V",
+   "formula": "F=FX",
+   "name_en": "Bus Voltage Threshold 11V"
+  },
+  {
+   "id": "SAT-C50123.7.32",
+   "bits": "0123.7.32",
+   "name_cn": "母线电压阈值10.4V",
+   "formula": "F=FX",
+   "name_en": "Bus Voltage Threshold 10.4V"
+  },
+  {
+   "id": "SAT-C50127.7.32",
+   "bits": "0127.7.32",
+   "name_cn": "载荷工作时长上限",
+   "formula": "F=FX",
+   "name_en": "Load Operation Duration Upper Limit"
+  },
+  {
+   "id": "SAT-C50131.7.32",
+   "bits": "0131.7.32",
+   "name_cn": "母线电压计数阈值",
+   "formula": "F=FX",
+   "name_en": "Bus Voltage Count Threshold"
+  },
+  {
+   "id": "SAT-C50135.7.32",
+   "bits": "0135.7.32",
+   "name_cn": "停控角速度阈值",
+   "formula": "F=FX",
+   "name_en": "Stop Control Angular Velocity Threshold"
+  },
+  {
+   "id": "SAT-C50139.7.32",
+   "bits": "0139.7.32",
+   "name_cn": "太阳矢量X",
+   "formula": "F=FX",
+   "name_en": "Sun Vector X"
+  },
+  {
+   "id": "SAT-C50143.7.32",
+   "bits": "0143.7.32",
+   "name_cn": "太阳矢量Y",
+   "formula": "F=FX",
+   "name_en": "Sun Vector Y"
+  },
+  {
+   "id": "SAT-C50147.7.32",
+   "bits": "0147.7.32",
+   "name_cn": "太阳矢量Z",
+   "formula": "F=FX",
+   "name_en": "Sun Vector Z"
+  },
+  {
+   "id": "SAT-C50151.7.8",
+   "bits": "0151.7.8",
+   "name_cn": "模式切换阈值数据来源",
+   "formula": "F=HX",
+   "name_en": "Mode Switching Threshold Data Source"
+  },
+  {
+   "id": "SAT-C50152.7.32",
+   "bits": "0152.7.32",
+   "name_cn": "当班机状态",
+   "formula": "F=HX",
+   "name_en": "Current Onboard Status"
+  },
+  {
+   "id": "SAT-C50156.7.8",
+   "bits": "0156.7.8",
+   "name_cn": "当班机状态来源",
+   "formula": "F=HX",
+   "name_en": "Current Onboard Status Source"
+  },
+  {
+   "id": "SAT-C50157.7.32",
+   "bits": "0157.7.32",
+   "name_cn": "烧绳次数上限",
+   "formula": "F=UX",
+   "name_en": "Burn Rope Count Upper Limit"
+  },
+  {
+   "id": "SAT-C50161.7.8",
+   "bits": "0161.7.8",
+   "name_cn": "烧绳次数上限来源",
+   "formula": "F=HX",
+   "name_en": "Burn Rope Count Upper Limit Source"
+  },
+  {
+   "id": "SAT-C50162.7.32",
+   "bits": "0162.7.32",
+   "name_cn": "烧绳后空闲周期",
+   "formula": "F=UX",
+   "name_en": "Idle Cycle After Burn Rope"
+  },
+  {
+   "id": "SAT-C50166.7.8",
+   "bits": "0166.7.8",
+   "name_cn": "烧绳后空闲周期数据来源",
+   "formula": "F=HX",
+   "name_en": "Idle Cycle After Burn Rope Data Source"
+  },
+  {
+   "id": "SAT-C50167.7.32",
+   "bits": "0167.7.32",
+   "name_cn": "GPS是否自动开启",
+   "formula": "F=HX",
+   "name_en": "GPS Auto-Enable Status"
+  },
+  {
+   "id": "SAT-C50171.7.8",
+   "bits": "0171.7.8",
+   "name_cn": "GPS是否自动开启数据来源",
+   "formula": "F=HX",
+   "name_en": "GPS Auto-Enable Status Data Source"
+  },
+  {
+   "id": "SAT-C50172.7.32",
+   "bits": "0172.7.32",
+   "name_cn": "磁强计补偿值X",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Compensation Value X"
+  },
+  {
+   "id": "SAT-C50176.7.32",
+   "bits": "0176.7.32",
+   "name_cn": "磁强计补偿值Y",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Compensation Value Y"
+  },
+  {
+   "id": "SAT-C50180.7.32",
+   "bits": "0180.7.32",
+   "name_cn": "磁强计补偿值Z",
+   "formula": "F=FX",
+   "name_en": "Magnetometer Compensation Value Z"
+  },
+  {
+   "id": "SAT-C50184.7.8",
+   "bits": "0184.7.8",
+   "name_cn": "磁强计补偿值数据来源",
+   "formula": "F=HX",
+   "name_en": "Magnetometer Compensation Value Data Source"
+  },
+  {
+   "id": "SAT-C50185.7.32",
+   "bits": "0185.7.32",
+   "name_cn": "数传自动开启时间(s)",
+   "formula": "F=UX",
+   "name_en": "Data Transmission Auto-Enable Time (s)"
+  },
+  {
+   "id": "SAT-C50189.7.32",
+   "bits": "0189.7.32",
+   "name_cn": "数传自动开启最低电压(mV)",
+   "formula": "F=UX",
+   "name_en": "Data Transmission Auto-Enable Minimum Voltage (mV)"
+  },
+  {
+   "id": "SAT-C50193.7.8",
+   "bits": "0193.7.8",
+   "name_cn": "数传自动开启时间数据来源",
+   "formula": "F=HX",
+   "name_en": "Data Transmission Auto-Enable Time Data Source"
+  },
+  {
+   "id": "SAT-C50194.7.32",
+   "bits": "0194.7.32",
+   "name_cn": "保留1",
+   "formula": "F=X",
+   "name_en": "Reserved1"
+  },
+  {
+   "id": "SAT-C50198.7.32",
+   "bits": "0198.7.32",
+   "name_cn": "保留2",
+   "formula": "F=X",
+   "name_en": "Reserved2"
+  },
+  {
+   "id": "SAT-C50202.7.32",
+   "bits": "0202.7.32",
+   "name_cn": "保留1",
+   "formula": "F=X",
+   "name_en": "Reserved1"
+  },
+  {
+   "id": "SAT-C50206.7.32",
+   "bits": "0206.7.32",
+   "name_cn": "保留2",
+   "formula": "F=X",
+   "name_en": "Reserved2"
+  },
+  {
+   "id": "SAT-C50210.7.8",
+   "bits": "0210.7.8",
+   "name_cn": "帧尾CBH",
+   "formula": "F=HX",
+   "name_en": "Frame Tail CBH"
+  }
+ ]
+}
