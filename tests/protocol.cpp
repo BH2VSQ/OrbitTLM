@@ -3,6 +3,7 @@
 #include "ssdv.h"
 #include "transport.h"
 #include "business.h"
+#include "by04.h"
 #include <QCoreApplication>
 #include <QtTest/QtTest>
 #include <QFile>
@@ -404,6 +405,82 @@ private slots:
         QCOMPARE(b.subType,0x0f);
         QCOMPARE(b.fields.size(),0);
         QCOMPARE(b.identification,QString("unmatched_legacy_envelope_candidate"));
+    }
+    void by04KnownSpacecraftIdAndVcDemultiplex(){
+        QByteArray vc1(223,char(0));vc1[0]=char(0x20);vc1[1]=char(0x52);
+        vc1[2]=char(1);vc1[3]=char(1);
+        QByteArray vc2=vc1;vc2[1]=char(0x54);
+        Frame f1=Protocol::parse(vc1,"BY04");
+        Frame f2=Protocol::parse(vc2,"BY04");
+        QCOMPARE(By04Decoder::spacecraftId(vc1),0x205);
+        QCOMPARE(By04Decoder::spacecraftId(vc2),0x205);
+        QCOMPARE(f1.vcid,1);QCOMPARE(f2.vcid,2);
+        const auto packets=Transport::reassemble({f1,f2});
+        QCOMPARE(packets.size(),0); // VC1 SSDV bytes are NOT a KISS stream
+    }
+    void by04CcsdsSpacePacketGetsHeaderFieldsNotInventedEngineering(){
+        QByteArray payload(192,char(0));
+        payload[0]=char(0x0f);payload[1]=char(0x12);
+        payload[2]=char(0x74);payload[3]=char(0x82);
+        const QByteArray source=QByteArray::fromHex("08F0FBA100BF")+payload;
+        QByteArray frame=QByteArray::fromHex("2054010100");
+        frame.append(char(0xc0));frame+=source;frame.append(char(0xc0));
+        frame+=QByteArray(223-frame.size(),char(0xaa));
+        const auto f=Protocol::parse(frame,"BY04");
+        const auto packets=Transport::reassemble({f});
+        QCOMPARE(packets.size(),1);
+        QCOMPARE(packets[0].apid,0xf0);
+        QCOMPARE(packets[0].sequence,0x3ba1);
+        QCOMPARE(packets[0].data.size(),192);
+        const auto output=By04Decoder::decodeAll(packets);
+        QCOMPARE(output.size(),1);
+        QCOMPARE(output[0].packetName,QString("BY04-CCSDS"));
+        QCOMPARE(output[0].identification,QString("by04_ccsds_header_only"));
+        QCOMPARE(output[0].fields.size(),7);
+        QCOMPARE(output[0].fields[0].value,QString("240"));
+        QCOMPARE(output[0].fields[3].value,QString("192"));
+        QCOMPARE(output[0].fields[6].status,QString("raw_unverified_business"));
+        QVERIFY(output[0].packetLabel.contains("BY04"));
+    }
+    void by04DslwpNativeVcidOneImageWithSourceVerifiedCrc(){
+        QByteArray frame(223,char(0));
+        frame[0]=char(0x20);frame[1]=char(0x52);
+        frame[2]=char(17);frame[3]=char(7);
+        QByteArray data(218,char(0));
+        data[0]=char(0x2b);data[1]=char(0);data[2]=char(0x22);
+        data[3]=char(20);data[4]=char(15); // 320 x 240
+        data[7]=char(0xff);data[8]=char(0xff);
+        // Independent known reference CRC vector (CRC32 with the DSLWP seed).
+        data.replace(214,4,QByteArray::fromHex("790B3FDF"));
+        frame.replace(5,218,data);
+        const auto parsed=Protocol::parse(frame,"BY04");
+        const auto recovered=By04Decoder::images({parsed});
+        QCOMPARE(recovered.size(),1);
+        QCOMPARE(recovered[0].imageId,43);
+        QCOMPARE(recovered[0].packetId,34);
+        QCOMPARE(recovered[0].width,320);
+        QCOMPARE(recovered[0].height,240);
+        QCOMPARE(recovered[0].bytes.size(),218);
+        QCOMPARE(recovered[0].status,QString("dslwp_crc32_pass"));
+        auto altered=frame;altered[5+40]=char(0x77);
+        const auto damaged=By04Decoder::images({Protocol::parse(altered,"BY04")});
+        QCOMPARE(damaged.size(),1);
+        QCOMPARE(damaged[0].status,QString("dslwp_crc32_failed"));
+    }
+    void by04MixedVcAndWrongSpacecraftIdAreNotParsedAsKiss(){
+        QByteArray payload(192,char(0));
+        QByteArray encoded=QByteArray::fromHex("08D2FBA100BF")+payload;
+        auto wrap=[&](QByteArray header) {
+            header.append(char(0xc0));header+=encoded;header.append(char(0xc0));
+            header+=QByteArray(223-header.size(),char(0xaa));
+            return Protocol::parse(header,"BY04");
+        };
+        const auto legitimate=wrap(QByteArray::fromHex("2054010100"));
+        const auto wrongScid=wrap(QByteArray::fromHex("0324010200"));
+        const auto rawVc1=wrap(QByteArray::fromHex("2052010100"));
+        const auto pkts=Transport::reassemble({legitimate,wrongScid,rawVc1});
+        QCOMPARE(pkts.size(),1);
+        QCOMPARE(pkts[0].apid,0x0d2);
     }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
