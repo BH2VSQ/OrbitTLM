@@ -334,6 +334,28 @@ private slots:
         QVERIFY(decoded.skippedFields>0);
         QCOMPARE(decoded.transport.integrity,QString("not_crc_verified"));
     }
+    void fieldTableCoverageAcrossAll27PacketKinds(){
+        BusinessCatalog catalog;QString error;
+        QVERIFY2(catalog.loadDirectory(QCoreApplication::applicationDirPath()+
+                 "/protocols/asrtu1",&error),qPrintable(error));
+        int decoded=0,unknownFormula=0,invalidSource=0;
+        for(const auto &id:catalog.packetTypeIds()){
+            QByteArray raw(8192,char(0));
+            raw[0]=char(id.first);
+            raw[1]=char(id.second);
+            ApplicationPacket p;p.bytes=raw;p.satellite="ASRTU-1";
+            auto out=catalog.decode(p);
+            QVERIFY2(!out.packetName.isEmpty(),qPrintable(QString::number(id.first)));
+            for(const auto &field:out.fields){
+                if(field.status=="raw_unsupported_formula")++unknownFormula;
+                else if(field.status=="invalid_source_bit_position")++invalidSource;
+                else ++decoded;
+            }
+        }
+        QVERIFY(decoded>1800);
+        QVERIFY(unknownFormula<40);
+        QVERIFY(invalidSource<20);
+    }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
         QVERIFY(f.complete);

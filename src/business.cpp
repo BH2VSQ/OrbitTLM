@@ -198,6 +198,11 @@ bool BusinessCatalog::loadDirectory(const QString &directory,QString *error){
     if(loaded.isEmpty()){if(error)*error="No packet definitions in "+directory;return false;}
     kinds_=std::move(loaded);return true;
 }
+QVector<QPair<int,int>> BusinessCatalog::packetTypeIds()const{
+    QVector<QPair<int,int>> ids;
+    for(const auto &packet:kinds_)ids.push_back({packet.main,packet.sub});
+    return ids;
+}
 int BusinessCatalog::fieldDefinitions()const{
     int total=0;for(const auto &k:kinds_)total+=k.fields.size();return total;
 }

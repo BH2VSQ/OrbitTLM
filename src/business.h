@@ -23,6 +23,7 @@ public:
     bool loadDirectory(const QString &directory,QString *error=nullptr);
     int packetKinds() const {return kinds_.size();}
     int fieldDefinitions() const;
+    QVector<QPair<int,int>> packetTypeIds() const;
     BusinessPacket decode(const ApplicationPacket &packet) const;
     QVector<BusinessPacket> decodeAll(const QVector<ApplicationPacket> &packets,
                                       BusinessStats *stats=nullptr) const;
