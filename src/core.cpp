@@ -55,37 +55,50 @@ void candidateQuaternion(Frame &f) {
 }
 }
 Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
-    Frame f;f.bytes=raw;f.hash=sha(raw);f.satellite=satellite;
-    if(raw.size()!=223){f.error="Incomplete/non-223-byte record";return f;}
-    const int b0=byte(raw,0),b1=byte(raw,1);
-    if((b0>>6)!=0){f.error="Unsupported TM version";return f;}
-    f.master=byte(raw,2);f.virtualCount=byte(raw,3);f.vcid=(b1>>1)&7;
-    if(f.vcid!=0 && f.vcid!=2) {
-        f.error="Unrecognized VCID; preserved without guessed application decoding";return f;
+    Frame f;
+    f.bytes=raw;f.hash=sha(raw);f.satellite=satellite;
+    if(raw.size()!=223) {
+        f.error="RS information frame requires exactly 223 bytes (5-byte TM + 218 data)";
+        return f;
     }
-    const int start=raw.indexOf(char(0xc0),5);
-    if(start<0){f.error="Missing KISS opening delimiter (or continuation)";return f;}
-    const int end=raw.indexOf(char(0xc0),start+1);
-    if(end<0){f.error="Missing KISS closing delimiter (or continuation)";return f;}
+    const int first=byte(raw,0), second=byte(raw,1);
+    if((first>>6)!=0) {
+        f.error="Unsupported CCSDS short TM transfer-frame version";
+        return f;
+    }
+    // The fifth octet is a first-header pointer field, NOT a packet length.
+    // The on-air RS codeword is longer than these 223 decoded information octets.
+    f.master=byte(raw,2);
+    f.virtualCount=byte(raw,3);
+    f.vcid=(second>>1)&0x07;
+    f.complete=true; // TM structural validity only; application packets may cross frame boundaries.
+    f.quality="structural_only";
+    f.error="TM frame accepted; application CRC and RS parity not verified here";
+    f.fields.push_back({"tm.vcid",QString::number(f.vcid),"","verified_protocol"});
+    f.fields.push_back({"tm.first_header_pointer",QString::number(byte(raw,4)),"","verified_protocol"});
+    f.fields.push_back({"tm.master_count",QString::number(f.master),"","verified_protocol"});
+    f.fields.push_back({"tm.virtual_count",QString::number(f.virtualCount),"","verified_protocol"});
+    // Compatibility preview: a single KISS packet MAY contain a CCSDS Space Packet.
+    // Neither the six-byte header nor a single complete packet is mandatory.
+    const QByteArray zone=raw.mid(5,218);
+    f.payload=zone;
+    const int open=zone.indexOf(char(0xc0));
+    if(open<0)return f;
+    const int close=zone.indexOf(char(0xc0),open+1);
+    if(close<0)return f;
     QByteArray packet;
-    if(!kiss(raw.mid(start+1,end-start-1),packet)) {
-        f.error="Malformed KISS escape";return f;
-    }
-    if(packet.size()<7){f.error="Short CCSDS Space Packet";return f;}
+    if(!kiss(zone.mid(open+1,close-open-1),packet))return f;
+    if(packet.size()<7)return f;
     const int header=(byte(packet,0)<<8)|byte(packet,1);
     const int seq=(byte(packet,2)<<8)|byte(packet,3);
-    const int length=((byte(packet,4)<<8)|byte(packet,5))+1;
-    if((header>>13)!=0){f.error="Unexpected CCSDS packet version";return f;}
-    if(packet.size()!=length+6){
-        f.error=QString("Space Packet size %1 != declared %2").arg(packet.size()).arg(length+6);return f;
-    }
-    f.complete=true;f.apid=header&0x7ff;f.sequence=seq&0x3fff;
-    f.payload=packet.mid(6);f.quality="structural_only";
-    f.error="No parity bytes available: RS validity cannot be independently certified";
-    f.fields.push_back({"ccsds.apid",QString::number(f.apid),"","verified_protocol"});
-    f.fields.push_back({"ccsds.vcid",QString::number(f.vcid),"","verified_protocol"});
-    f.fields.push_back({"ccsds.sequence",QString::number(f.sequence),"","verified_protocol"});
-    candidateQuaternion(f);
+    const int length=1+(byte(packet,4)<<8)+byte(packet,5);
+    if((header>>13)!=0 || length+6!=packet.size())return f;
+    f.apid=header&0x7ff;
+    f.sequence=seq&0x3fff;
+    f.payload=packet.mid(6);
+    f.fields.push_back({"candidate.ccsds.apid",QString::number(f.apid),"","header_candidate"});
+    f.fields.push_back({"candidate.ccsds.sequence",QString::number(f.sequence),"","header_candidate"});
+    candidateQuaternion(f); // experimental offset within *candidate* inner payload
     return f;
 }
 QVector<Frame> Protocol::fromLog(const QString &path,const QString &satellite,QString *error){
