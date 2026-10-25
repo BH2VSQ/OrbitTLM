@@ -126,13 +126,19 @@ private slots:
         a.payload=bytes.left(128);
         b.apid=a.apid;b.sequence=12;b.complete=true;b.quality=a.quality;
         b.payload=bytes.mid(128);
-        const auto found=ImageTools::candidates({a,b},0x321);
+        ApplicationPacket pa,pb;
+        pa.apid=0x321;pa.sequence=11;pa.fecEvidence="log_fec_reported";
+        pa.classification="ccsds_space_packet_candidate";
+        pa.data=bytes.left(128);
+        pb=pa;pb.sequence=12;pb.data=bytes.mid(128);
+        const auto found=ImageTools::candidatesFromKiss({pa,pb},0x321);
         QCOMPARE(found.size(),1);
         QCOMPARE(found[0].packetId,1);
         QCOMPARE(found[0].width,320);
-        QCOMPARE(ImageTools::candidates({a,b},0x320).size(),0);
+        QCOMPARE(ImageTools::candidatesFromKiss({pa,pb},0x320).size(),0);
         b.sequence=14;
-        QCOMPARE(ImageTools::candidates({a,b},0x321).size(),0);
+        pb.sequence=14;
+        QCOMPARE(ImageTools::candidatesFromKiss({pa,pb},0x321).size(),0);
     }
 
     void physicalHeaderIsFiveBytes(){
