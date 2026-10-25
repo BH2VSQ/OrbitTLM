@@ -1,5 +1,8 @@
 #include "core.h"
 #include "schema.h"
+#include "ssdv.h"
+#include <QProcess>
+#include <QPixmap>
 #include <QFileInfo>
 #include <QSignalBlocker>
 #include <QApplication>
@@ -118,6 +121,46 @@ public:
             fillTable();updateChart();
             statusBar()->showMessage("Loaded "+path+" (engineering semantics require independent validation)",8000);
         });
+        menu->addAction("Extract SSDV candidates...",[this]{
+            bool ok=false;
+            const int apid=QInputDialog::getInt(this,"SSDV candidates",
+                  "Choose verified image APID (decimal)",240,0,2047,1,&ok);
+            if(!ok)return;
+            const auto packets=ImageTools::candidates(frames_,apid);
+            if(packets.isEmpty()){
+                QMessageBox::information(this,"SSDV","No 256-byte SSDV candidate packets on this APID.");
+                return;
+            }
+            const QString target=QFileDialog::getSaveFileName(this,"Export unverified SSDV candidates",
+                                            "candidate.ssdv","SSDV bytes (*.ssdv *.bin)");
+            if(target.isEmpty())return;
+            QString reason;
+            if(!ImageTools::savePackets(packets,target,&reason))
+                QMessageBox::warning(this,"SSDV export",reason);
+            else QMessageBox::information(this,"SSDV",
+                    QString("%1 unverified SSDV candidates exported. Independent CRC/RS checks still required.").arg(packets.size()));
+        });
+        menu->addAction("Decode SSDV using installed CLI...",[this]{
+            const QString tool=QFileDialog::getOpenFileName(this,"Choose trusted SSDV CLI executable");
+            if(tool.isEmpty())return;
+            const QString input=QFileDialog::getOpenFileName(this,"Choose SSDV packet stream",{},"SSDV (*.ssdv *.bin)");
+            if(input.isEmpty())return;
+            const QString output=QFileDialog::getSaveFileName(this,"Output JPEG","decoded.jpg","JPEG (*.jpg *.jpeg)");
+            if(output.isEmpty())return;
+            auto *job=new QProcess(this);
+            connect(job,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,
+               [this,job,output](int code,QProcess::ExitStatus status){
+                  if(code==0&&status==QProcess::NormalExit&&!QPixmap(output).isNull()){
+                      QPixmap img(output);
+                      imagePane_->setPixmap(img.scaled(imagePane_->size(),Qt::KeepAspectRatio,
+                                                       Qt::SmoothTransformation));
+                      statusBar()->showMessage("Image decoded by external tool: "+output,9000);
+                  }else QMessageBox::warning(this,"SSDV decode",
+                           "External decoder failed: "+QString::fromUtf8(job->readAllStandardError()));
+                  job->deleteLater();
+               });
+            job->start(tool,{"-d",input,output});
+        });
         menu->addSeparator();
         menu->addAction("Export CSV",[this]{exportFile(true);});
         menu->addAction("Export JSON",[this]{exportFile(false);});
@@ -202,10 +245,10 @@ public:
         chartLayout->addWidget(chart_,1);right->addTab(chartPage,"Time series");
         auto attitude=new AttitudeView;
         attitude_=attitude;right->addTab(attitude,"Attitude preview");
-        auto imagePane=new QLabel("No verified SSDV image in session. Raw packets are preserved.\n"
+        imagePane_=new QLabel("No verified SSDV image in session. Raw packets are preserved.\n"
               "Image reconstruction requires independently identified SSDV packets.");
-        imagePane->setWordWrap(true);imagePane->setAlignment(Qt::AlignCenter);
-        right->addTab(imagePane,"Images");
+        imagePane_->setWordWrap(true);imagePane_->setAlignment(Qt::AlignCenter);
+        right->addTab(imagePane_,"Images");
         auto controls=new QHBoxLayout;
         auto play=new QPushButton("Play");controls->addWidget(play);
         auto pause=new QPushButton("Pause");controls->addWidget(pause);
@@ -354,7 +397,7 @@ private:
     Schema schema_;
     bool hasSchema_=false;
     QVector<Frame> frames_;
-    QLabel *sources_=nullptr,*banner_=nullptr,*timeLabel_=nullptr;
+    QLabel *sources_=nullptr,*banner_=nullptr,*timeLabel_=nullptr,*imagePane_=nullptr;
     QComboBox *satellite_=nullptr,*speed_=nullptr,*chartSelect_=nullptr;
     QLineEdit *filter_=nullptr;
     QTableWidget *framesTable_=nullptr,*fieldsTable_=nullptr;
