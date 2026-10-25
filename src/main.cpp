@@ -176,6 +176,7 @@ public:
             const int index=names.indexOf(choice);
             frames_=database_.load(sessions[index].first,&problem);
             if(!problem.isEmpty()){QMessageBox::warning(this,"SQLite",problem);return;}
+            rebuildPackets();
             fillTable();
             timeline_->setRange(0,std::max(0,int(frames_.size())-1));
             if(!frames_.isEmpty())showFrame(0);
@@ -236,7 +237,7 @@ public:
         connect(live_,&LiveTcp::status,this,[this](const QString &s){statusBar()->showMessage(s,6000);});
         connect(live_,&LiveTcp::received,this,[this](const Frame &f){
             for(const auto &x:frames_)if(x.hash==f.hash)return;
-            frames_.push_back(f);fillTable();timeline_->setMaximum(std::max(0,int(frames_.size())-1));
+            frames_.push_back(f);rebuildPackets();fillTable();timeline_->setMaximum(std::max(0,int(frames_.size())-1));
             statusBar()->showMessage("TCP frame received (RS parity not independently verified)",3000);
         });
 
