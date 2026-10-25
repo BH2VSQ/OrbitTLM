@@ -286,8 +286,6 @@ private slots:
     void optionalSpaceHeaderInsideValidatedCrcEnvelope(){
         QByteArray inner=QByteArray::fromHex("08f0fba10000");
         inner+=char(0x05);
-        const quint16 crc=qChecksum(inner.constData(),size_t(inner.size()),
-                                    Qt::ChecksumIso3309);
         // This test does not assert that Qt's CRC is the satellite CRC.
         // Use the exact explicit profile obtained by brute-force test data:
         CrcConfig config;
@@ -300,7 +298,6 @@ private slots:
             v^=quint32(quint8(x))<<8;
             for(int i=0;i<8;++i)v=(v&0x8000)?((v<<1)^0x1021)&0xffff:(v<<1)&0xffff;
         }
-        Q_UNUSED(crc);
         envelope+=char((v>>8)&0xff);envelope+=char(v&0xff);
         QByteArray tm=QByteArray::fromHex("2054010100");
         tm+=char(0xc0);tm+=envelope;tm+=char(0xc0);
