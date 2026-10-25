@@ -49,7 +49,8 @@ BusinessPacket By04Decoder::decode(const ApplicationPacket &packet){
     result.packetName=QStringLiteral("BY04-CCSDS");
     result.packetLabel=QStringLiteral("BY04 应用包 · APID %1").arg(hex(packet.apid,3));
     result.identification="by04_ccsds_header_only";
-    result.mainType=packet.apid; // This is an APID, NOT a mission service type.
+    // APID is not a BY04 mission subsystem main/sub type.
+    result.mainType=-1;
     result.subType=-1;
     result.fields.push_back(field("by04.ccsds.apid",QStringLiteral("应用进程标识 APID"),
                                   packet.apid,2));

@@ -297,6 +297,8 @@ QJsonObject BusinessCatalog::toJson(const BusinessPacket &packet){
     return {
         {"packet",packet.packetName},{"packet_label",packet.packetLabel},
         {"main_type",packet.mainType},{"sub_type",packet.subType},
+        {"ccsds_apid",packet.transport.apid},
+        {"ccsds_packet_sequence",packet.transport.sequence},
         {"identification",packet.identification},
         {"skipped_fields",packet.skippedFields},{"fields",fields},
         {"vcid",packet.transport.vcid},{"fec_evidence",packet.transport.fecEvidence},
