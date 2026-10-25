@@ -1,6 +1,7 @@
 #include "core.h"
 #include "schema.h"
 #include "ssdv.h"
+#include "transport.h"
 #include <QtTest/QtTest>
 #include <QFile>
 #include <QTemporaryDir>
@@ -39,8 +40,13 @@ private slots:
         QVERIFY2(f.complete,qPrintable(f.error));
         QCOMPARE(f.vcid,2);QCOMPARE(f.master,0x91);
         QCOMPARE(f.apid,0xf0);QCOMPARE(f.sequence,0x3ba1);
-        QCOMPARE(f.payload.size(),192);QCOMPARE(f.fields.size(),8);
-        QCOMPARE(f.fields.at(3).status,QString("candidate_unverified"));
+        QCOMPARE(f.payload.size(),192);
+        QVERIFY(f.fields.size() >= 10);
+        bool hasCandidate=false;
+        for(const auto &x:f.fields)
+            if(x.name=="candidate.quaternion.q0" && x.status=="candidate_unverified")
+                hasCandidate=true;
+        QVERIFY(hasCandidate);
     }
     void kissEscapeBeforeLength() {
         Frame f=Protocol::parse(syntheticFrame(true),"ASRTU-1");
@@ -50,8 +56,9 @@ private slots:
     void corruptFrameIsNotPromoted() {
         QByteArray raw=syntheticFrame();raw[5]=char(0x42);
         Frame f=Protocol::parse(raw,"ASRTU-1");
-        QVERIFY(!f.complete);
-        QCOMPARE(f.quality,QString("invalid"));
+        QVERIFY(f.complete); // the 5-byte TM frame is still valid
+        QCOMPARE(f.apid,-1);  // but the KISS subpacket preview is unavailable
+        QCOMPARE(f.quality,QString("structural_only"));
     }
     void duplicateFusionAndNoFakeUtc(){
         Frame log=Protocol::parse(syntheticFrame(),"ASRTU-1");
@@ -127,10 +134,83 @@ private slots:
         b.sequence=14;
         QCOMPARE(ImageTools::candidates({a,b},0x321).size(),0);
     }
+
+    void physicalHeaderIsFiveBytes(){
+        const QByteArray info=syntheticFrame();
+        const auto data=Transport::frameData(info);
+        QCOMPARE(data.size(),218);
+        QCOMPARE(quint8(data[0]),quint8(0xc0));
+        QCOMPARE(quint8(info[4]),quint8(0x00)); // first header pointer, not length
+        Frame f=Protocol::parse(info,"ASRTU-1");
+        QVERIFY(f.complete);
+        QCOMPARE(f.quality,QString("structural_only"));
+    }
+    void variableLengthPacketsInOneTmFrame(){
+        QByteArray raw(223,char(0xc0));
+        raw.replace(0,5,QByteArray::fromHex("2054010100"));
+        int offset=5;
+        for(const QByteArray &p:{QByteArray::fromHex("011122"),
+                                 QByteArray::fromHex("02AABBCCDD"),
+                                 QByteArray::fromHex("03")}) {
+            raw[offset++]=char(0xc0);
+            for(char c:p)raw[offset++]=c;
+            raw[offset++]=char(0xc0);
+        }
+        Frame f=Protocol::parse(raw,"ASRTU-1");
+        QVERIFY(f.complete);
+        const auto packets=Transport::reassemble({f});
+        QCOMPARE(packets.size(),3);
+        QCOMPARE(packets[0].bytes,QByteArray::fromHex("011122"));
+        QCOMPARE(packets[1].bytes,QByteArray::fromHex("02AABBCCDD"));
+        QCOMPARE(packets[2].bytes,QByteArray::fromHex("03"));
+        QCOMPARE(packets[0].crcStatus,QString("not_checked"));
+    }
+    void crossTmFragmentAndKissEscape(){
+        QByteArray rawA(223,char(0x31));
+        QByteArray rawB(223,char(0xc0));
+        rawA.replace(0,5,QByteArray::fromHex("2054010100"));
+        rawB.replace(0,5,QByteArray::fromHex("2054020200"));
+        rawA[5]=char(0xc0);
+        rawA[221]=char(0xdb); // KISS escape at end of first 218-octet data block
+        rawA[222]=char(0xdc); // turns into 0xc0 inside packet
+        rawB[5]=char(0xdb);rawB[6]=char(0xdd); // turns into 0xdb
+        rawB[7]=char(0x42);rawB[8]=char(0xc0);
+        Frame a=Protocol::parse(rawA,"ASRTU-1");
+        Frame b=Protocol::parse(rawB,"ASRTU-1");
+        QVERIFY(a.complete && b.complete);
+        const auto packets=Transport::reassemble({a,b});
+        QCOMPARE(packets.size(),1);
+        QCOMPARE(packets[0].bytes.size(),219);
+        QCOMPARE(quint8(packets[0].bytes[216]),quint8(0xc0));
+        QCOMPARE(quint8(packets[0].bytes[217]),quint8(0xdb));
+        QCOMPARE(quint8(packets[0].bytes[218]),quint8(0x42));
+        QCOMPARE(packets[0].contributingFrames,2);
+    }
+    void gapMustNotJoinUnrelatedFrames(){
+        QByteArray rawA(223,char(0x31));
+        QByteArray rawB(223,char(0xc0));
+        rawA.replace(0,5,QByteArray::fromHex("2054010100"));
+        rawB.replace(0,5,QByteArray::fromHex("2054020400")); // virtual count gap
+        rawA[5]=char(0xc0);
+        rawB[5]=char(0x42);rawB[6]=char(0xc0);
+        QCOMPARE(Transport::reassemble({Protocol::parse(rawA,"ASRTU-1"),
+                                       Protocol::parse(rawB,"ASRTU-1")}).size(),0);
+    }
+    void configurableCrcDoesNotGuessPolynomial(){
+        const QByteArray message("123456789");
+        const QByteArray bytes=message+QByteArray::fromHex("29B1");
+        CrcConfig crc; // disabled by default even for checksum-bearing data
+        QCOMPARE(Transport::checkCrc(bytes,crc),QString("not_checked"));
+        crc.enabled=true;
+        QCOMPARE(Transport::checkCrc(bytes,crc),QString("pass"));
+        QByteArray corrupted=bytes;corrupted[2]=char('X');
+        QCOMPARE(Transport::checkCrc(corrupted,crc),QString("fail"));
+    }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
         QVERIFY(f.complete);
-        QCOMPARE(f.fields.size(),3);
+        QVERIFY(f.fields.size()>=4);
+        for(const auto &x:f.fields)QVERIFY(!x.name.startsWith("candidate.quaternion"));
     }
 };
 QTEST_GUILESS_MAIN(ProtocolTest)
