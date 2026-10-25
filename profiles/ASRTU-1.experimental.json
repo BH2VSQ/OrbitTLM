@@ -1,0 +1,11 @@
+{
+  "satellite": "ASRTU-1",
+  "revision": "experimental-2026-10-25",
+  "description": "Candidate floats found in APID 0x0F0 after CCSDS/KISS validation. This does NOT identify spacecraft attitude conventions.",
+  "fields": [
+    {"name":"candidate.quaternion.q0","apid":"0x0F0","offset":140,"type":"f32be","status":"candidate_unverified"},
+    {"name":"candidate.quaternion.q1","apid":"0x0F0","offset":144,"type":"f32be","status":"candidate_unverified"},
+    {"name":"candidate.quaternion.q2","apid":"0x0F0","offset":148,"type":"f32be","status":"candidate_unverified"},
+    {"name":"candidate.quaternion.q3","apid":"0x0F0","offset":152,"type":"f32be","status":"candidate_unverified"}
+  ]
+}

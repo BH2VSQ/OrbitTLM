@@ -1,0 +1,6 @@
+{
+  "satellite": "BY04",
+  "revision": "unverified-profile-template-1",
+  "description": "CCSDS records supported; do not assume ASRTU-1 telemetry offsets also apply to BY04.",
+  "fields": []
+}
