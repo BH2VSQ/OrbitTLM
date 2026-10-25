@@ -226,8 +226,8 @@ void MainWindow::rebuildSession(){
     }
     populateEvents();
     updateFrameList();
-    updateMetrics();
     scanSsdv();
+    updateMetrics();
     timeline_->setRange(0,std::max(0,int(business_.size())-1));
     currentIndex_=-1;
     if(!business_.isEmpty())selectEvent(0);

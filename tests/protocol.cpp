@@ -482,6 +482,34 @@ private slots:
         QCOMPARE(pkts.size(),1);
         QCOMPARE(pkts[0].apid,0x0d2);
     }
+    void by04RealWorldDslwpFixtureRegression(){
+        QFile fixture(QCoreApplication::applicationDirPath()+
+                      "/fixtures/by04_ssdv_bad_packet.b64");
+        QVERIFY2(fixture.open(QIODevice::ReadOnly),qPrintable(fixture.errorString()));
+        const QByteArray raw=QByteArray::fromBase64(fixture.readAll());
+        QCOMPARE(raw.size(),11*223);
+        QVector<Frame> frames;
+        for(int i=0;i<raw.size();i+=223){
+            Frame f=Protocol::parse(raw.mid(i,223),"BY04");
+            QVERIFY(f.complete);
+            QCOMPARE(f.vcid,1);
+            QCOMPARE(By04Decoder::spacecraftId(f.bytes),0x205);
+            frames.push_back(f);
+        }
+        TransportStats stats;
+        const auto falseKiss=Transport::reassemble(frames,&stats);
+        QCOMPARE(falseKiss.size(),0);
+        const auto images=By04Decoder::images(frames);
+        QVERIFY(images.size()>=9);
+        int crcPass=0;
+        for(const auto &packet:images){
+            QCOMPARE(packet.bytes.size(),218);
+            if(packet.status=="dslwp_crc32_pass")++crcPass;
+            QCOMPARE(packet.width,320);
+            QCOMPARE(packet.height,240);
+        }
+        QVERIFY(crcPass>=7);
+    }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
         QVERIFY(f.complete);

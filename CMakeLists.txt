@@ -46,3 +46,13 @@ foreach(target OrbitTLM OrbitTLM-cli orbit_tests)
 endforeach()
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/protocols/asrtu1"
         DESTINATION "bin/protocols")
+
+# Public BY04 VC1 DSLWP capture fixture used for decoder regression.
+if(TARGET orbit_tests)
+  add_custom_command(TARGET orbit_tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:orbit_tests>/fixtures"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/by04_ssdv_bad_packet.b64"
+      "$<TARGET_FILE_DIR:orbit_tests>/fixtures/by04_ssdv_bad_packet.b64"
+    VERBATIM)
+endif()
