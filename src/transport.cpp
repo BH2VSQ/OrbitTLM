@@ -61,13 +61,13 @@ QByteArray Transport::frameData(const QByteArray &frame) {
 QString Transport::checkCrc(const QByteArray &packet,const CrcConfig &config){
     if(!config.enabled)return "not_checked";
     if(config.width!=16&&config.width!=32)return "unsupported_configuration";
-    if(config.skipLeadingBytes<0)return "unsupported_configuration";
+    if(config.skipLeadingBytes<0 || config.trailingBytesAfterCrc<0)return "unsupported_configuration";
     const int suffix=config.width/8;
-    if(packet.size()<config.skipLeadingBytes+suffix)return "insufficient_bytes";
+    if(packet.size()<config.skipLeadingBytes+suffix+config.trailingBytesAfterCrc)return "insufficient_bytes";
     const quint32 mask=config.width==32?0xffffffffu:0xffffu;
     quint32 remainder=config.initial&mask;
     const quint32 poly=config.polynomial&mask;
-    const int end=packet.size()-suffix;
+    const int end=packet.size()-suffix-config.trailingBytesAfterCrc;
     for(int n=config.skipLeadingBytes;n<end;++n){
         quint32 v=quint32(octet(packet[n]));
         if(config.reflectInput)v=reflect(v,8);
@@ -86,8 +86,10 @@ QString Transport::checkCrc(const QByteArray &packet,const CrcConfig &config){
     }
     return remainder==received?"pass":"fail";
 }
-QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,const CrcConfig &crc){
+QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,const CrcConfig &crc,
+                                          PacketFilter filter,TransportStats *stats){
     QVector<ApplicationPacket> out;
+    TransportStats observed;
     QHash<int,State> states;
     constexpr int MaximumKissPacket=65536;
     // The original recorder clock may be absent for BIN-only frames. A bounded
@@ -123,13 +125,15 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
         if(frame.vcid<0)continue;
         State &s=states[frame.vcid];
         // Only the per-VC counter can assess continuity; master count interleaves VCs.
-        if(s.haveCount && ((s.previousCount+1)&0xff)!=frame.virtualCount){
+        if(s.haveCount && frame.virtualCount>=0 && ((s.previousCount+1)&0xff)!=frame.virtualCount){
+            if(s.started && !s.buffer.isEmpty())++observed.interruptedByCounterGap;
             s.resetPacket();
             s.started=false;
         }
         s.previousCount=frame.virtualCount;
         s.haveCount=frame.virtualCount>=0;
         if(!frame.complete || frame.bytes.size()!=223){
+            if(s.started && !s.buffer.isEmpty())++observed.interruptedByCounterGap;
             s.resetPacket();s.started=false;continue;
         }
         const QByteArray data=frame.bytes.mid(5,218);
@@ -149,11 +153,18 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
                     pkt.captureLocal=s.firstTime;
                     pkt.timestampBasis=s.timeBasis;
                     pkt.crcStatus=checkCrc(pkt.bytes,crc);
+                    pkt.crcProfileEvidence=crc.enabled ? "user_selected_unverified" : "not_checked";
                     pkt.fecEvidence=s.allFecReported && s.anyFecReported
                         ? "log_fec_reported"
                         : (s.anyFecReported?"mixed_fec_unverified":"bin_only_unverified");
                     recognizeOptionalSpacePacket(pkt);
-                    out.push_back(std::move(pkt));
+                    ++observed.decodedPackets;
+                    if(pkt.crcStatus=="pass")++observed.crcPassed;
+                    else if(pkt.crcStatus=="fail")++observed.crcFailed;
+                    else ++observed.crcUnchecked;
+                    if(filter==PacketFilter::RequireCrcPass && pkt.crcStatus!="pass")
+                        ++observed.discardedByPolicy;
+                    else out.push_back(std::move(pkt));
                 }
                 s.resetPacket();
                 s.started=true;
@@ -179,15 +190,19 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
                 s.escaped=false;
                 if(b==0xdc)s.buffer.append(char(0xc0));
                 else if(b==0xdd)s.buffer.append(char(0xdb));
-                else {s.oversized=true;s.buffer.clear();}
+                else {++observed.malformedEscapePackets;s.oversized=true;s.buffer.clear();}
             }else if(b==0xdb)s.escaped=true;
             else s.buffer.append(c);
             if(s.buffer.size()>MaximumKissPacket){
-                s.oversized=true;s.buffer.clear();
+                ++observed.oversizedPackets;s.oversized=true;s.buffer.clear();
             }
         }
     }
     // No closing FEND: never publish a partial packet as a valid application packet.
+    for(auto it=states.constBegin();it!=states.constEnd();++it)
+        if(it.value().started && !it.value().buffer.isEmpty() && !it.value().oversized)
+            ++observed.incompleteAtEof;
+    if(stats)*stats=observed;
     return out;
 }
 bool Transport::exportJson(const QString &path,const QVector<ApplicationPacket> &packets,QString *error){
@@ -202,6 +217,7 @@ bool Transport::exportJson(const QString &path,const QVector<ApplicationPacket> 
           {"capture_local",p.captureLocal.isValid()?p.captureLocal.toString(Qt::ISODateWithMs):QString()},
           {"timestamp_basis",p.timestampBasis},{"spacecraft_utc",QJsonValue::Null},
           {"classification",p.classification},{"crc_status",p.crcStatus},
+          {"crc_profile_evidence",p.crcProfileEvidence},
           {"fec_evidence",p.fecEvidence},
           {"apid",p.apid},{"packet_sequence",p.sequence},
           {"data_hex",QString::fromLatin1(p.bytes.toHex())},

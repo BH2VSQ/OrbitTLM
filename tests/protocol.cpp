@@ -212,6 +212,55 @@ private slots:
         QByteArray corrupted=bytes;corrupted[2]=char('X');
         QCOMPARE(Transport::checkCrc(corrupted,crc),QString("fail"));
     }
+    void crcWithUnprotectedPaddingAndExplicitFiltering(){
+        CrcConfig config;
+        config.enabled=true;
+        config.trailingBytesAfterCrc=3;
+        const QByteArray good=QByteArray("123456789")+QByteArray::fromHex("29b1")+"PAD";
+        QCOMPARE(Transport::checkCrc(good,config),QString("pass"));
+        QByteArray bad=good;bad[2]='X';
+        QCOMPARE(Transport::checkCrc(bad,config),QString("fail"));
+
+        auto wrapped=[](QByteArray content,int count) {
+            QByteArray data=QByteArray::fromHex("2054010000");
+            data+=char(0xc0);
+            for(char c:content) {
+                if(quint8(c)==0xc0){data+=char(0xdb);data+=char(0xdc);}
+                else if(quint8(c)==0xdb){data+=char(0xdb);data+=char(0xdd);}
+                else data+=c;
+            }
+            data+=char(0xc0);
+            data+=QByteArray(223-data.size(),char(0xc0));
+            data[3]=char(count);
+            auto frame=Protocol::parse(data,"ASRTU-1");
+            frame.quality="log_fec_reported";
+            return frame;
+        };
+        TransportStats stats;
+        auto result=Transport::reassemble({wrapped(good,1),wrapped(bad,2)},config,
+                     PacketFilter::RequireCrcPass,&stats);
+        QCOMPARE(stats.decodedPackets,2);
+        QCOMPARE(stats.crcPassed,1);
+        QCOMPARE(stats.crcFailed,1);
+        QCOMPARE(stats.discardedByPolicy,1);
+        QCOMPARE(result.size(),1);
+        QCOMPARE(result[0].bytes,good);
+        QCOMPARE(result[0].crcProfileEvidence,QString("user_selected_unverified"));
+        const auto preserved=Transport::reassemble({wrapped(good,1),wrapped(bad,2)});
+        QCOMPARE(preserved.size(),2);
+        QCOMPARE(preserved[0].crcStatus,QString("not_checked"));
+    }
+    void sequenceGapRejectsIncompleteWithoutCRC(){
+        QByteArray a(223,char(0x41)),b(223,char(0xc0));
+        a.replace(0,5,QByteArray::fromHex("2054010100"));
+        b.replace(0,5,QByteArray::fromHex("2054020400"));
+        a[5]=char(0xc0);b[5]=char(0xc0);
+        const auto frames=QVector<Frame>{Protocol::parse(a,"ASRTU-1"),Protocol::parse(b,"ASRTU-1")};
+        TransportStats stats;
+        auto packets=Transport::reassemble(frames,{},PacketFilter::PreserveAll,&stats);
+        QCOMPARE(packets.size(),0);
+        QCOMPARE(stats.interruptedByCounterGap,1);
+    }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
         QVERIFY(f.complete);

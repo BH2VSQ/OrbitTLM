@@ -283,6 +283,14 @@ public:
         crcMode_->addItems({"Not checked","CRC16/CCITT-FALSE (manual)","CRC16/X25 (manual)",
                             "CRC32/ISO (manual)"});
         packetControls->addWidget(crcMode_);
+        requireCrc_=new QCheckBox("Show CRC passed only");
+        requireCrc_->setEnabled(false);
+        packetControls->addWidget(requireCrc_);
+        connect(crcMode_,&QComboBox::currentIndexChanged,this,[this](int index){
+            requireCrc_->setEnabled(index>0);
+            if(index==0)requireCrc_->setChecked(false);
+        });
+        connect(requireCrc_,&QCheckBox::toggled,this,[this]{rebuildPackets();});
         packetControls->addWidget(new QLabel("CRC preset applies to entire KISS content; not mission verified"));
         packetLayout->addLayout(packetControls);
         packetTable_=new QTableWidget(0,8);
@@ -408,7 +416,9 @@ private:
             crc.reflectInput=true;crc.reflectOutput=true;crc.trailerLittleEndian=true;break;
         default:break;
         }
-        packets_=Transport::reassemble(frames_,crc);
+        packets_=Transport::reassemble(frames_,crc,
+            requireCrc_->isChecked()?PacketFilter::RequireCrcPass:PacketFilter::PreserveAll,
+            &packetStats_);
         packetTable_->setRowCount(packets_.size());
         for(int i=0;i<packets_.size();++i){
             const auto &p=packets_[i];
@@ -518,6 +528,8 @@ private:
     QTableWidget *packetTable_=nullptr;
     QComboBox *crcMode_=nullptr;
     QVector<ApplicationPacket> packets_;
+    TransportStats packetStats_;
+    QCheckBox *requireCrc_=nullptr;
     QSlider *timeline_=nullptr;
     QTimer *timer_=nullptr;
     QChartView *chart_=nullptr;
