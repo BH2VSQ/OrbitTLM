@@ -87,7 +87,34 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
     QVector<ApplicationPacket> out;
     QHash<int,State> states;
     constexpr int MaximumKissPacket=65536;
-    for(const Frame &frame:frames){
+    // The original recorder clock may be absent for BIN-only frames. A bounded
+    // sequence window can be ordered by the TM master counter without inventing time.
+    QVector<const Frame*> ordered;
+    ordered.reserve(frames.size());
+    QVector<int> counters;
+    for(const auto &f:frames){
+        ordered.push_back(&f);
+        if(f.master>=0) counters.push_back(f.master);
+    }
+    if(counters.size()>=2 && counters.size()==frames.size() && counters.size()<128){
+        std::sort(counters.begin(),counters.end());
+        counters.erase(std::unique(counters.begin(),counters.end()),counters.end());
+        int gap=-1,start=0;
+        for(int i=0;i<counters.size();++i){
+            const int next=counters[(i+1)%counters.size()];
+            const int distance=(next-counters[i]+256)%256;
+            if(distance>gap){gap=distance;start=next;}
+        }
+        // If the sample covers nearly an entire 256-count cycle, ordering is
+        // ambiguous and we preserve source order instead.
+        if(gap>128){
+            std::stable_sort(ordered.begin(),ordered.end(),[start](const Frame *a,const Frame *b){
+                return ((a->master-start+256)%256)<((b->master-start+256)%256);
+            });
+        }
+    }
+    for(const Frame *source:ordered){
+        const Frame &frame=*source;
         if(frame.vcid<0)continue;
         State &s=states[frame.vcid];
         // Only the per-VC counter can assess continuity; master count interleaves VCs.
