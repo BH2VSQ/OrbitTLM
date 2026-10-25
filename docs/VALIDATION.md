@@ -1,65 +1,70 @@
-# Acceptance matrix (do not overstate completion)
+# OrbitTLM acceptance status
 
-| Milestone | Implemented | Validation |
+| Module | Current behavior | Evidence / limitation |
 |---|---|---|
-| P0: read paired LOG/BIN, exact 223-byte hashing and origin fusion | yes | Qt unit tests |
-| P0: 5-byte TM header + 218-byte KISS region | yes | Qt tests |
-| P0: Variable-length KISS stream and per-VC cross-frame reassembly | yes | synthetic Qt regressions |
-| P0: Application CRC check | intentionally omitted | current offline replay does not need speculative CRC validation |
-| P0: Inner CCSDS Space Packet | optional candidate only | not mandatory for all subsystems |
-| P0: mission-specific filler and all discontinuity cases | partial | awaiting more reference fixtures |
-| P0: every ASRTU-1 engineering field | schema-driven extension only | requires confirmed mission subpacket and field definitions |
-| P1: Qt frame browser, playback slider, detail, raw hex, CSV/JSON | yes | CI compile; GUI manual QA pending |
-| P1: reopen persisted SQLite sessions | yes | SQLite roundtrip; GUI manual QA pending |
-| P2: quaternion candidate, plotted time series and 3-D wireframe preview | experimental | no physical coordinate convention established |
-| P2: UTC chronological onboard telemetry output | no inferred timestamps | onboard epoch specification required |
-| P3: BY04 CCSDS-level support | yes | synthetic regression |
-| P3: BY04 engineering telemetry | schema interface only | verified BY04 packet layout needed |
-| P4: 223-byte live TCP stream | yes | hardware / gateway tests pending |
-| P4: SSDV candidate packet extraction | yes (opt-in per APID) | CRC, FEC and JPEG recovery are not implemented |
-| P4: SatNOGS/MMT uploads and ZMQ transport | not implemented | future extension |
+| Paired LOG + BIN import | implemented | hash fusion and provenance; UTC not inferred |
+| CCSDS short TM 5+218 | implemented | synthetic protocol tests |
+| VC-specific variable-length KISS stream | implemented | fragmented packets, multiple packets, escape tests |
+| Missing VC frames / malformed escape | incomplete payload discarded from reconstructed output | tested; input raw TM bytes preserved |
+| Application CRC | **intentionally not implemented** | real ASRTU-1 parameters unverified and not necessary to preserve KISS packets |
+| Optional inner Space Packet-shaped header | candidate only; 0/2/4 byte suffix tolerated but unverified | never required for KISS reconstruction |
+| Telemetry schema / engineering values | extensible, not full mission implementation | subsystem field definitions require validation |
+| Qt replay and SQLite | implemented | CI compilation and SQL tests; manual GUI validation remains |
+| Attitude quaternion preview | experimental candidate only | no verified quaternion reference-frame semantics |
+| BY04/8104 | framework and optional schema supported | mission-specific field validation pending |
+| SSDV | packet candidate reconstruction and optional external decoder | not an authoritative image CRC test |
+| TCP live receive | basic 223-byte record stream | field hardware tests pending |
 
-**Important:** The sample file named SSDV_received_frames223.bin is a 223-byte CCSDS transfer-frame stream, not a direct concatenation of 256-byte SSDV packets. Never classify packets as valid JPEG just because the file has SSDV in its name.
+## Flight encoding, as described by developer BG7ZDQ
 
-Samples without an official conversion definition remain \`schema_declared_unverified\`; candidate quaternions cannot be used to command an antenna or claim polarization accuracy.
+The satellite's different subsystems emit packets of various lengths and types.
+Their application packets include auxiliary headers and a CRC, and are KISS-wrapped.
+KISS stream data is then segmented into **218-byte slices**, prefixed with a
+**5-byte short CCSDS TM header**, to form **223-byte RS information frames**.
+RS encoding follows. Thus the 223-byte recorder output has no RS parity bytes
+and cannot independently recheck Reed–Solomon correction.
 
-## Reproducible local validation
-\`\`\`sh
-cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
-\`\`\`
-Use a reference session with both source files, then compare SHA-256, master-frame counts, VCIDs, APIDs, sequence counts, KISS escapes and missing frames. Source timestamps are kept as *logger-local-unverified*; raw BIN frames lack timestamps.
+The fifth short-TM header byte is header metadata; the application KISS stream
+is recovered from the remaining 218 bytes, potentially spanning multiple frames.
 
-## BG7ZDQ protocol corrections (2026-10-25)
+KISS integrity (proper delimiters and escape sequences) and TM provenance
+are *not the same as application CRC validity*. A successful RS/FEC log message
+also does not prove application CRC validity.
 
-Subsystems generate variable-length and differently typed application packets, append CRC, and wrap them using KISS. The KISS byte stream is split into 218-byte segments. A 5-byte CCSDS short TM header is prefixed, resulting in exactly 223 RS *information* bytes, which are then RS-encoded. The 223 bytes recorded by the receiver are not full parity-bearing codewords.
+## ASRTU-1 application CRC: research and deliberate omission
 
-Short TM byte 5 is the first header pointer; it is NOT a KISS payload length. The following 218 octets are a KISS transport region, not necessarily one complete CCSDS Space Packet.
+Consulted the published BG7ZDQ/ASRTU_Series_Receiver source, the
+HyacinthSat/asrtu-sndmdm-backend Go source, and gr-lilacsat. The first handles
+223-byte demodulated telemetry information frames and image delivery; the second
+contains engineering field rules but no demonstrable end-to-end application
+checksum implementation. gr-lilacsat has an AFSK CRC-CCITT routine, but that
+is not a verified ASRTU-1 downlink application CRC implementation.
 
-Some real KISS payloads include a six-byte CCSDS Space Packet-shaped inner header; this is OPTIONAL. Never require it to accept a TM frame or recover other subsystem packets.
+Additional public references include the ASRTU-1 on-board-computer software
+repository, which documents a released flight-software codebase. The specific
+application downlink CRC polynomial, init, xorout, reflection, header coverage
+and trailing-byte placement **were not established from an independently
+validated source trace**.
 
-Application CRC width, polynomial, coverage, reflection, init/final value and trailer endian are NOT provided. Default status is not_checked; manual CRC presets are experimental. A FEC-reported input frame is not equivalent to application CRC pass.
+**Decision:** delete speculative CRC presets, checker, CRC-only packet filter,
+related UI and CLI switches. Preserve all structurally reassembled KISS
+packets with `integrity=not_crc_verified`; never label them `crc_pass`
+or remove them because a guessed CRC variant failed. Preserve frame hashes,
+FEC log provenance, timestamps and KISS loss/error statistics. The raw TM
+frames remain available for future CRC reprocessing if confirmed specifications
+or paired known-good packets become available.
 
-KISS transport per VCID supports packets of different lengths, more than one packet in a TM frame, fragmentation and escapes across TM frames. An observed virtual-channel sequence gap abandons an incomplete packet. All-0xAA segments between FEND markers are treated as probable filler but do not confirm CRC integrity.
+For command-line batch export:
+```sh
+OrbitTLM-cli --satellite ASRTU-1 --log decoder.log --bin SSDV_received_frames223.bin --packets-json packets.json --json frames.json
+```
 
-UTC from spacecraft remains unknown if not explicitly decoded with mission epoch. No timestamps are synthesized from BIN frame ordering.
+## Explicit remaining risks
 
-## CRC implementation follow-up (2026-10-25)
-
-The gr-lilacsat tree has an AFSK reflected CRC-CCITT implementation. That does not establish that the ASRTU-1 spacecraft application packets use the same CRC variant. The HyacinthSat/asrtu-sndmdm-backend application processes telemetry fields and lacks independent application CRC verification. Thus OrbitTLM retains separate FEC evidence, KISS framing status, and packet-CRC status.
-
-New explicit CRC filtering (application-packet level):
-- by default, retain all well-framed packets and mark them `not_checked`;
-- with a user-selected CRC profile, compute checksum using selected coverage offset and optional unprotected suffix;
-- with optional `--only-crc-passed`, keep only packets that passed that explicit configured CRC, while keeping the underlying raw TM frames;
-- packets interrupted by missing VC frames, malformed KISS escapes or EOF are not promoted to complete packets and are counted in diagnostics;
-- an optional CCSDS Space Packet-shaped header is detected *after* successfully verified trailer removal when an experimental profile is selected.
-
-The sample capture did not provide sufficient evidence to identify a unique spacecraft application CRC variant; common CRC16/CRC32 presets alone do not justify default filtering. Adding a verified mission profile remains an open item.
-
-## CRC research outcome / policy (2026-10-25)
-
-After inspecting BG7ZDQ/ASRTU_Series_Receiver, HyacinthSat/asrtu-sndmdm-backend, and gr-lilacsat, no demonstrated application CRC preset for the ASRTU-1 downlink was established. The CRC-CCITT function in gr-lilacsat is in the AFSK-related module and does not certify the separate downlink KISS packet checksum. The spacecraft's publicly released OBC software may be an additional verification source, but its specific CRC configuration has not been verified for the relevant telemetry path.
-
-We removed the optional CRC code, CLI parameters, guessed filters and UI controls instead of retaining speculative verification. **Do not use an arbitrary CRC mismatch as proof of packet damage**. The KISS packet output and JSON mark application integrity `not_crc_verified`. FEC/log provenance is separate and does not imply application CRC success. A user-provided mission CRC specification or confirmed source trace will be needed to implement authoritative CRC filtering in the future.
+- BIN-only packets without captured timestamps cannot be reliably ordered by
+  UTC; limited frame-counter ordering is an inference, not a replacement for time.
+- No unverified quaternion may be used as an authoritative spacecraft attitude.
+- A KISS delimiter and plausible inner payload length are insufficient to prove
+  correctness of all application bytes.
+- The exact satellite-specific telemetry field map and onboard UTC epoch must
+  be verified before physical engineering values are labeled authoritative.
