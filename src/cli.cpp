@@ -1,6 +1,7 @@
 #include "core.h"
 #include "schema.h"
 #include "transport.h"
+#include "business.h"
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QJsonDocument>
@@ -19,9 +20,12 @@ int main(int argc,char **argv){
         QCommandLineOption({"s","satellite"},"ASRTU-1 or BY04 (8104)","name","ASRTU-1"),
         QCommandLineOption({"p","profile"},"Optional engineering rules JSON","file"),
         QCommandLineOption("json","Write full ordered JSON","file"),
-        QCommandLineOption("packets-json","Write reassembled variable-length KISS packets with CRC status","file"),
+        QCommandLineOption("packets-json","Write reassembled KISS packets with unverified application integrity","file"),
+        QCommandLineOption("telemetry-json","Write business packet fields and engineering units to JSON","file"),
+        QCommandLineOption("telemetry-csv","Write business packet fields and engineering units to CSV","file"),
         QCommandLineOption("csv","Write full ordered CSV","file"),
-        QCommandLineOption("quaternion-csv","Write unverified quaternion candidate time-series","file"),
+        QCommandLineOption("quaternion-csv","Write SAT-S3 official-schema calculated q0..q3; CRC unverified","file"),
+        QCommandLineOption("candidate-quaternion-csv","Write experimental legacy frame candidate quaternions","file"),
         QCommandLineOption("sqlite","Persist one session to SQLite","file")
     });
     args.process(app);
@@ -56,7 +60,32 @@ int main(int argc,char **argv){
        !Transport::exportJson(args.value("packets-json"),packets,&reason)){
         err<<"KISS packets: "<<reason<<"\n";return 6;
     }
-    if(args.isSet("sqlite")){
+    QVector<BusinessPacket> business;
+    BusinessStats bs;
+    if(sat=="ASRTU-1"){
+        BusinessCatalog catalog;
+        if(!catalog.loadDirectory(QCoreApplication::applicationDirPath()+
+             "/protocols/asrtu1",&reason)){
+            err<<"ASRTU-1 catalog: "<<reason<<"\n";return 8;
+        }
+        business=catalog.decodeAll(packets,&bs);
+        if(args.isSet("telemetry-json") &&
+           !BusinessCatalog::exportJson(args.value("telemetry-json"),business,&reason)){
+            err<<"Telemetry JSON: "<<reason<<"\n";return 8;
+        }
+        if(args.isSet("telemetry-csv") &&
+           !BusinessCatalog::exportCsv(args.value("telemetry-csv"),business,&reason)){
+            err<<"Telemetry CSV: "<<reason<<"\n";return 8;
+        }
+        if(args.isSet("quaternion-csv") &&
+           !BusinessCatalog::exportQuaternionCsv(args.value("quaternion-csv"),business,&reason)){
+            err<<"SAT-S3 quaternion CSV: "<<reason<<"\n";return 8;
+        }
+    }else if(args.isSet("telemetry-json")||args.isSet("telemetry-csv")||args.isSet("quaternion-csv")){
+        err<<"Mission-specific engineering catalog is available for ASRTU-1 only; BY04 needs separately validated tables\n";
+        return 8;
+    }
+
         Database db;
         if(!db.open(args.value("sqlite"),&reason)||
            !db.save(sat+" batch import",frames,&reason)){
@@ -69,9 +98,9 @@ int main(int argc,char **argv){
     if(args.isSet("json")&&!Protocol::exportJson(args.value("json"),frames,&reason)){
         err<<"JSON: "<<reason<<"\n";return 6;
     }
-    if(args.isSet("quaternion-csv")&&
-       !Protocol::exportAttitudeCsv(args.value("quaternion-csv"),frames,&reason)){
-        err<<"Quaternion: "<<reason<<"\n";return 6;
+    if(args.isSet("candidate-quaternion-csv") &&
+       !Protocol::exportAttitudeCsv(args.value("candidate-quaternion-csv"),frames,&reason)){
+        err<<"Experimental quaternion: "<<reason<<"\n";return 6;
     }
     const QJsonObject result{
         {"satellite",sat},{"log_observations",stats.logObservations},
@@ -80,6 +109,11 @@ int main(int argc,char **argv){
         {"structural_only",stats.structuralOnly},
         {"invalid",stats.invalid},{"duplicate_observations",stats.duplicates},
         {"application_kiss_packets",packets.size()},
+        {"catalog_business_recognized",bs.recognized},
+        {"catalog_business_unknown",bs.unknown},
+        {"engineering_fields_decoded",bs.decodedFields},
+        {"engineering_fields_raw_only",bs.unsupportedFields},
+        {"engineering_fields_out_of_range",bs.truncatedFields},
         {"application_interrupted_by_gap",packetStats.interruptedByCounterGap},
         {"application_incomplete_at_eof",packetStats.incompleteAtEof},
         {"note","223 bytes = 5-byte TM header + 218-byte KISS transport region; application CRC not verified, packet recovery is structural only"}
