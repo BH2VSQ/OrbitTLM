@@ -1,6 +1,7 @@
 #include "core.h"
 #include "schema.h"
 #include "ssdv.h"
+#include "transport.h"
 #include <QProcess>
 #include <QPixmap>
 #include <QFileInfo>
@@ -183,6 +184,16 @@ public:
         });
         menu->addAction("Export CSV",[this]{exportFile(true);});
         menu->addAction("Export JSON",[this]{exportFile(false);});
+        menu->addAction("Export reassembled KISS packets JSON",[this]{
+            if(packets_.isEmpty())return;
+            const QString path=QFileDialog::getSaveFileName(this,"Export KISS application packets",
+                                                     "kiss_packets.json","JSON (*.json)");
+            if(path.isEmpty())return;
+            QString reason;
+            if(!Transport::exportJson(path,packets_,&reason))
+                QMessageBox::warning(this,"KISS export",reason);
+            else statusBar()->showMessage(QString("Exported %1 KISS packets").arg(packets_.size()),8000);
+        });
         menu->addAction("Export quaternion series CSV",[this]{
             if(frames_.isEmpty())return;
             const QString out=QFileDialog::getSaveFileName(this,"Export quaternion time series",
@@ -263,6 +274,43 @@ public:
         rawText_=new QPlainTextEdit;rawText_->setReadOnly(true);
         rawText_->setLineWrapMode(QPlainTextEdit::NoWrap);
         right->addTab(rawText_,"Raw HEX");
+        auto packetPage=new QWidget;
+        auto packetLayout=new QVBoxLayout(packetPage);
+        auto packetControls=new QHBoxLayout;
+        packetControls->addWidget(new QLabel("Application packet CRC:"));
+        crcMode_=new QComboBox;
+        crcMode_->addItems({"Not checked","CRC16/CCITT-FALSE (manual)","CRC16/X25 (manual)",
+                            "CRC32/ISO (manual)"});
+        packetControls->addWidget(crcMode_);
+        packetControls->addWidget(new QLabel("CRC preset applies to entire KISS content; not mission verified"));
+        packetLayout->addLayout(packetControls);
+        packetTable_=new QTableWidget(0,7);
+        packetTable_->setHorizontalHeaderLabels(
+          {"VCID","Master span","Bytes","Inner APID?","Classification","CRC","Frame count"});
+        packetTable_->verticalHeader()->hide();
+        packetTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        packetTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+        packetTable_->horizontalHeader()->setStretchLastSection(true);
+        packetLayout->addWidget(packetTable_,2);
+        packetHex_=new QPlainTextEdit;
+        packetHex_->setReadOnly(true);
+        packetHex_->setLineWrapMode(QPlainTextEdit::NoWrap);
+        packetLayout->addWidget(packetHex_,1);
+        right->addTab(packetPage,"KISS packets");
+        connect(crcMode_,&QComboBox::currentIndexChanged,this,[this]{rebuildPackets();});
+        connect(packetTable_,&QTableWidget::itemSelectionChanged,this,[this]{
+            const int i=packetTable_->currentRow();
+            if(i>=0&&i<packets_.size()){
+                const auto &p=packets_[i];
+                packetHex_->setPlainText(
+                    QString("KISS content (%1 octets)\n").arg(p.bytes.size())+
+                    QString::fromLatin1(p.bytes.toHex(' ').toUpper())+
+                    "\n\nOptional inner Space Packet data:\n"+
+                    QString::fromLatin1(p.data.toHex(' ').toUpper())+
+                    "\n\n"+p.diagnostic);
+            }
+        });
+
         auto chartPage=new QWidget;auto chartLayout=new QVBoxLayout(chartPage);
         chartSelect_=new QComboBox;chartSelect_->addItems({
             "candidate.quaternion.q0","candidate.quaternion.q1",
@@ -333,6 +381,7 @@ private:
         if(hasSchema_ && schema_.satellite()==sat){
             for(auto &frame:frames_)schema_.apply(frame);
         }
+        rebuildPackets();
         fillTable();
         timeline_->setRange(0,std::max(0,int(frames_.size())-1));
         if(!frames_.isEmpty())showFrame(0);
@@ -344,6 +393,34 @@ private:
         if(!database_.save(sat+" paired import",frames_,&dbError))
             QMessageBox::warning(this,"SQLite",dbError);
         statusBar()->showMessage(msg,20000);
+    }
+    void rebuildPackets(){
+        CrcConfig crc;
+        switch(crcMode_->currentIndex()){
+        case 1: crc.enabled=true;break;
+        case 2:
+            crc.enabled=true;crc.reflectInput=true;crc.reflectOutput=true;
+            crc.finalXor=0xffff;crc.trailerLittleEndian=true;break;
+        case 3:
+            crc.enabled=true;crc.width=32;crc.polynomial=0x04c11db7;
+            crc.initial=0xffffffff;crc.finalXor=0xffffffff;
+            crc.reflectInput=true;crc.reflectOutput=true;crc.trailerLittleEndian=true;break;
+        default:break;
+        }
+        packets_=Transport::reassemble(frames_,crc);
+        packetTable_->setRowCount(packets_.size());
+        for(int i=0;i<packets_.size();++i){
+            const auto &p=packets_[i];
+            const QStringList columns={
+                QString::number(p.vcid),
+                QString("%1-%2").arg(p.firstMaster).arg(p.lastMaster),
+                QString::number(p.bytes.size()),
+                p.apid<0?"(opaque)":QString("0x%1").arg(p.apid,3,16,QChar('0')),
+                p.classification,p.crcStatus,QString::number(p.contributingFrames)};
+            for(int j=0;j<columns.size();++j)
+                packetTable_->setItem(i,j,new QTableWidgetItem(columns[j]));
+        }
+        if(packets_.isEmpty())packetHex_->clear();
     }
     void fillTable(){
         framesTable_->setRowCount(frames_.size());
@@ -388,7 +465,7 @@ private:
             const QStringList values={x.name,x.value,x.unit,x.status};
             for(int j=0;j<4;++j)fieldsTable_->setItem(i,j,new QTableWidgetItem(values[j]));
         }
-        rawText_->setPlainText("FRAME\n"+QString::fromLatin1(f.bytes.toHex(' ').toUpper())+
+        rawText_->setPlainText("223-BYTE TM INFORMATION FRAME (5-BYTE HEADER + 218 KISS OCTETS)\n"+QString::fromLatin1(f.bytes.toHex(' ').toUpper())+
                             "\n\nSPACE PACKET PAYLOAD\n"+QString::fromLatin1(f.payload.toHex(' ').toUpper()));
         timeLabel_->setText(QString("%1 / %2").arg(index+1).arg(frames_.size()));
         attitude_->display(f);
