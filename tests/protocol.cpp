@@ -1,4 +1,5 @@
 #include "core.h"
+#include "schema.h"
 #include <QtTest/QtTest>
 #include <QFile>
 #include <QTemporaryDir>
@@ -79,6 +80,20 @@ private slots:
         QVERIFY(csv.readAll().contains("candidate.quaternion.q0"));
         QFile json(temp.filePath("samples.json"));QVERIFY(json.open(QIODevice::ReadOnly));
         QVERIFY(json.readAll().contains("candidate_unverified"));
+    }
+    void externalSchemaIsSatelliteIsolated(){
+        QTemporaryDir temp;QVERIFY(temp.isValid());
+        QFile file(temp.filePath("fields.json"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(R"({"satellite":"BY04","revision":"v1","fields":[{"name":"raw.test","apid":"0xF0","offset":30,"type":"u8","status":"schema_declared_unverified"}]})");
+        file.close();
+        Schema schema;QString error;
+        QVERIFY2(schema.load(file.fileName(),&error),qPrintable(error));
+        Frame by04=Protocol::parse(syntheticFrame(),"BY04");
+        QCOMPARE(schema.apply(by04),1);
+        QCOMPARE(by04.fields.back().status,QString("schema_declared_unverified"));
+        Frame asrtu=Protocol::parse(syntheticFrame(),"ASRTU-1");
+        QCOMPARE(schema.apply(asrtu),0);
     }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
