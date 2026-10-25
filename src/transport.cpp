@@ -147,6 +147,9 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
         for(char c:data){
             const int b=octet(c);
             if(b==0xc0){
+                // A delimiter cannot legally terminate a pending FESC sequence.
+                // Fail closed; do not publish partial bytes with a guessed escape.
+                if(s.escaped)++observed.malformedEscapePackets;
                 if(s.started && !s.buffer.isEmpty() && !s.oversized &&
                    !s.escaped && !isPaddingOnly(s.buffer)){
                     ApplicationPacket pkt;
