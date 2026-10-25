@@ -2,6 +2,7 @@
 #include "schema.h"
 #include "ssdv.h"
 #include "transport.h"
+#include "business.h"
 #include <QProcess>
 #include <QPixmap>
 #include <QFileInfo>
@@ -195,15 +196,26 @@ public:
                 QMessageBox::warning(this,"KISS export",reason);
             else statusBar()->showMessage(QString("Exported %1 KISS packets").arg(packets_.size()),8000);
         });
-        menu->addAction("Export quaternion series CSV",[this]{
-            if(frames_.isEmpty())return;
-            const QString out=QFileDialog::getSaveFileName(this,"Export quaternion time series",
-                                              "quaternion_series.csv","CSV (*.csv)");
-            if(out.isEmpty())return;
+        menu->addAction("Export subsystem telemetry CSV",[this]{exportBusiness(true);});
+        menu->addAction("Export subsystem telemetry JSON",[this]{exportBusiness(false);});
+        menu->addAction("Export SAT-S3 calculated quaternion CSV",[this]{
+            if(businessPackets_.isEmpty())return;
+            const QString path=QFileDialog::getSaveFileName(this,"Export SAT-S3 quaternion series",
+                                            "SAT-S3-quaternions.csv","CSV (*.csv)");
+            if(path.isEmpty())return;
             QString error;
-            if(!Protocol::exportAttitudeCsv(out,frames_,&error))
-                QMessageBox::warning(this,"Attitude export",error);
-            else statusBar()->showMessage("Exported candidate quaternion series (unverified semantics)",8000);
+            if(!BusinessCatalog::exportQuaternionCsv(path,businessPackets_,&error))
+                QMessageBox::warning(this,"ASRTU-1 quaternion",error);
+            else statusBar()->showMessage("SAT-S3 schema-based quaternion exported (CRC not verified)",8000);
+        });
+        menu->addAction("Export legacy candidate quaternion CSV",[this]{
+            if(frames_.isEmpty())return;
+            const QString path=QFileDialog::getSaveFileName(this,"Export experimental frame candidate",
+                                            "candidate-quaternion.csv","CSV (*.csv)");
+            if(path.isEmpty())return;
+            QString err;
+            if(!Protocol::exportAttitudeCsv(path,frames_,&err))
+                QMessageBox::warning(this,"Legacy candidate",err);
         });
         auto bar=addToolBar("Session");
         auto chooseLog=bar->addAction("LOG");connect(chooseLog,&QAction::triggered,this,[this]{
@@ -305,6 +317,57 @@ public:
             }
         });
 
+        auto businessPage=new QWidget;
+        auto businessLayout=new QVBoxLayout(businessPage);
+        businessInfo_=new QLabel("Satellite business packets: 27 ASRTU-1 definitions; application CRC not verified.");
+        businessInfo_->setWordWrap(true);
+        businessLayout->addWidget(businessInfo_);
+        businessFilter_=new QLineEdit;
+        businessFilter_->setPlaceholderText("Filter packet name/type, time or subsystem");
+        businessLayout->addWidget(businessFilter_);
+        businessTable_=new QTableWidget(0,7);
+        businessTable_->setHorizontalHeaderLabels(
+            {"Recorder time","Packet","Main","Sub","Fields","Identification","FEC evidence"});
+        businessTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        businessTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+        businessTable_->horizontalHeader()->setStretchLastSection(true);
+        businessTable_->verticalHeader()->hide();
+        businessLayout->addWidget(businessTable_,2);
+        businessFields_=new QTableWidget(0,7);
+        businessFields_->setHorizontalHeaderLabels(
+            {"Chinese name","English name","Value","Unit","Raw HEX","Formula","Status"});
+        businessFields_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        businessFields_->setSelectionBehavior(QAbstractItemView::SelectRows);
+        businessFields_->horizontalHeader()->setStretchLastSection(true);
+        businessFields_->verticalHeader()->hide();
+        businessLayout->addWidget(businessFields_,3);
+        businessChart_=new QChartView(new QChart);
+        businessChart_->setRenderHint(QPainter::Antialiasing);
+        businessChart_->setMinimumHeight(120);
+        businessLayout->addWidget(businessChart_,2);
+        right->addTab(businessPage,"Engineering telemetry");
+        connect(businessTable_,&QTableWidget::itemSelectionChanged,this,[this]{
+            showBusinessFields(businessTable_->currentRow());
+        });
+        connect(businessFields_,&QTableWidget::itemSelectionChanged,this,[this]{
+            const int idx=businessTable_->currentRow();
+            const int field=businessFields_->currentRow();
+            if(idx>=0&&idx<businessPackets_.size() &&
+               field>=0&&field<businessPackets_[idx].fields.size())
+                plotBusinessField(businessPackets_[idx].packetName,
+                                  businessPackets_[idx].fields[field].code);
+        });
+        connect(businessFilter_,&QLineEdit::textChanged,this,[this](const QString &needle){
+            for(int i=0;i<businessTable_->rowCount();++i){
+                bool found=needle.isEmpty();
+                for(int c=0;c<businessTable_->columnCount()&&!found;c++){
+                    const auto *item=businessTable_->item(i,c);
+                    if(item&&item->text().contains(needle,Qt::CaseInsensitive))found=true;
+                }
+                businessTable_->setRowHidden(i,!found);
+            }
+        });
+
         auto chartPage=new QWidget;auto chartLayout=new QVBoxLayout(chartPage);
         chartSelect_=new QComboBox;chartSelect_->addItems({
             "candidate.quaternion.q0","candidate.quaternion.q1",
@@ -352,6 +415,13 @@ public:
         QDir().mkpath(QFileInfo(dbFile).absolutePath());
         QString err;
         if(!database_.open(dbFile,&err))statusBar()->showMessage("SQLite unavailable: "+err,15000);
+        if(!catalog_.loadDirectory(QCoreApplication::applicationDirPath()+"/protocols/asrtu1",&err))
+            statusBar()->showMessage("ASRTU-1 packet catalog unavailable: "+err,20000);
+        else{
+            catalogReady_=true;
+            businessInfo_->setText(QString("%1 packet kinds, %2 engineering field definitions | CRC not verified")
+                .arg(catalog_.packetKinds()).arg(catalog_.fieldDefinitions()));
+        }
     }
 private:
     QString selectedSatellite()const{
@@ -403,6 +473,80 @@ private:
                 packetTable_->setItem(i,j,new QTableWidgetItem(columns[j]));
         }
         if(packets_.isEmpty())packetHex_->clear();
+        rebuildBusiness();
+    }
+    void rebuildBusiness(){
+        BusinessStats stats;
+        businessPackets_=catalogReady_&&selectedSatellite()=="ASRTU-1"
+            ? catalog_.decodeAll(packets_,&stats):QVector<BusinessPacket>{};
+        businessTable_->setRowCount(businessPackets_.size());
+        for(int row=0;row<businessPackets_.size();++row){
+            const auto &b=businessPackets_[row];
+            const QStringList cols={
+                b.transport.captureLocal.isValid()
+                    ?b.transport.captureLocal.toString("yyyy-MM-dd HH:mm:ss.zzz"):"(unknown)",
+                b.packetName.isEmpty()?"(unknown)":b.packetName,
+                b.mainType<0?"":QString("0x%1").arg(b.mainType,2,16,QChar('0')).toUpper(),
+                b.subType<0?"":QString::number(b.subType),
+                QString("%1 / %2").arg(b.fields.size()).arg(b.skippedFields),
+                b.identification,b.transport.fecEvidence};
+            for(int i=0;i<cols.size();++i)
+                businessTable_->setItem(row,i,new QTableWidgetItem(cols[i]));
+        }
+        businessInfo_->setText(QString(
+            "%1 packet kinds / %2 defined fields | %3 recognized packets | %4 decoded fields | "
+            "%5 out-of-range | %6 unknown packets | application CRC not verified")
+            .arg(catalog_.packetKinds()).arg(catalog_.fieldDefinitions())
+            .arg(stats.recognized).arg(stats.decodedFields)
+            .arg(stats.truncatedFields).arg(stats.unknown));
+        businessFields_->setRowCount(0);
+        if(!businessPackets_.isEmpty())showBusinessFields(0);
+    }
+    void showBusinessFields(int idx){
+        if(idx<0||idx>=businessPackets_.size()){businessFields_->setRowCount(0);return;}
+        const auto &p=businessPackets_[idx];
+        businessFields_->setRowCount(p.fields.size());
+        for(int row=0;row<p.fields.size();++row){
+            const auto &f=p.fields[row];
+            const QStringList cols={f.nameCn,f.nameEn,f.value,f.unit,f.rawHex,f.formula,f.status};
+            for(int c=0;c<cols.size();++c)
+                businessFields_->setItem(row,c,new QTableWidgetItem(cols[c]));
+        }
+    }
+    void plotBusinessField(const QString &packet,const QString &code){
+        auto *chart=new QChart;
+        auto *series=new QLineSeries(chart);
+        QDateTime start;
+        for(const auto &p:businessPackets_)
+            if(p.transport.captureLocal.isValid()){start=p.transport.captureLocal;break;}
+        for(int i=0;i<businessPackets_.size();++i){
+            const auto &p=businessPackets_[i];
+            if(p.packetName!=packet)continue;
+            for(const auto &f:p.fields)if(f.code==code){
+                bool ok=false;const double y=f.value.toDouble(&ok);
+                if(ok&&std::isfinite(y)){
+                    const double x=(start.isValid()&&p.transport.captureLocal.isValid())
+                        ?start.msecsTo(p.transport.captureLocal)/1000.0 : double(i);
+                    series->append(x,y);
+                }
+            }
+        }
+        chart->addSeries(series);chart->createDefaultAxes();
+        chart->setTitle(packet+" / "+code+" (logger seconds, application CRC unverified)");
+        businessChart_->setChart(chart);
+    }
+    void exportBusiness(bool csv){
+        if(businessPackets_.isEmpty())return;
+        const QString name=QFileDialog::getSaveFileName(this,"Export engineering telemetry",
+            csv?"asrtu-engineering.csv":"asrtu-engineering.json",
+            csv?"CSV (*.csv)":"JSON (*.json)");
+        if(name.isEmpty())return;
+        QString err;
+        const bool ok=csv
+            ?BusinessCatalog::exportCsv(name,businessPackets_,&err)
+            :BusinessCatalog::exportJson(name,businessPackets_,&err);
+        if(!ok)QMessageBox::warning(this,"Telemetry export",err);
+        else statusBar()->showMessage("Exported "+name,7000);
     }
     void fillTable(){
         framesTable_->setRowCount(frames_.size());
@@ -486,6 +630,9 @@ private:
     }
     QString logPath_,binPath_;
     Database database_;
+    BusinessCatalog catalog_;
+    bool catalogReady_=false;
+    QVector<BusinessPacket> businessPackets_;
     LiveTcp *live_=nullptr;
     Stats stats_;
     Schema schema_;
@@ -497,6 +644,10 @@ private:
     QTableWidget *framesTable_=nullptr,*fieldsTable_=nullptr;
     QPlainTextEdit *rawText_=nullptr,*packetHex_=nullptr;
     QTableWidget *packetTable_=nullptr;
+    QTableWidget *businessTable_=nullptr,*businessFields_=nullptr;
+    QLineEdit *businessFilter_=nullptr;
+    QLabel *businessInfo_=nullptr;
+    QChartView *businessChart_=nullptr;
     QVector<ApplicationPacket> packets_;
     TransportStats packetStats_;
     QSlider *timeline_=nullptr;
