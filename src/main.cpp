@@ -513,7 +513,10 @@ private:
     QComboBox *satellite_=nullptr,*speed_=nullptr,*chartSelect_=nullptr;
     QLineEdit *filter_=nullptr;
     QTableWidget *framesTable_=nullptr,*fieldsTable_=nullptr;
-    QPlainTextEdit *rawText_=nullptr;
+    QPlainTextEdit *rawText_=nullptr,*packetHex_=nullptr;
+    QTableWidget *packetTable_=nullptr;
+    QComboBox *crcMode_=nullptr;
+    QVector<ApplicationPacket> packets_;
     QSlider *timeline_=nullptr;
     QTimer *timer_=nullptr;
     QChartView *chart_=nullptr;
