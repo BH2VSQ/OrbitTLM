@@ -84,6 +84,9 @@ Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
     // Neither the six-byte header nor a single complete packet is mandatory.
     const QByteArray zone=raw.mid(5,218);
     f.payload=zone;
+    // BY04 VC1 is a binary DSLWP SSDV stream; arbitrary 0xC0 bytes
+    // inside compressed image data must never be treated as KISS delimiters.
+    if(satellite=="BY04" && f.vcid==1)return f;
     const int open=zone.indexOf(char(0xc0));
     if(open<0)return f;
     const int close=zone.indexOf(char(0xc0),open+1);

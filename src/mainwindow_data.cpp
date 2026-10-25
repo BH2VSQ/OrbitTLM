@@ -583,11 +583,13 @@ void MainWindow::updateFrameList(){
 void MainWindow::inspectFrame(int index){
     if(index<0||index>=frames_.size()){debugText_->clear();return;}
     const auto &f=frames_[index];
-    QString result=QStringLiteral("接收时间：%1\n记录时间依据：%2\nMFC：%3\n虚拟信道：%4\n"
-        "候选 APID：%5\nFEC/来源：%6\n帧质量：%7\n校验：应用层 CRC 未执行\n"
-        "诊断：%8\nSHA-256：%9\n\n原始 223 字节信息帧：\n%10")
+    const int scid=f.bytes.size()>=2?
+        ((quint8(f.bytes[0])&0x3f)<<4)|(quint8(f.bytes[1])>>4):-1;
+    QString result=QStringLiteral("接收时间：%1\n记录时间依据：%2\n航天器标识 SCID：0x%3\nMFC：%4\n虚拟信道：%5\n"
+        "候选 APID：%6\nFEC/来源：%7\n帧质量：%8\n校验：应用层 CRC 未执行\n"
+        "诊断：%9\nSHA-256：%10\n\n原始 223 字节信息帧：\n%11")
         .arg(utcLabel(f.captureLocal),f.timeBasis)
-        .arg(f.master).arg(f.vcid).arg(f.apid)
+        .arg(scid,3,16,QChar('0')).arg(f.master).arg(f.vcid).arg(f.apid)
         .arg(sourceLabel(f.sources)).arg(qualityLabel(f.quality))
         .arg(f.error,f.hash,QString::fromLatin1(f.bytes.toHex(' ').toUpper()));
     debugText_->setPlainText(result);
