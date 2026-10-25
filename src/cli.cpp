@@ -1,5 +1,6 @@
 #include "core.h"
 #include "schema.h"
+#include "transport.h"
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QJsonDocument>
@@ -18,6 +19,9 @@ int main(int argc,char **argv){
         QCommandLineOption({"s","satellite"},"ASRTU-1 or BY04 (8104)","name","ASRTU-1"),
         QCommandLineOption({"p","profile"},"Optional engineering rules JSON","file"),
         QCommandLineOption("json","Write full ordered JSON","file"),
+        QCommandLineOption("packets-json","Write reassembled variable-length KISS packets with CRC status","file"),
+        QCommandLineOption("crc-profile","Optional CRC profile: none, ccitt-false, x25, crc32-iso; default NONE","profile","none"),
+        QCommandLineOption("crc-skip","Skip N prefix octets when computing CRC (default 0)","count","0"),
         QCommandLineOption("csv","Write full ordered CSV","file"),
         QCommandLineOption("quaternion-csv","Write unverified quaternion candidate time-series","file"),
         QCommandLineOption("sqlite","Persist one session to SQLite","file")
@@ -48,6 +52,33 @@ int main(int argc,char **argv){
         }
         for(auto &f:frames)schema.apply(f);
     }
+    CrcConfig crc;
+    const QString profile=args.value("crc-profile").toLower();
+    if(profile!="none"){
+        crc.enabled=true;
+        if(profile=="ccitt-false"){
+            crc.width=16;crc.polynomial=0x1021;crc.initial=0xffff;
+        }else if(profile=="x25"){
+            crc.width=16;crc.polynomial=0x1021;crc.initial=0xffff;
+            crc.reflectInput=true;crc.reflectOutput=true;
+            crc.finalXor=0xffff;crc.trailerLittleEndian=true;
+        }else if(profile=="crc32-iso"){
+            crc.width=32;crc.polynomial=0x04c11db7;crc.initial=0xffffffff;
+            crc.reflectInput=true;crc.reflectOutput=true;
+            crc.finalXor=0xffffffff;crc.trailerLittleEndian=true;
+        }else {
+            err<<"Unsupported CRC preset. Configure only a confirmed mission CRC.\n";
+            return 7;
+        }
+        bool ok=false;
+        crc.skipLeadingBytes=args.value("crc-skip").toInt(&ok);
+        if(!ok||crc.skipLeadingBytes<0){err<<"Invalid --crc-skip\n";return 7;}
+    }
+    const auto packets=Transport::reassemble(frames,crc);
+    if(args.isSet("packets-json")&&
+       !Transport::exportJson(args.value("packets-json"),packets,&reason)){
+        err<<"KISS packets: "<<reason<<"\n";return 6;
+    }
     if(args.isSet("sqlite")){
         Database db;
         if(!db.open(args.value("sqlite"),&reason)||
@@ -71,7 +102,9 @@ int main(int argc,char **argv){
         {"log_fec_reported",stats.trustedFromLog},
         {"structural_only",stats.structuralOnly},
         {"invalid",stats.invalid},{"duplicate_observations",stats.duplicates},
-        {"note","Recorder clock is not spacecraft UTC; unknown time stays unknown"}
+        {"application_kiss_packets",packets.size()},
+        {"crc_profile",profile},
+        {"note","223 bytes = 5-byte short TM header + 218-byte KISS transport region; CRC not assumed unless --crc-profile is set"}
     };
     out<<QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Indented));
     return 0;
