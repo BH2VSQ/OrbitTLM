@@ -3,11 +3,14 @@
 | Milestone | Implemented | Validation |
 |---|---|---|
 | P0: read paired LOG/BIN, exact 223-byte hashing and origin fusion | yes | Qt unit tests |
-| P0: KISS escape + single complete Space Packet | yes | Qt unit tests |
-| P0: multi-frame short-KISS continuation, arbitrary VC transport | no | pending reference fixtures |
+| P0: 5-byte TM header + 218-byte KISS region | yes | Qt tests |
+| P0: Variable-length KISS stream and per-VC cross-frame reassembly | yes | synthetic Qt regressions |
+| P0: Application CRC check | configurable opt-in | mission parameters still unverified |
+| P0: Inner CCSDS Space Packet | optional candidate only | not mandatory for all subsystems |
+| P0: mission-specific filler and all discontinuity cases | partial | awaiting more reference fixtures |
 | P0: every ASRTU-1 engineering field | schema-driven extension only | requires confirmed mission subpacket and field definitions |
 | P1: Qt frame browser, playback slider, detail, raw hex, CSV/JSON | yes | CI compile; GUI manual QA pending |
-| P1: reopen persisted SQLite sessions | stored, re-open UI pending | not yet verified |
+| P1: reopen persisted SQLite sessions | yes | SQLite roundtrip; GUI manual QA pending |
 | P2: quaternion candidate, plotted time series and 3-D wireframe preview | experimental | no physical coordinate convention established |
 | P2: UTC chronological onboard telemetry output | no inferred timestamps | onboard epoch specification required |
 | P3: BY04 CCSDS-level support | yes | synthetic regression |
@@ -27,3 +30,17 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 \`\`\`
 Use a reference session with both source files, then compare SHA-256, master-frame counts, VCIDs, APIDs, sequence counts, KISS escapes and missing frames. Source timestamps are kept as *logger-local-unverified*; raw BIN frames lack timestamps.
+
+## BG7ZDQ protocol corrections (2026-10-25)
+
+Subsystems generate variable-length and differently typed application packets, append CRC, and wrap them using KISS. The KISS byte stream is split into 218-byte segments. A 5-byte CCSDS short TM header is prefixed, resulting in exactly 223 RS *information* bytes, which are then RS-encoded. The 223 bytes recorded by the receiver are not full parity-bearing codewords.
+
+Short TM byte 5 is the first header pointer; it is NOT a KISS payload length. The following 218 octets are a KISS transport region, not necessarily one complete CCSDS Space Packet.
+
+Some real KISS payloads include a six-byte CCSDS Space Packet-shaped inner header; this is OPTIONAL. Never require it to accept a TM frame or recover other subsystem packets.
+
+Application CRC width, polynomial, coverage, reflection, init/final value and trailer endian are NOT provided. Default status is not_checked; manual CRC presets are experimental. A FEC-reported input frame is not equivalent to application CRC pass.
+
+KISS transport per VCID supports packets of different lengths, more than one packet in a TM frame, fragmentation and escapes across TM frames. An observed virtual-channel sequence gap abandons an incomplete packet. All-0xAA segments between FEND markers are treated as probable filler but do not confirm CRC integrity.
+
+UTC from spacecraft remains unknown if not explicitly decoded with mission epoch. No timestamps are synthesized from BIN frame ordering.
