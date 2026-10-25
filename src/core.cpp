@@ -74,6 +74,8 @@ Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
     f.complete=true; // TM structural validity only; application packets may cross frame boundaries.
     f.quality="structural_only";
     f.error="TM frame accepted; application CRC and RS parity not verified here";
+    const int scid=((first&0x3f)<<4)|(second>>4);
+    f.fields.push_back({"tm.spacecraft_id",QString::number(scid),"","verified_protocol"});
     f.fields.push_back({"tm.vcid",QString::number(f.vcid),"","verified_protocol"});
     f.fields.push_back({"tm.first_header_pointer",QString::number(byte(raw,4)),"","verified_protocol"});
     f.fields.push_back({"tm.master_count",QString::number(f.master),"","verified_protocol"});

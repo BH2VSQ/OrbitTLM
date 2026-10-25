@@ -95,6 +95,13 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,Tr
     for(const Frame *source:ordered){
         const Frame &frame=*source;
         if(frame.vcid<0)continue;
+        if(frame.satellite=="BY04"){
+            if(frame.bytes.size()!=223)continue;
+            const int scid=((quint8(frame.bytes[0])&0x3f)<<4)|(quint8(frame.bytes[1])>>4);
+            // BY04 uses spacecraft ID 0x205. VC1 is the native 218-byte
+            // DSLWP SSDV image service, NOT KISS. VC0/VC2 may carry KISS.
+            if(scid!=0x205 || frame.vcid==1)continue;
+        }
         State &s=states[frame.vcid];
         // Only the per-VC counter can assess continuity; master count interleaves VCs.
         if(s.haveCount && frame.virtualCount>=0 && ((s.previousCount+1)&0xff)!=frame.virtualCount){
