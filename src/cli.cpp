@@ -2,6 +2,7 @@
 #include "schema.h"
 #include "transport.h"
 #include "business.h"
+#include "by04.h"
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QJsonDocument>
@@ -23,6 +24,7 @@ int main(int argc,char **argv){
         QCommandLineOption("packets-json","Write reassembled KISS packets with unverified application integrity","file"),
         QCommandLineOption("telemetry-json","Write business packet fields and engineering units to JSON","file"),
         QCommandLineOption("telemetry-csv","Write business packet fields and engineering units to CSV","file"),
+        QCommandLineOption("by04-ssdv-bin","Save native 218-byte BY04 VC1 DSLWP SSDV image packets","file"),
         QCommandLineOption("csv","Write full ordered CSV","file"),
         QCommandLineOption("quaternion-csv","Write SAT-S3 official-schema calculated q0..q3; CRC unverified","file"),
         QCommandLineOption("candidate-quaternion-csv","Write experimental legacy frame candidate quaternions","file"),
@@ -81,11 +83,32 @@ int main(int argc,char **argv){
            !BusinessCatalog::exportQuaternionCsv(args.value("quaternion-csv"),business,&reason)){
             err<<"SAT-S3 quaternion CSV: "<<reason<<"\n";return 8;
         }
-    }else if(args.isSet("telemetry-json")||args.isSet("telemetry-csv")||args.isSet("quaternion-csv")){
-        err<<"Mission-specific engineering catalog is available for ASRTU-1 only; BY04 needs separately validated tables\n";
-        return 8;
+    }else if(sat=="BY04"){
+        business=By04Decoder::decodeAll(packets);
+        for(const auto &item:business){
+            if(item.identification=="by04_ccsds_header_only")++bs.recognized;
+            else ++bs.unknown;
+            bs.decodedFields+=item.fields.size();
+        }
+        if(args.isSet("quaternion-csv")){
+            err<<"BY04 does not reuse SAT-S3 quaternion engineering fields; no verified BY04 mission schema available\n";
+            return 8;
+        }
+        if(args.isSet("telemetry-json") &&
+           !BusinessCatalog::exportJson(args.value("telemetry-json"),business,&reason)){
+            err<<"BY04 header JSON: "<<reason<<"\n";return 8;
+        }
+        if(args.isSet("telemetry-csv") &&
+           !BusinessCatalog::exportCsv(args.value("telemetry-csv"),business,&reason)){
+            err<<"BY04 header CSV: "<<reason<<"\n";return 8;
+        }
+        if(args.isSet("by04-ssdv-bin")){
+            const auto imagePackets=By04Decoder::images(frames);
+            if(!ImageTools::savePackets(imagePackets,args.value("by04-ssdv-bin"),&reason)){
+                err<<"BY04 DSLWP SSDV: "<<reason<<"\n";return 8;
+            }
+        }
     }
-
     if(args.isSet("sqlite")){
         Database db;
         if(!db.open(args.value("sqlite"),&reason)||
