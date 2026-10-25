@@ -270,6 +270,46 @@ bool Database::save(const QString &name,const QVector<Frame> &frames,QString *er
     if(!db_.commit()){if(error)*error=db_.lastError().text();return false;}
     return true;
 }
+QVector<QPair<qint64,QString>> Database::sessions(QString *error) const {
+    QVector<QPair<qint64,QString>> result;
+    if(!db_.isOpen()){if(error)*error="Database not open";return result;}
+    QSqlQuery q(db_);
+    if(!q.exec("SELECT id,name FROM sessions ORDER BY id DESC")){
+        if(error)*error=q.lastError().text();return result;
+    }
+    while(q.next())result.push_back({q.value(0).toLongLong(),q.value(1).toString()});
+    return result;
+}
+QVector<Frame> Database::load(qint64 sessionId,QString *error) const {
+    QVector<Frame> frames;
+    QSqlQuery q(db_);
+    q.prepare("SELECT id,hash,satellite,capture_local,time_basis,quality,diagnostic,"
+              "master,virtual_count,vcid,apid,sequence,sources,raw,payload FROM frames "
+              "WHERE session_id=? ORDER BY CASE WHEN capture_local IS NULL THEN 1 ELSE 0 END, capture_local, id");
+    q.addBindValue(sessionId);
+    if(!q.exec()){if(error)*error=q.lastError().text();return frames;}
+    QSqlQuery sample(db_);
+    sample.prepare("SELECT name,value,unit,status FROM fields WHERE frame_id=? ORDER BY id");
+    while(q.next()){
+        Frame f;
+        f.hash=q.value(1).toString();f.satellite=q.value(2).toString();
+        if(!q.value(3).isNull())f.captureLocal=QDateTime::fromString(q.value(3).toString(),Qt::ISODateWithMs);
+        f.timeBasis=q.value(4).toString();f.quality=q.value(5).toString();
+        f.error=q.value(6).toString();f.master=q.value(7).toInt();
+        f.virtualCount=q.value(8).toInt();f.vcid=q.value(9).toInt();
+        f.apid=q.value(10).toInt();f.sequence=q.value(11).toInt();
+        f.sources=q.value(12).toString().split(';',Qt::SkipEmptyParts);
+        f.bytes=q.value(13).toByteArray();f.payload=q.value(14).toByteArray();
+        f.complete=f.quality!="invalid";
+        sample.bindValue(0,q.value(0));
+        if(!sample.exec()){if(error)*error=sample.lastError().text();return {};}
+        while(sample.next())f.fields.push_back({
+            sample.value(0).toString(),sample.value(1).toString(),
+            sample.value(2).toString(),sample.value(3).toString()});
+        frames.push_back(f);
+    }
+    return frames;
+}
 LiveTcp::LiveTcp(QObject *parent):QObject(parent){
     connect(&socket_,&QTcpSocket::readyRead,this,[this]{
         queued_+=socket_.readAll();
