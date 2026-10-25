@@ -29,12 +29,15 @@ struct State {
     int previousCount = -1;
     int firstMaster = -1, lastMaster = -1;
     int frameCount=0;
+    bool allFecReported=true;
+    bool anyFecReported=false;
     QDateTime firstTime;
     QString timeBasis="unknown";
     QStringList sources;
     void resetPacket(){
         buffer.clear();escaped=false;oversized=false;
         firstMaster=-1;lastMaster=-1;frameCount=0;
+        allFecReported=true;anyFecReported=false;
         firstTime={};timeBasis="unknown";sources.clear();
     }
 };
@@ -144,6 +147,9 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
                     pkt.captureLocal=s.firstTime;
                     pkt.timestampBasis=s.timeBasis;
                     pkt.crcStatus=checkCrc(pkt.bytes,crc);
+                    pkt.fecEvidence=s.allFecReported && s.anyFecReported
+                        ? "log_fec_reported"
+                        : (s.anyFecReported?"mixed_fec_unverified":"bin_only_unverified");
                     recognizeOptionalSpacePacket(pkt);
                     out.push_back(std::move(pkt));
                 }
@@ -158,6 +164,8 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
             s.lastMaster=frame.master;
             if(!countedThisFrame){
                 ++s.frameCount;countedThisFrame=true;
+                if(frame.quality=="log_fec_reported")s.anyFecReported=true;
+                else s.allFecReported=false;
             }
             if(!frame.sources.isEmpty())
                 for(const QString &source:frame.sources)
@@ -192,6 +200,7 @@ bool Transport::exportJson(const QString &path,const QVector<ApplicationPacket> 
           {"capture_local",p.captureLocal.isValid()?p.captureLocal.toString(Qt::ISODateWithMs):QString()},
           {"timestamp_basis",p.timestampBasis},{"spacecraft_utc",QJsonValue::Null},
           {"classification",p.classification},{"crc_status",p.crcStatus},
+          {"fec_evidence",p.fecEvidence},
           {"apid",p.apid},{"packet_sequence",p.sequence},
           {"data_hex",QString::fromLatin1(p.bytes.toHex())},
           {"user_data_hex",QString::fromLatin1(p.data.toHex())},
