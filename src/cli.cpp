@@ -20,10 +20,6 @@ int main(int argc,char **argv){
         QCommandLineOption({"p","profile"},"Optional engineering rules JSON","file"),
         QCommandLineOption("json","Write full ordered JSON","file"),
         QCommandLineOption("packets-json","Write reassembled variable-length KISS packets with CRC status","file"),
-        QCommandLineOption("crc-profile","Optional CRC profile: none, ccitt-false, x25, crc32-iso; default NONE","profile","none"),
-        QCommandLineOption("crc-skip","Skip N prefix octets when computing CRC (default 0)","count","0"),
-        QCommandLineOption("crc-tail","Skip N trailing postfix octets after CRC (default 0)","count","0"),
-        QCommandLineOption("only-crc-passed","Export only application packets passing the selected CRC check"),
         QCommandLineOption("csv","Write full ordered CSV","file"),
         QCommandLineOption("quaternion-csv","Write unverified quaternion candidate time-series","file"),
         QCommandLineOption("sqlite","Persist one session to SQLite","file")
@@ -54,37 +50,8 @@ int main(int argc,char **argv){
         }
         for(auto &f:frames)schema.apply(f);
     }
-    CrcConfig crc;
-    const QString profile=args.value("crc-profile").toLower();
-    if(profile!="none"){
-        crc.enabled=true;
-        if(profile=="ccitt-false"){
-            crc.width=16;crc.polynomial=0x1021;crc.initial=0xffff;
-        }else if(profile=="x25"){
-            crc.width=16;crc.polynomial=0x1021;crc.initial=0xffff;
-            crc.reflectInput=true;crc.reflectOutput=true;
-            crc.finalXor=0xffff;crc.trailerLittleEndian=true;
-        }else if(profile=="crc32-iso"){
-            crc.width=32;crc.polynomial=0x04c11db7;crc.initial=0xffffffff;
-            crc.reflectInput=true;crc.reflectOutput=true;
-            crc.finalXor=0xffffffff;crc.trailerLittleEndian=true;
-        }else {
-            err<<"Unsupported CRC preset. Configure only a confirmed mission CRC.\n";
-            return 7;
-        }
-        bool ok=false;
-        crc.skipLeadingBytes=args.value("crc-skip").toInt(&ok);
-        if(!ok||crc.skipLeadingBytes<0){err<<"Invalid --crc-skip\n";return 7;}
-        crc.trailingBytesAfterCrc=args.value("crc-tail").toInt(&ok);
-        if(!ok||crc.trailingBytesAfterCrc<0){err<<"Invalid --crc-tail\n";return 7;}
-    }
-    if(args.isSet("only-crc-passed")&&!crc.enabled){
-        err<<"--only-crc-passed requires an explicit --crc-profile; mission CRC remains unverified\n";return 7;
-    }
     TransportStats packetStats;
-    const auto packets=Transport::reassemble(frames,crc,
-        args.isSet("only-crc-passed")?PacketFilter::RequireCrcPass:PacketFilter::PreserveAll,
-        &packetStats);
+    const auto packets=Transport::reassemble(frames,&packetStats);
     if(args.isSet("packets-json")&&
        !Transport::exportJson(args.value("packets-json"),packets,&reason)){
         err<<"KISS packets: "<<reason<<"\n";return 6;
@@ -113,14 +80,9 @@ int main(int argc,char **argv){
         {"structural_only",stats.structuralOnly},
         {"invalid",stats.invalid},{"duplicate_observations",stats.duplicates},
         {"application_kiss_packets",packets.size()},
-        {"application_crc_pass",packetStats.crcPassed},
-        {"application_crc_fail",packetStats.crcFailed},
-        {"application_crc_unchecked",packetStats.crcUnchecked},
-        {"application_quarantined_by_policy",packetStats.discardedByPolicy},
         {"application_interrupted_by_gap",packetStats.interruptedByCounterGap},
         {"application_incomplete_at_eof",packetStats.incompleteAtEof},
-        {"crc_profile",profile},
-        {"note","223 bytes = 5-byte short TM header + 218-byte KISS transport region; CRC not assumed unless --crc-profile is set"}
+        {"note","223 bytes = 5-byte TM header + 218-byte KISS transport region; application CRC not verified, packet recovery is structural only"}
     };
     out<<QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Indented));
     return 0;

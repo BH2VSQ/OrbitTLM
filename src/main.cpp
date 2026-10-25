@@ -277,25 +277,11 @@ public:
         right->addTab(rawText_,"Raw HEX");
         auto packetPage=new QWidget;
         auto packetLayout=new QVBoxLayout(packetPage);
-        auto packetControls=new QHBoxLayout;
-        packetControls->addWidget(new QLabel("Application packet CRC:"));
-        crcMode_=new QComboBox;
-        crcMode_->addItems({"Not checked","CRC16/CCITT-FALSE (manual)","CRC16/X25 (manual)",
-                            "CRC32/ISO (manual)"});
-        packetControls->addWidget(crcMode_);
-        requireCrc_=new QCheckBox("Show CRC passed only");
-        requireCrc_->setEnabled(false);
-        packetControls->addWidget(requireCrc_);
-        connect(crcMode_,&QComboBox::currentIndexChanged,this,[this](int index){
-            requireCrc_->setEnabled(index>0);
-            if(index==0)requireCrc_->setChecked(false);
-        });
-        connect(requireCrc_,&QCheckBox::toggled,this,[this]{rebuildPackets();});
-        packetControls->addWidget(new QLabel("CRC preset applies to entire KISS content; not mission verified"));
-        packetLayout->addLayout(packetControls);
-        packetTable_=new QTableWidget(0,8);
+        packetLayout->addWidget(new QLabel(
+            "Application CRC: unverified. Reassembled packets are preserved without speculative CRC filtering."));
+        packetTable_=new QTableWidget(0,7);
         packetTable_->setHorizontalHeaderLabels(
-          {"VCID","Master span","Bytes","Inner APID?","Classification","CRC","FEC evidence","Frame count"});
+          {"VCID","Master span","Bytes","Inner APID?","Classification","FEC evidence","Frame count"});
         packetTable_->verticalHeader()->hide();
         packetTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
         packetTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -306,7 +292,6 @@ public:
         packetHex_->setLineWrapMode(QPlainTextEdit::NoWrap);
         packetLayout->addWidget(packetHex_,1);
         right->addTab(packetPage,"KISS packets");
-        connect(crcMode_,&QComboBox::currentIndexChanged,this,[this]{rebuildPackets();});
         connect(packetTable_,&QTableWidget::itemSelectionChanged,this,[this]{
             const int i=packetTable_->currentRow();
             if(i>=0&&i<packets_.size()){
@@ -404,21 +389,7 @@ private:
         statusBar()->showMessage(msg,20000);
     }
     void rebuildPackets(){
-        CrcConfig crc;
-        switch(crcMode_->currentIndex()){
-        case 1: crc.enabled=true;break;
-        case 2:
-            crc.enabled=true;crc.reflectInput=true;crc.reflectOutput=true;
-            crc.finalXor=0xffff;crc.trailerLittleEndian=true;break;
-        case 3:
-            crc.enabled=true;crc.width=32;crc.polynomial=0x04c11db7;
-            crc.initial=0xffffffff;crc.finalXor=0xffffffff;
-            crc.reflectInput=true;crc.reflectOutput=true;crc.trailerLittleEndian=true;break;
-        default:break;
-        }
-        packets_=Transport::reassemble(frames_,crc,
-            requireCrc_->isChecked()?PacketFilter::RequireCrcPass:PacketFilter::PreserveAll,
-            &packetStats_);
+        packets_=Transport::reassemble(frames_,&packetStats_);
         packetTable_->setRowCount(packets_.size());
         for(int i=0;i<packets_.size();++i){
             const auto &p=packets_[i];
@@ -427,7 +398,7 @@ private:
                 QString("%1-%2").arg(p.firstMaster).arg(p.lastMaster),
                 QString::number(p.bytes.size()),
                 p.apid<0?"(opaque)":QString("0x%1").arg(p.apid,3,16,QChar('0')),
-                p.classification,p.crcStatus,p.fecEvidence,QString::number(p.contributingFrames)};
+                p.classification,p.fecEvidence,QString::number(p.contributingFrames)};
             for(int j=0;j<columns.size();++j)
                 packetTable_->setItem(i,j,new QTableWidgetItem(columns[j]));
         }
@@ -526,10 +497,8 @@ private:
     QTableWidget *framesTable_=nullptr,*fieldsTable_=nullptr;
     QPlainTextEdit *rawText_=nullptr,*packetHex_=nullptr;
     QTableWidget *packetTable_=nullptr;
-    QComboBox *crcMode_=nullptr;
     QVector<ApplicationPacket> packets_;
     TransportStats packetStats_;
-    QCheckBox *requireCrc_=nullptr;
     QSlider *timeline_=nullptr;
     QTimer *timer_=nullptr;
     QChartView *chart_=nullptr;

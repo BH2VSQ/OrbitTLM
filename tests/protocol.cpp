@@ -169,7 +169,7 @@ private slots:
         QCOMPARE(packets[0].bytes,QByteArray::fromHex("011122"));
         QCOMPARE(packets[1].bytes,QByteArray::fromHex("02AABBCCDD"));
         QCOMPARE(packets[2].bytes,QByteArray::fromHex("03"));
-        QCOMPARE(packets[0].crcStatus,QString("not_checked"));
+        QCOMPARE(packets[0].integrity,QString("not_crc_verified"));
     }
     void crossTmFragmentAndKissEscape(){
         QByteArray rawA(223,char(0x31));
@@ -202,54 +202,6 @@ private slots:
         QCOMPARE(Transport::reassemble({Protocol::parse(rawA,"ASRTU-1"),
                                        Protocol::parse(rawB,"ASRTU-1")}).size(),0);
     }
-    void configurableCrcDoesNotGuessPolynomial(){
-        const QByteArray message("123456789");
-        const QByteArray bytes=message+QByteArray::fromHex("29B1");
-        CrcConfig crc; // disabled by default even for checksum-bearing data
-        QCOMPARE(Transport::checkCrc(bytes,crc),QString("not_checked"));
-        crc.enabled=true;
-        QCOMPARE(Transport::checkCrc(bytes,crc),QString("pass"));
-        QByteArray corrupted=bytes;corrupted[2]=char('X');
-        QCOMPARE(Transport::checkCrc(corrupted,crc),QString("fail"));
-    }
-    void crcWithUnprotectedPaddingAndExplicitFiltering(){
-        CrcConfig config;
-        config.enabled=true;
-        config.trailingBytesAfterCrc=3;
-        const QByteArray good=QByteArray("123456789")+QByteArray::fromHex("29b1")+"PAD";
-        QCOMPARE(Transport::checkCrc(good,config),QString("pass"));
-        QByteArray bad=good;bad[2]='X';
-        QCOMPARE(Transport::checkCrc(bad,config),QString("fail"));
-
-        auto wrapped=[](QByteArray content,int count) {
-            QByteArray data=QByteArray::fromHex("2054010000");
-            data+=char(0xc0);
-            for(char c:content) {
-                if(quint8(c)==0xc0){data+=char(0xdb);data+=char(0xdc);}
-                else if(quint8(c)==0xdb){data+=char(0xdb);data+=char(0xdd);}
-                else data+=c;
-            }
-            data+=char(0xc0);
-            data+=QByteArray(223-data.size(),char(0xc0));
-            data[3]=char(count);
-            auto frame=Protocol::parse(data,"ASRTU-1");
-            frame.quality="log_fec_reported";
-            return frame;
-        };
-        TransportStats stats;
-        auto result=Transport::reassemble({wrapped(good,1),wrapped(bad,2)},config,
-                     PacketFilter::RequireCrcPass,&stats);
-        QCOMPARE(stats.decodedPackets,2);
-        QCOMPARE(stats.crcPassed,1);
-        QCOMPARE(stats.crcFailed,1);
-        QCOMPARE(stats.discardedByPolicy,1);
-        QCOMPARE(result.size(),1);
-        QCOMPARE(result[0].bytes,good);
-        QCOMPARE(result[0].crcProfileEvidence,QString("user_selected_unverified"));
-        const auto preserved=Transport::reassemble({wrapped(good,1),wrapped(bad,2)});
-        QCOMPARE(preserved.size(),2);
-        QCOMPARE(preserved[0].crcStatus,QString("not_checked"));
-    }
     void sequenceGapRejectsIncompleteWithoutCRC(){
         QByteArray a(223,char(0x41)),b(223,char(0xc0));
         a.replace(0,5,QByteArray::fromHex("2054010100"));
@@ -257,7 +209,7 @@ private slots:
         a[5]=char(0xc0);b[5]=char(0xc0);
         const auto frames=QVector<Frame>{Protocol::parse(a,"ASRTU-1"),Protocol::parse(b,"ASRTU-1")};
         TransportStats stats;
-        auto packets=Transport::reassemble(frames,{},PacketFilter::PreserveAll,&stats);
+        auto packets=Transport::reassemble(frames,&stats);
         QCOMPARE(packets.size(),0);
         QCOMPARE(stats.interruptedByCounterGap,1);
     }
@@ -268,58 +220,24 @@ private slots:
         tm[8]=char(0xc0); // unexpected FEND, not TFEND/TFESC
         auto f=Protocol::parse(tm,"ASRTU-1");
         TransportStats stats;
-        const auto packets=Transport::reassemble({f},{},PacketFilter::PreserveAll,&stats);
+        const auto packets=Transport::reassemble({f},&stats);
         QCOMPARE(packets.size(),0);
         QCOMPARE(stats.malformedEscapePackets,1);
         QCOMPARE(stats.decodedPackets,0);
     }
-    void standardCrcVectorsRemainDistinctFromMissionCrc(){
-        const QByteArray msg("123456789");
-        CrcConfig x25;
-        x25.enabled=true;
-        x25.width=16;x25.polynomial=0x1021;x25.initial=0xffff;
-        x25.finalXor=0xffff;x25.reflectInput=true;x25.reflectOutput=true;
-        x25.trailerLittleEndian=true;
-        QCOMPARE(Transport::checkCrc(msg+QByteArray::fromHex("6e90"),x25),
-                 QString("pass"));
-        x25.trailerLittleEndian=false;
-        QCOMPARE(Transport::checkCrc(msg+QByteArray::fromHex("6e90"),x25),
-                 QString("fail"));
-        CrcConfig crc32;
-        crc32.enabled=true;crc32.width=32;crc32.polynomial=0x04c11db7;
-        crc32.initial=0xffffffff;crc32.finalXor=0xffffffff;
-        crc32.reflectInput=true;crc32.reflectOutput=true;
-        crc32.trailerLittleEndian=true;
-        QCOMPARE(Transport::checkCrc(msg+QByteArray::fromHex("2639f4cb"),crc32),
-                 QString("pass"));
-        QCOMPARE(Transport::checkCrc(msg+QByteArray::fromHex("2639f4c0"),crc32),
-                 QString("fail"));
-    }
-    void optionalSpaceHeaderInsideValidatedCrcEnvelope(){
-        QByteArray inner=QByteArray::fromHex("08f0fba10000");
-        inner+=char(0x05);
-        // This test does not assert that Qt's CRC is the satellite CRC.
-        // Use the exact explicit profile obtained by brute-force test data:
-        CrcConfig config;
-        config.enabled=true;
-        config.initial=0xffff;config.polynomial=0x1021;
-        QByteArray envelope=inner;
-        // The chosen synthetic payload is deliberately not a mission fixture.
-        quint32 v=0xffff;
-        for(char x:inner){
-            v^=quint32(quint8(x))<<8;
-            for(int i=0;i<8;++i)v=(v&0x8000)?((v<<1)^0x1021)&0xffff:(v<<1)&0xffff;
-        }
-        envelope+=char((v>>8)&0xff);envelope+=char(v&0xff);
-        QByteArray tm=QByteArray::fromHex("2054010100");
-        tm+=char(0xc0);tm+=envelope;tm+=char(0xc0);
-        tm+=QByteArray(223-tm.size(),char(0xc0));
-        auto frame=Protocol::parse(tm,"ASRTU-1");
-        frame.quality="log_fec_reported";
-        auto packets=Transport::reassemble({frame},config,PacketFilter::RequireCrcPass);
+    void optionalInnerHeaderWithUnknownChecksumSuffix(){
+        QByteArray raw(223,char(0xc0));
+        raw.replace(0,5,QByteArray::fromHex("2054010100"));
+        QByteArray candidate=QByteArray::fromHex("08f0fba10000");
+        candidate.append(char(0x42));
+        candidate.append(QByteArray::fromHex("1234"));
+        raw.replace(6,candidate.size(),candidate);
+        const auto packets=Transport::reassemble({Protocol::parse(raw,"ASRTU-1")});
         QCOMPARE(packets.size(),1);
         QCOMPARE(packets[0].apid,0xf0);
-        QCOMPARE(packets[0].data,QByteArray(1,char(0x05)));
+        QCOMPARE(packets[0].opaqueSuffixBytes,2);
+        QCOMPARE(packets[0].data,QByteArray(1,char(0x42)));
+        QCOMPARE(packets[0].integrity,QString("not_crc_verified"));
     }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");

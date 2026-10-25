@@ -5,7 +5,7 @@
 | P0: read paired LOG/BIN, exact 223-byte hashing and origin fusion | yes | Qt unit tests |
 | P0: 5-byte TM header + 218-byte KISS region | yes | Qt tests |
 | P0: Variable-length KISS stream and per-VC cross-frame reassembly | yes | synthetic Qt regressions |
-| P0: Application CRC check | configurable opt-in | mission parameters still unverified |
+| P0: Application CRC check | intentionally omitted | current offline replay does not need speculative CRC validation |
 | P0: Inner CCSDS Space Packet | optional candidate only | not mandatory for all subsystems |
 | P0: mission-specific filler and all discontinuity cases | partial | awaiting more reference fixtures |
 | P0: every ASRTU-1 engineering field | schema-driven extension only | requires confirmed mission subpacket and field definitions |
@@ -57,3 +57,9 @@ New explicit CRC filtering (application-packet level):
 - an optional CCSDS Space Packet-shaped header is detected *after* successfully verified trailer removal when an experimental profile is selected.
 
 The sample capture did not provide sufficient evidence to identify a unique spacecraft application CRC variant; common CRC16/CRC32 presets alone do not justify default filtering. Adding a verified mission profile remains an open item.
+
+## CRC research outcome / policy (2026-10-25)
+
+After inspecting BG7ZDQ/ASRTU_Series_Receiver, HyacinthSat/asrtu-sndmdm-backend, and gr-lilacsat, no demonstrated application CRC preset for the ASRTU-1 downlink was established. The CRC-CCITT function in gr-lilacsat is in the AFSK-related module and does not certify the separate downlink KISS packet checksum. The spacecraft's publicly released OBC software may be an additional verification source, but its specific CRC configuration has not been verified for the relevant telemetry path.
+
+We removed the optional CRC code, CLI parameters, guessed filters and UI controls instead of retaining speculative verification. **Do not use an arbitrary CRC mismatch as proof of packet damage**. The KISS packet output and JSON mark application integrity `not_crc_verified`. FEC/log provenance is separate and does not imply application CRC success. A user-provided mission CRC specification or confirmed source trace will be needed to implement authoritative CRC filtering in the future.

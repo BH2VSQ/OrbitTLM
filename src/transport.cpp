@@ -10,11 +10,6 @@
 namespace orbit {
 namespace {
 int octet(char c) { return static_cast<unsigned char>(c); }
-quint32 reflect(quint32 value,int width) {
-    quint32 result=0;
-    for(int i=0;i<width;++i){ result=(result<<1)|((value>>i)&1u); }
-    return result;
-}
 bool isPaddingOnly(const QByteArray &bytes) {
     if(bytes.isEmpty())return true;
     return std::all_of(bytes.cbegin(),bytes.cend(),
@@ -41,58 +36,30 @@ struct State {
         firstTime={};timeBasis="unknown";sources.clear();
     }
 };
-void recognizeOptionalSpacePacket(ApplicationPacket &packet,const CrcConfig &crc) {
-    QByteArray checked;
-    // If the selected CRC passes, omit the checksum and unprotected postfix
-    // when inspecting an optional inner header. The original bytes are kept.
-    if(crc.enabled && packet.crcStatus=="pass")
-        checked=packet.bytes.left(packet.bytes.size()-(crc.width/8)-crc.trailingBytesAfterCrc);
-    const QByteArray &b=checked.isEmpty()?packet.bytes:checked;
+void recognizeOptionalSpacePacket(ApplicationPacket &packet) {
+    const QByteArray &b=packet.bytes;
     if(b.size()<7)return;
     const int id=(octet(b[0])<<8)|octet(b[1]);
     const int seq=(octet(b[2])<<8)|octet(b[3]);
-    const int len=1+(octet(b[4])<<8)+octet(b[5]);
-    if((id>>13)!=0 || len<1 || len+6!=b.size())return;
+    const int length=1+(octet(b[4])<<8)+octet(b[5]);
+    if((id>>13)!=0 || length<1)return;
+    const int expected=length+6;
+    const int suffix=b.size()-expected;
+    // Application CRC may be appended, but is NOT checked. These are merely
+    // candidate layouts, never a claim of checksum validity.
+    if(suffix!=0 && suffix!=2 && suffix!=4)return;
     packet.apid=id&0x7ff;
     packet.sequence=seq&0x3fff;
-    packet.data=b.mid(6);
+    packet.data=b.mid(6,length);
+    packet.opaqueSuffixBytes=suffix;
     packet.classification="ccsds_space_packet_candidate";
-    packet.diagnostic="Optional internal six-byte CCSDS layout matches; application CRC is separate";
+    packet.diagnostic=QString("Candidate inner header; %1 suffix bytes unverified").arg(suffix);
 }
 }
 QByteArray Transport::frameData(const QByteArray &frame) {
     return frame.size()==223?frame.mid(5,218):QByteArray();
 }
-QString Transport::checkCrc(const QByteArray &packet,const CrcConfig &config){
-    if(!config.enabled)return "not_checked";
-    if(config.width!=16&&config.width!=32)return "unsupported_configuration";
-    if(config.skipLeadingBytes<0 || config.trailingBytesAfterCrc<0)return "unsupported_configuration";
-    const int suffix=config.width/8;
-    if(packet.size()<config.skipLeadingBytes+suffix+config.trailingBytesAfterCrc)return "insufficient_bytes";
-    const quint32 mask=config.width==32?0xffffffffu:0xffffu;
-    quint32 remainder=config.initial&mask;
-    const quint32 poly=config.polynomial&mask;
-    const int end=packet.size()-suffix-config.trailingBytesAfterCrc;
-    for(int n=config.skipLeadingBytes;n<end;++n){
-        quint32 v=quint32(octet(packet[n]));
-        if(config.reflectInput)v=reflect(v,8);
-        remainder ^= v<<(config.width-8);
-        for(int bit=0;bit<8;++bit)
-            remainder=(remainder & (quint32(1)<<(config.width-1)))
-                ? ((remainder<<1)^poly)&mask : (remainder<<1)&mask;
-    }
-    if(config.reflectOutput)remainder=reflect(remainder,config.width);
-    remainder=(remainder ^ config.finalXor)&mask;
-    quint32 received=0;
-    if(config.trailerLittleEndian){
-        for(int n=suffix-1;n>=0;--n)received=(received<<8)|octet(packet[end+n]);
-    }else{
-        for(int n=0;n<suffix;++n)received=(received<<8)|octet(packet[end+n]);
-    }
-    return remainder==received?"pass":"fail";
-}
-QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,const CrcConfig &crc,
-                                          PacketFilter filter,TransportStats *stats){
+QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,TransportStats *stats){
     QVector<ApplicationPacket> out;
     TransportStats observed;
     QHash<int,State> states;
@@ -161,19 +128,12 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
                     pkt.sources=s.sources;
                     pkt.captureLocal=s.firstTime;
                     pkt.timestampBasis=s.timeBasis;
-                    pkt.crcStatus=checkCrc(pkt.bytes,crc);
-                    pkt.crcProfileEvidence=crc.enabled ? "user_selected_unverified" : "not_checked";
                     pkt.fecEvidence=s.allFecReported && s.anyFecReported
                         ? "log_fec_reported"
                         : (s.anyFecReported?"mixed_fec_unverified":"bin_only_unverified");
-                    recognizeOptionalSpacePacket(pkt,crc);
+                    recognizeOptionalSpacePacket(pkt);
                     ++observed.decodedPackets;
-                    if(pkt.crcStatus=="pass")++observed.crcPassed;
-                    else if(pkt.crcStatus=="fail")++observed.crcFailed;
-                    else ++observed.crcUnchecked;
-                    if(filter==PacketFilter::RequireCrcPass && pkt.crcStatus!="pass")
-                        ++observed.discardedByPolicy;
-                    else out.push_back(std::move(pkt));
+                    out.push_back(std::move(pkt));
                 }
                 s.resetPacket();
                 s.started=true;
@@ -226,8 +186,8 @@ bool Transport::exportJson(const QString &path,const QVector<ApplicationPacket> 
           {"contributing_frames",p.contributingFrames},
           {"capture_local",p.captureLocal.isValid()?p.captureLocal.toString(Qt::ISODateWithMs):QString()},
           {"timestamp_basis",p.timestampBasis},{"spacecraft_utc",QJsonValue::Null},
-          {"classification",p.classification},{"crc_status",p.crcStatus},
-          {"crc_profile_evidence",p.crcProfileEvidence},
+          {"classification",p.classification},{"integrity",p.integrity},
+          {"opaque_suffix_bytes",p.opaqueSuffixBytes},
           {"fec_evidence",p.fecEvidence},
           {"apid",p.apid},{"packet_sequence",p.sequence},
           {"data_hex",QString::fromLatin1(p.bytes.toHex())},

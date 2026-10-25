@@ -10,7 +10,7 @@ OrbitTLM is a C++20 / Qt 6 / CMake / SQLite desktop workbench for **offline sate
 - Each decoded RS information frame is exactly **5 bytes of short CCSDS TM header + 218 bytes of KISS stream**. RS parity is not present in these 223 bytes.
 - Variable-length subsystem packets have CRC added before KISS encoding; multiple packets can share a TM frame, or one packet can span frames.
 - KISS escapes are processed across TM frame boundaries, independently per virtual channel, before any optional CCSDS Space Packet-shaped inner header is considered.
-- Application CRC is **not checked by default** until the correct satellite/subsystem CRC parameters are established.
+- Application CRC is not checked: this version restores KISS packets without using unverified CRC parameters to discard data.
 - A structurally valid packet **does not prove** it passed Reed–Solomon error correction.
 - Satellite-specific values without a verified conversion schema are exported as **raw**, not invented engineering units.
 - Experimental ASRTU-1 quaternion candidates are explicitly labeled `candidate_unverified`: reference frame, component order and antenna alignment are not certified.
@@ -45,21 +45,9 @@ Open the `OrbitTLM` executable. Use **Import session** to choose a log and binar
 
 This project is an independently written decoder and does not include any binary executable from third parties.
 
-## Application packet reconstruction and CRC
 
-The desktop application has a **KISS packets** tab showing reconstructed variable-length packets, VCID, source TM master counts, inner 6-byte CCSDS layout *if positively recognized*, and CRC result.
+## ASRTU-1 application CRC research decision
 
-The command-line decoder can also write these to a structured JSON file with `--packets-json packets.json`.
+The two reference projects do not establish the satellite application's CRC width, coverage, polynomial, trailer encoding and per-subsystem handling. gr-lilacsat's AFSK CRC implementation is not proof of the spacecraft's application checksum. A separate OBC software repository is publicly available but the precise downlink CRC call path has not been independently established.
 
-There is **no confirmed ASRTU-1 application CRC preset** yet. The optional `--crc-profile ccitt-false|x25|crc32-iso` switch is provided for controlled experiments, not official validation; `--crc-skip N` changes the number of header bytes excluded from the checksum calculation. Without an explicit profile, all application CRC states are `not_checked`.
-
-A successful RS/FEC result in an external demodulator log does **not** establish that the application packet CRC has passed. Captured application packets are never treated as verified solely because their length resembles a CCSDS Space Packet.
-
-### CRC-based packet selection (experimental until mission CRC is confirmed)
-
-```sh
-OrbitTLM-cli --satellite ASRTU-1 --log decoder.log --bin SSDV_received_frames223.bin --packets-json kiss_all.json
-OrbitTLM-cli --satellite ASRTU-1 --log decoder.log --bin SSDV_received_frames223.bin --crc-profile ccitt-false --crc-skip 0 --crc-tail 0 --only-crc-passed --packets-json kiss_crc_passed.json
-```
-
-The second command is **only a manual algorithm experiment**, not a recommended ASRTU-1 preset. Do not interpret CRC mismatch under an unverified profile as proven RF corruption. Filtering never deletes the source TM frames.
+For the current task, which is recovery and offline replay of 223-byte TM information frames, the application CRC is **not required** to preserve and export recovered variable-length KISS packets. To avoid false negatives and mislabeling corrupted packets as verified, OrbitTLM has **removed experimental CRC presets, the only-CRC-passed filter, and the checker implementation**. Frames remain retained with source and FEC evidence. Application packet status is always `not_crc_verified` until a documented satellite-specific implementation is introduced. KISS escape integrity, missing-frame discontinuities and incomplete-packet detection remain active.
