@@ -41,8 +41,13 @@ struct State {
         firstTime={};timeBasis="unknown";sources.clear();
     }
 };
-void recognizeOptionalSpacePacket(ApplicationPacket &packet) {
-    const auto &b=packet.bytes;
+void recognizeOptionalSpacePacket(ApplicationPacket &packet,const CrcConfig &crc) {
+    QByteArray checked;
+    // If the selected CRC passes, omit the checksum and unprotected postfix
+    // when inspecting an optional inner header. The original bytes are kept.
+    if(crc.enabled && packet.crcStatus=="pass")
+        checked=packet.bytes.left(packet.bytes.size()-(crc.width/8)-crc.trailingBytesAfterCrc);
+    const QByteArray &b=checked.isEmpty()?packet.bytes:checked;
     if(b.size()<7)return;
     const int id=(octet(b[0])<<8)|octet(b[1]);
     const int seq=(octet(b[2])<<8)|octet(b[3]);
@@ -126,7 +131,8 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
         State &s=states[frame.vcid];
         // Only the per-VC counter can assess continuity; master count interleaves VCs.
         if(s.haveCount && frame.virtualCount>=0 && ((s.previousCount+1)&0xff)!=frame.virtualCount){
-            if(s.started && !s.buffer.isEmpty())++observed.interruptedByCounterGap;
+            if(s.started && !s.buffer.isEmpty() && !isPaddingOnly(s.buffer))
+                ++observed.interruptedByCounterGap;
             s.resetPacket();
             s.started=false;
         }
@@ -157,7 +163,7 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
                     pkt.fecEvidence=s.allFecReported && s.anyFecReported
                         ? "log_fec_reported"
                         : (s.anyFecReported?"mixed_fec_unverified":"bin_only_unverified");
-                    recognizeOptionalSpacePacket(pkt);
+                    recognizeOptionalSpacePacket(pkt,crc);
                     ++observed.decodedPackets;
                     if(pkt.crcStatus=="pass")++observed.crcPassed;
                     else if(pkt.crcStatus=="fail")++observed.crcFailed;
@@ -200,7 +206,8 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,co
     }
     // No closing FEND: never publish a partial packet as a valid application packet.
     for(auto it=states.constBegin();it!=states.constEnd();++it)
-        if(it.value().started && !it.value().buffer.isEmpty() && !it.value().oversized)
+        if(it.value().started && !it.value().buffer.isEmpty() &&
+           !it.value().oversized && !isPaddingOnly(it.value().buffer))
             ++observed.incompleteAtEof;
     if(stats)*stats=observed;
     return out;

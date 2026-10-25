@@ -54,3 +54,12 @@ The command-line decoder can also write these to a structured JSON file with `--
 There is **no confirmed ASRTU-1 application CRC preset** yet. The optional `--crc-profile ccitt-false|x25|crc32-iso` switch is provided for controlled experiments, not official validation; `--crc-skip N` changes the number of header bytes excluded from the checksum calculation. Without an explicit profile, all application CRC states are `not_checked`.
 
 A successful RS/FEC result in an external demodulator log does **not** establish that the application packet CRC has passed. Captured application packets are never treated as verified solely because their length resembles a CCSDS Space Packet.
+
+### CRC-based packet selection (experimental until mission CRC is confirmed)
+
+```sh
+OrbitTLM-cli --satellite ASRTU-1 --log decoder.log --bin SSDV_received_frames223.bin --packets-json kiss_all.json
+OrbitTLM-cli --satellite ASRTU-1 --log decoder.log --bin SSDV_received_frames223.bin --crc-profile ccitt-false --crc-skip 0 --crc-tail 0 --only-crc-passed --packets-json kiss_crc_passed.json
+```
+
+The second command is **only a manual algorithm experiment**, not a recommended ASRTU-1 preset. Do not interpret CRC mismatch under an unverified profile as proven RF corruption. Filtering never deletes the source TM frames.

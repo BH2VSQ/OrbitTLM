@@ -44,3 +44,16 @@ Application CRC width, polynomial, coverage, reflection, init/final value and tr
 KISS transport per VCID supports packets of different lengths, more than one packet in a TM frame, fragmentation and escapes across TM frames. An observed virtual-channel sequence gap abandons an incomplete packet. All-0xAA segments between FEND markers are treated as probable filler but do not confirm CRC integrity.
 
 UTC from spacecraft remains unknown if not explicitly decoded with mission epoch. No timestamps are synthesized from BIN frame ordering.
+
+## CRC implementation follow-up (2026-10-25)
+
+The gr-lilacsat tree has an AFSK reflected CRC-CCITT implementation. That does not establish that the ASRTU-1 spacecraft application packets use the same CRC variant. The HyacinthSat/asrtu-sndmdm-backend application processes telemetry fields and lacks independent application CRC verification. Thus OrbitTLM retains separate FEC evidence, KISS framing status, and packet-CRC status.
+
+New explicit CRC filtering (application-packet level):
+- by default, retain all well-framed packets and mark them `not_checked`;
+- with a user-selected CRC profile, compute checksum using selected coverage offset and optional unprotected suffix;
+- with optional `--only-crc-passed`, keep only packets that passed that explicit configured CRC, while keeping the underlying raw TM frames;
+- packets interrupted by missing VC frames, malformed KISS escapes or EOF are not promoted to complete packets and are counted in diagnostics;
+- an optional CCSDS Space Packet-shaped header is detected *after* successfully verified trailer removal when an experimental profile is selected.
+
+The sample capture did not provide sufficient evidence to identify a unique spacecraft application CRC variant; common CRC16/CRC32 presets alone do not justify default filtering. Adding a verified mission profile remains an open item.

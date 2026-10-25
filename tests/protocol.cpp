@@ -261,6 +261,57 @@ private slots:
         QCOMPARE(packets.size(),0);
         QCOMPARE(stats.interruptedByCounterGap,1);
     }
+    void standardCrcVectorsRemainDistinctFromMissionCrc(){
+        const QByteArray msg("123456789");
+        CrcConfig x25;
+        x25.enabled=true;
+        x25.width=16;x25.polynomial=0x1021;x25.initial=0xffff;
+        x25.finalXor=0xffff;x25.reflectInput=true;x25.reflectOutput=true;
+        x25.trailerLittleEndian=true;
+        QCOMPARE(Transport::checkCrc(msg+QByteArray::fromHex("6e90"),x25),
+                 QString("pass"));
+        x25.trailerLittleEndian=false;
+        QCOMPARE(Transport::checkCrc(msg+QByteArray::fromHex("6e90"),x25),
+                 QString("fail"));
+        CrcConfig crc32;
+        crc32.enabled=true;crc32.width=32;crc32.polynomial=0x04c11db7;
+        crc32.initial=0xffffffff;crc32.finalXor=0xffffffff;
+        crc32.reflectInput=true;crc32.reflectOutput=true;
+        crc32.trailerLittleEndian=true;
+        QCOMPARE(Transport::checkCrc(msg+QByteArray::fromHex("2639f4cb"),crc32),
+                 QString("pass"));
+        QCOMPARE(Transport::checkCrc(msg+QByteArray::fromHex("2639f4c0"),crc32),
+                 QString("fail"));
+    }
+    void optionalSpaceHeaderInsideValidatedCrcEnvelope(){
+        QByteArray inner=QByteArray::fromHex("08f0fba10000");
+        inner+=char(0x05);
+        const quint16 crc=qChecksum(inner.constData(),size_t(inner.size()),
+                                    Qt::ChecksumIso3309);
+        // This test does not assert that Qt's CRC is the satellite CRC.
+        // Use the exact explicit profile obtained by brute-force test data:
+        CrcConfig config;
+        config.enabled=true;
+        config.initial=0xffff;config.polynomial=0x1021;
+        QByteArray envelope=inner;
+        // The chosen synthetic payload is deliberately not a mission fixture.
+        quint32 v=0xffff;
+        for(char x:inner){
+            v^=quint32(quint8(x))<<8;
+            for(int i=0;i<8;++i)v=(v&0x8000)?((v<<1)^0x1021)&0xffff:(v<<1)&0xffff;
+        }
+        Q_UNUSED(crc);
+        envelope+=char((v>>8)&0xff);envelope+=char(v&0xff);
+        QByteArray tm=QByteArray::fromHex("2054010100");
+        tm+=char(0xc0);tm+=envelope;tm+=char(0xc0);
+        tm+=QByteArray(223-tm.size(),char(0xc0));
+        auto frame=Protocol::parse(tm,"ASRTU-1");
+        frame.quality="log_fec_reported";
+        auto packets=Transport::reassemble({frame},config,PacketFilter::RequireCrcPass);
+        QCOMPARE(packets.size(),1);
+        QCOMPARE(packets[0].apid,0xf0);
+        QCOMPARE(packets[0].data,QByteArray(1,char(0x05)));
+    }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
         QVERIFY(f.complete);
