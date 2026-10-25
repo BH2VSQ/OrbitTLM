@@ -171,10 +171,10 @@ private slots:
         rawA.replace(0,5,QByteArray::fromHex("2054010100"));
         rawB.replace(0,5,QByteArray::fromHex("2054020200"));
         rawA[5]=char(0xc0);
-        rawA[221]=char(0xdb); // KISS escape at end of first 218-octet data block
-        rawA[222]=char(0xdc); // turns into 0xc0 inside packet
-        rawB[5]=char(0xdb);rawB[6]=char(0xdd); // turns into 0xdb
-        rawB[7]=char(0x42);rawB[8]=char(0xc0);
+        rawA[222]=char(0xdb); // FESC at end of the first 218-octet block
+        rawB[5]=char(0xdc); // TFEND arrives in the next TM frame
+        rawB[6]=char(0xdb);rawB[7]=char(0xdd); // escaped FESC
+        rawB[8]=char(0x42);rawB[9]=char(0xc0);
         Frame a=Protocol::parse(rawA,"ASRTU-1");
         Frame b=Protocol::parse(rawB,"ASRTU-1");
         QVERIFY(a.complete && b.complete);
