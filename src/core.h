@@ -36,6 +36,7 @@ public:
     static QVector<Frame> fuse(const QVector<Frame> &logs,const QVector<Frame> &bins,Stats *stats=nullptr);
     static bool exportCsv(const QString &path,const QVector<Frame> &frames,QString *error=nullptr);
     static bool exportJson(const QString &path,const QVector<Frame> &frames,QString *error=nullptr);
+    static bool exportAttitudeCsv(const QString &path,const QVector<Frame> &frames,QString *error=nullptr);
     static QJsonObject toJson(const Frame &frame);
 };
 class Database {
