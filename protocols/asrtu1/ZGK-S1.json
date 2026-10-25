@@ -1,0 +1,673 @@
+{
+ "packet": "ZGK-S1",
+ "main_type": 170,
+ "sub_type": 1,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "ZGK-C10000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型",
+   "formula": "F={UX|AAH(姿轨控)}",
+   "name_en": "Telemetry Main Type: Power Distribution Expansion Board"
+  },
+  {
+   "id": "ZGK-C10001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|01H(第1类遥测)}",
+   "name_en": "Telemetry Sub Type"
+  },
+  {
+   "id": "ZGK-C10002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=HX<s>",
+   "name_en": "OBC Time Accumulated Seconds Integer"
+  },
+  {
+   "id": "ZGK-C10006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=HX<ms>",
+   "name_en": "OBC Time Seconds Fraction"
+  },
+  {
+   "id": "ZGK-C10008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=HX<s>",
+   "name_en": "UTC Time Accumulated Seconds"
+  },
+  {
+   "id": "ZGK-C10012.7.8",
+   "bits": "0012.7.8",
+   "name_cn": "星敏Y包头0x3C",
+   "formula": "F={UX|3CH(固定)}",
+   "name_en": "Star Sensor Y Packet Header 0x3C"
+  },
+  {
+   "id": "ZGK-C10013.7.16",
+   "bits": "0013.7.16",
+   "name_cn": "星敏Y帧头0xF190",
+   "formula": "F={UX|F190H(固定)}",
+   "name_en": "Star Sensor Y Frame Header 0xF190"
+  },
+  {
+   "id": "ZGK-C10015.7.16",
+   "bits": "0015.7.16",
+   "name_cn": "星敏Y帧长度",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Y Frame Length"
+  },
+  {
+   "id": "ZGK-C10017.7.24",
+   "bits": "0017.7.24",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10020.7.16",
+   "bits": "0020.7.16",
+   "name_cn": "星敏Y指令类型",
+   "formula": "F={UX|2201H(固定)}",
+   "name_en": "Star Sensor Y Command Type"
+  },
+  {
+   "id": "ZGK-C10022.7.32",
+   "bits": "0022.7.32",
+   "name_cn": "星敏Y秒时间戳",
+   "formula": "F=UX<s>",
+   "name_en": "Star Sensor Y Second Timestamp"
+  },
+  {
+   "id": "ZGK-C10026.7.16",
+   "bits": "0026.7.16",
+   "name_cn": "星敏Y毫秒时间戳",
+   "formula": "F=UX<s>",
+   "name_en": "Star Sensor Y Millisecond Timestamp"
+  },
+  {
+   "id": "ZGK-C10028.7.16",
+   "bits": "0028.7.16",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10030.7.32",
+   "bits": "0030.7.32",
+   "name_cn": "星敏Y四元数q0",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Quaternion q0"
+  },
+  {
+   "id": "ZGK-C10034.7.32",
+   "bits": "0034.7.32",
+   "name_cn": "星敏Y四元数q1",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Quaternion q1"
+  },
+  {
+   "id": "ZGK-C10038.7.32",
+   "bits": "0038.7.32",
+   "name_cn": "星敏Y四元数q2",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Quaternion q2"
+  },
+  {
+   "id": "ZGK-C10042.7.32",
+   "bits": "0042.7.32",
+   "name_cn": "星敏Y四元数q3",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Quaternion q3"
+  },
+  {
+   "id": "ZGK-C10046.7.32",
+   "bits": "0046.7.32",
+   "name_cn": "星敏Y角速度X rad/s",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Angular Velocity X (rad/s)"
+  },
+  {
+   "id": "ZGK-C10050.7.32",
+   "bits": "0050.7.32",
+   "name_cn": "星敏Y角速度Y rad/s",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Angular Velocity Y (rad/s)"
+  },
+  {
+   "id": "ZGK-C10054.7.32",
+   "bits": "0054.7.32",
+   "name_cn": "星敏Y角速度Z rad/s",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Y Angular Velocity Z (rad/s)"
+  },
+  {
+   "id": "ZGK-C10058.7.3",
+   "bits": "0058.7.3",
+   "name_cn": "星敏Y工作模式1待机2全天3跟踪",
+   "formula": "F={UX|01H(待机),02H(全天),03H(跟踪)}",
+   "name_en": "Star Sensor Y Operating Mode"
+  },
+  {
+   "id": "ZGK-C10058.4.1",
+   "bits": "0058.4.1",
+   "name_cn": "星敏Y姿态有效标志1有效0无效",
+   "formula": "F={UX|0H(无效),1H(有效)}",
+   "name_en": "Star Sensor Y Attitude Validity Flag"
+  },
+  {
+   "id": "ZGK-C10058.3.1",
+   "bits": "0058.3.1",
+   "name_cn": "星敏Y抗杂光功能开启标志1开启0关闭",
+   "formula": "F={UX|0H(关闭),1H(开启)}",
+   "name_en": "Star Sensor Y Anti-glare Function Enable Flag"
+  },
+  {
+   "id": "ZGK-C10058.2.1",
+   "bits": "0058.2.1",
+   "name_cn": "星敏Y星点质心提取异常标志",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Y Star Point Centroid Extraction Error Flag"
+  },
+  {
+   "id": "ZGK-C10058.1.6",
+   "bits": "0058.1.6",
+   "name_cn": "星敏Y观测星个数0-63",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Y Number of Observed Stars (0-63)"
+  },
+  {
+   "id": "ZGK-C10059.3.6",
+   "bits": "0059.3.6",
+   "name_cn": "星敏Y识别星个数0-63",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Y Number of Identified Stars (0-63)"
+  },
+  {
+   "id": "ZGK-C10060.5.14",
+   "bits": "0060.5.14",
+   "name_cn": "星敏Y当前帧处理时间ms",
+   "formula": "F=UX<ms>",
+   "name_en": "Star Sensor Y Current Frame Processing Time (ms)"
+  },
+  {
+   "id": "ZGK-C10062.7.8",
+   "bits": "0062.7.8",
+   "name_cn": "星敏Y成像器件温度",
+   "formula": "F=SX",
+   "name_en": "Star Sensor Y Imaging Device Temperature"
+  },
+  {
+   "id": "ZGK-C10063.7.12",
+   "bits": "0063.7.12",
+   "name_cn": "星敏Y图像灰度均值",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Y Image Grayscale Mean"
+  },
+  {
+   "id": "ZGK-C10064.3.1",
+   "bits": "0064.3.1",
+   "name_cn": "星敏Y时间戳有效标志0未设置1已设置",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Y Timestamp Validity Flag"
+  },
+  {
+   "id": "ZGK-C10064.2.1",
+   "bits": "0064.2.1",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10064.1.2",
+   "bits": "0064.1.2",
+   "name_cn": "星敏Y成像器件状态标志1正常 其他异常",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Y Imaging Device Status Flag"
+  },
+  {
+   "id": "ZGK-C10065.7.8",
+   "bits": "0065.7.8",
+   "name_cn": "星敏Y曝光时间ms",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Y Exposure Time (ms)"
+  },
+  {
+   "id": "ZGK-C10066.7.1",
+   "bits": "0066.7.1",
+   "name_cn": "星敏YPPS有效标志0无效1有效",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Y PPS Validity Flag"
+  },
+  {
+   "id": "ZGK-C10066.6.15",
+   "bits": "0066.6.15",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10068.7.8",
+   "bits": "0068.7.8",
+   "name_cn": "星敏Y数字增益",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Y Digital Gain"
+  },
+  {
+   "id": "ZGK-C10069.7.8",
+   "bits": "0069.7.8",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10070.7.24",
+   "bits": "0070.7.24",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10073.7.8",
+   "bits": "0073.7.8",
+   "name_cn": "星敏Y校验和",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Y Checksum"
+  },
+  {
+   "id": "ZGK-C10074.7.8",
+   "bits": "0074.7.8",
+   "name_cn": "星敏Z包头0x3C",
+   "formula": "F={UX|3CH(固定)}",
+   "name_en": "Star Sensor Z Packet Header 0x3C"
+  },
+  {
+   "id": "ZGK-C10075.7.16",
+   "bits": "0075.7.16",
+   "name_cn": "星敏Z帧头0xF190",
+   "formula": "F={UX|F190H(固定)}",
+   "name_en": "Star Sensor Z Frame Header 0xF190"
+  },
+  {
+   "id": "ZGK-C10077.7.16",
+   "bits": "0077.7.16",
+   "name_cn": "星敏Z帧长度",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Z Frame Length"
+  },
+  {
+   "id": "ZGK-C10079.7.24",
+   "bits": "0079.7.24",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10082.7.16",
+   "bits": "0082.7.16",
+   "name_cn": "星敏Z指令类型",
+   "formula": "F={UX|2201H(固定)}",
+   "name_en": "Star Sensor Z Command Type"
+  },
+  {
+   "id": "ZGK-C10084.7.32",
+   "bits": "0084.7.32",
+   "name_cn": "星敏Z秒时间戳",
+   "formula": "F=UX<s>",
+   "name_en": "Star Sensor Z Second Timestamp"
+  },
+  {
+   "id": "ZGK-C10088.7.16",
+   "bits": "0088.7.16",
+   "name_cn": "星敏Z毫秒时间戳",
+   "formula": "F=UX<s>",
+   "name_en": "Star Sensor Z Millisecond Timestamp"
+  },
+  {
+   "id": "ZGK-C10090.7.16",
+   "bits": "0090.7.16",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10092.7.32",
+   "bits": "0092.7.32",
+   "name_cn": "星敏Z四元数q0",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Quaternion q0"
+  },
+  {
+   "id": "ZGK-C10096.7.32",
+   "bits": "0096.7.32",
+   "name_cn": "星敏Z四元数q1",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Quaternion q1"
+  },
+  {
+   "id": "ZGK-C10100.7.32",
+   "bits": "0100.7.32",
+   "name_cn": "星敏Z四元数q2",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Quaternion q2"
+  },
+  {
+   "id": "ZGK-C10104.7.32",
+   "bits": "0104.7.32",
+   "name_cn": "星敏Z四元数q3",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Quaternion q3"
+  },
+  {
+   "id": "ZGK-C10108.7.32",
+   "bits": "0108.7.32",
+   "name_cn": "星敏Z角速度X rad/s",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Angular Velocity X (rad/s)"
+  },
+  {
+   "id": "ZGK-C10112.7.32",
+   "bits": "0112.7.32",
+   "name_cn": "星敏Z角速度Y rad/s",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Angular Velocity Y (rad/s)"
+  },
+  {
+   "id": "ZGK-C10116.7.32",
+   "bits": "0116.7.32",
+   "name_cn": "星敏Z角速度Z rad/s",
+   "formula": "F=SX/1073741824",
+   "name_en": "Star Sensor Z Angular Velocity Z (rad/s)"
+  },
+  {
+   "id": "ZGK-C10120.7.3",
+   "bits": "0120.7.3",
+   "name_cn": "星敏Z工作模式1待机2全天3跟踪",
+   "formula": "F={UX|01H(待机),02H(全天),03H(跟踪)}",
+   "name_en": "Star Sensor Z Operating Mode"
+  },
+  {
+   "id": "ZGK-C10120.4.1",
+   "bits": "0120.4.1",
+   "name_cn": "星敏Z姿态有效标志1有效0无效",
+   "formula": "F={UX|0H(无效),1H(有效)}",
+   "name_en": "Star Sensor Z Attitude Validity Flag"
+  },
+  {
+   "id": "ZGK-C10120.3.1",
+   "bits": "0120.3.1",
+   "name_cn": "星敏Z抗杂光功能开启标志1开启0关闭",
+   "formula": "F={UX|0H(关闭),1H(开启)}",
+   "name_en": "Star Sensor Z Anti-glare Function Enable Flag"
+  },
+  {
+   "id": "ZGK-C10120.2.1",
+   "bits": "0120.2.1",
+   "name_cn": "星敏Z星点质心提取异常标志",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Z Star Point Centroid Extraction Error Flag"
+  },
+  {
+   "id": "ZGK-C10120.1.6",
+   "bits": "0120.1.6",
+   "name_cn": "星敏Z观测星个数0-63",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Z Number of Observed Stars (0-63)"
+  },
+  {
+   "id": "ZGK-C10121.3.6",
+   "bits": "0121.3.6",
+   "name_cn": "星敏Z识别星个数0-63",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Z Number of Identified Stars (0-63)"
+  },
+  {
+   "id": "ZGK-C10122.5.14",
+   "bits": "0122.5.14",
+   "name_cn": "星敏Z当前帧处理时间ms",
+   "formula": "F=UX<ms>",
+   "name_en": "Star Sensor Z Current Frame Processing Time (ms)"
+  },
+  {
+   "id": "ZGK-C10124.7.8",
+   "bits": "0124.7.8",
+   "name_cn": "星敏Z成像器件温度",
+   "formula": "F=SX",
+   "name_en": "Star Sensor Z Imaging Device Temperature"
+  },
+  {
+   "id": "ZGK-C10125.7.12",
+   "bits": "0125.7.12",
+   "name_cn": "星敏Z图像灰度均值",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Z Image Grayscale Mean"
+  },
+  {
+   "id": "ZGK-C10126.3.1",
+   "bits": "0126.3.1",
+   "name_cn": "星敏Z时间戳有效标志0未设置1已设置",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Z Timestamp Validity Flag"
+  },
+  {
+   "id": "ZGK-C10126.2.1",
+   "bits": "0126.2.1",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10126.1.2",
+   "bits": "0126.1.2",
+   "name_cn": "星敏Z成像器件状态标志1正常 其他异常",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Z Imaging Device Status Flag"
+  },
+  {
+   "id": "ZGK-C10127.7.8",
+   "bits": "0127.7.8",
+   "name_cn": "星敏Z曝光时间ms",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Z Exposure Time (ms)"
+  },
+  {
+   "id": "ZGK-C10128.7.1",
+   "bits": "0128.7.1",
+   "name_cn": "星敏ZPPS有效标志0无效1有效",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Z PPS Validity Flag"
+  },
+  {
+   "id": "ZGK-C10128.6.15",
+   "bits": "0128.6.15",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10130.7.8",
+   "bits": "0130.7.8",
+   "name_cn": "星敏Z数字增益",
+   "formula": "F=UX",
+   "name_en": "Star Sensor Z Digital Gain"
+  },
+  {
+   "id": "ZGK-C10131.7.8",
+   "bits": "0131.7.8",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10132.7.24",
+   "bits": "0132.7.24",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C10135.7.8",
+   "bits": "0135.7.8",
+   "name_cn": "星敏Z校验和",
+   "formula": "F=HX",
+   "name_en": "Star Sensor Z Checksum"
+  },
+  {
+   "id": "ZGK-C10136.7.16",
+   "bits": "0136.7.16",
+   "name_cn": "GNSS_FlagF",
+   "formula": "F=SX",
+   "name_en": "GNSS_FlagF"
+  },
+  {
+   "id": "ZGK-C10138.7.32",
+   "bits": "0138.7.32",
+   "name_cn": "GNSS重启次数计数",
+   "formula": "F=SX",
+   "name_en": "GNSS Restart Count"
+  },
+  {
+   "id": "ZGK-C10142.7.16",
+   "bits": "0142.7.16",
+   "name_cn": "星敏Y物理量故障标志",
+   "formula": "F=SX",
+   "name_en": "Star Sensor Y Physical Quantity Fault Flag"
+  },
+  {
+   "id": "ZGK-C10144.7.16",
+   "bits": "0144.7.16",
+   "name_cn": "星敏Z物理量故障标志",
+   "formula": "F=SX",
+   "name_en": "Star Sensor Z Physical Quantity Fault Flag"
+  },
+  {
+   "id": "ZGK-C10146.7.32",
+   "bits": "0146.7.32",
+   "name_cn": "星敏Y重启次数计数",
+   "formula": "F=SX",
+   "name_en": "Star Sensor Y Restart Count"
+  },
+  {
+   "id": "ZGK-C10150.7.32",
+   "bits": "0150.7.32",
+   "name_cn": "星敏Z重启次数计数",
+   "formula": "F=SX",
+   "name_en": "Star Sensor Z Restart Count"
+  },
+  {
+   "id": "ZGK-C10154.7.16",
+   "bits": "0154.7.16",
+   "name_cn": "陀螺物理量异常故障标志",
+   "formula": "F=SX",
+   "name_en": "Gyroscope Physical Quantity Abnormal Fault Flag"
+  },
+  {
+   "id": "ZGK-C10156.7.32",
+   "bits": "0156.7.32",
+   "name_cn": "光纤陀螺重启次数计数",
+   "formula": "F=SX",
+   "name_en": "Fiber Optic Gyroscope Restart Count"
+  },
+  {
+   "id": "ZGK-C10160.7.16",
+   "bits": "0160.7.16",
+   "name_cn": "太阳敏感器故障标志",
+   "formula": "F=SX",
+   "name_en": "Sun Sensor Fault Flag"
+  },
+  {
+   "id": "ZGK-C10162.7.32",
+   "bits": "0162.7.32",
+   "name_cn": "太阳敏感器重启次数计数",
+   "formula": "F=SX",
+   "name_en": "Sun Sensor Restart Count"
+  },
+  {
+   "id": "ZGK-C10166.7.16",
+   "bits": "0166.7.16",
+   "name_cn": "磁强计故障标志",
+   "formula": "F=SX",
+   "name_en": "Magnetometer Fault Flag"
+  },
+  {
+   "id": "ZGK-C10168.7.32",
+   "bits": "0168.7.32",
+   "name_cn": "磁强计重启次数计数",
+   "formula": "F=SX",
+   "name_en": "Magnetometer Restart Count"
+  },
+  {
+   "id": "ZGK-C10172.7.16",
+   "bits": "0172.7.16",
+   "name_cn": "飞轮X物理量故障标志",
+   "formula": "F=SX",
+   "name_en": "Flywheel X Physical Quantity Fault Flag"
+  },
+  {
+   "id": "ZGK-C10174.7.16",
+   "bits": "0174.7.16",
+   "name_cn": "飞轮Y物理量故障标志",
+   "formula": "F=SX",
+   "name_en": "Flywheel Y Physical Quantity Fault Flag"
+  },
+  {
+   "id": "ZGK-C10176.7.16",
+   "bits": "0176.7.16",
+   "name_cn": "飞轮Z物理量故障标志",
+   "formula": "F=SX",
+   "name_en": "Flywheel Z Physical Quantity Fault Flag"
+  },
+  {
+   "id": "ZGK-C10178.7.16",
+   "bits": "0178.7.16",
+   "name_cn": "飞轮S物理量故障标志",
+   "formula": "F=SX",
+   "name_en": "Flywheel S Physical Quantity Fault Flag"
+  },
+  {
+   "id": "ZGK-C10180.7.32",
+   "bits": "0180.7.32",
+   "name_cn": "飞轮X重启计数",
+   "formula": "F=SX",
+   "name_en": "Flywheel X Restart Count"
+  },
+  {
+   "id": "ZGK-C10184.7.32",
+   "bits": "0184.7.32",
+   "name_cn": "飞轮Y重启计数",
+   "formula": "F=SX",
+   "name_en": "Flywheel Y Restart Count"
+  },
+  {
+   "id": "ZGK-C10188.7.32",
+   "bits": "0188.7.32",
+   "name_cn": "飞轮Z重启计数",
+   "formula": "F=SX",
+   "name_en": "Flywheel Z Restart Count"
+  },
+  {
+   "id": "ZGK-C10192.7.32",
+   "bits": "0192.7.32",
+   "name_cn": "飞轮S重启计数",
+   "formula": "F=SX",
+   "name_en": "Flywheel S Restart Count"
+  },
+  {
+   "id": "ZGK-C10196.7.32",
+   "bits": "0196.7.32",
+   "name_cn": "安全模式计数",
+   "formula": "F=SX",
+   "name_en": "Safety Mode Count"
+  },
+  {
+   "id": "ZGK-C10200.7.8",
+   "bits": "0200.7.8",
+   "name_cn": "帧尾CBH",
+   "formula": "F=HX",
+   "name_en": "Frame Tail CBH"
+  }
+ ]
+}

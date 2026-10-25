@@ -1,0 +1,771 @@
+{
+ "packet": "PDB-S0",
+ "main_type": 4,
+ "sub_type": 0,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "PDB-C00000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型:配电扩展板",
+   "formula": "F={UX|04H(配电扩展板)}",
+   "name_en": "Telemetry Main Type: Power Distribution Expansion Board"
+  },
+  {
+   "id": "PDB-C00001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|00H(第0类遥测)}",
+   "name_en": "Telemetry Sub Type"
+  },
+  {
+   "id": "PDB-C00002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=X<s>",
+   "name_en": "OBC Time Accumulated Seconds Integer"
+  },
+  {
+   "id": "PDB-C00006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=X<ms>",
+   "name_en": "OBC Time Seconds Fraction"
+  },
+  {
+   "id": "PDB-C00008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=X<s>",
+   "name_en": "UTC Time Accumulated Seconds"
+  },
+  {
+   "id": "PDB-C00012.7.1",
+   "bits": "0012.7.1",
+   "name_cn": "开关8GNSS",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 8 GNSS"
+  },
+  {
+   "id": "PDB-C00012.6.1",
+   "bits": "0012.6.1",
+   "name_cn": "开关7",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 7"
+  },
+  {
+   "id": "PDB-C00012.5.1",
+   "bits": "0012.5.1",
+   "name_cn": "开关6",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 6"
+  },
+  {
+   "id": "PDB-C00012.4.1",
+   "bits": "0012.4.1",
+   "name_cn": "开关5时空表",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 5 Space-Time Table"
+  },
+  {
+   "id": "PDB-C00012.3.1",
+   "bits": "0012.3.1",
+   "name_cn": "开关4导航增强",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 4 Navigation Enhancement"
+  },
+  {
+   "id": "PDB-C00012.2.1",
+   "bits": "0012.2.1",
+   "name_cn": "开关3数传通道",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 3 Data Transmission Channel"
+  },
+  {
+   "id": "PDB-C00012.1.1",
+   "bits": "0012.1.1",
+   "name_cn": "开关2数传基带",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 2 Data Transmission Baseband"
+  },
+  {
+   "id": "PDB-C00012.0.1",
+   "bits": "0012.0.1",
+   "name_cn": "开关1存储板",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 1 Storage Board"
+  },
+  {
+   "id": "PDB-C00013.7.1",
+   "bits": "0013.7.1",
+   "name_cn": "开关16飞轮S",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 16 Flywheel S"
+  },
+  {
+   "id": "PDB-C00013.6.1",
+   "bits": "0013.6.1",
+   "name_cn": "开关15飞轮Z",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 15 Flywheel Z"
+  },
+  {
+   "id": "PDB-C00013.5.1",
+   "bits": "0013.5.1",
+   "name_cn": "开关14飞轮Y",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 14 Flywheel Y"
+  },
+  {
+   "id": "PDB-C00013.4.1",
+   "bits": "0013.4.1",
+   "name_cn": "开关13飞轮X",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 13 Flywheel X"
+  },
+  {
+   "id": "PDB-C00013.3.1",
+   "bits": "0013.3.1",
+   "name_cn": "开关12太敏",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 12 Taimin"
+  },
+  {
+   "id": "PDB-C00013.2.1",
+   "bits": "0013.2.1",
+   "name_cn": "开关11增阻球电磁阀2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 11 Throttle Ball Solenoid Valve 2"
+  },
+  {
+   "id": "PDB-C00013.1.1",
+   "bits": "0013.1.1",
+   "name_cn": "开关10增阻球电磁阀1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 10 Throttle Ball Solenoid Valve 1"
+  },
+  {
+   "id": "PDB-C00013.0.1",
+   "bits": "0013.0.1",
+   "name_cn": "开关9增阻球熔断",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 9 Throttle Ball Fuse"
+  },
+  {
+   "id": "PDB-C00014.7.1",
+   "bits": "0014.7.1",
+   "name_cn": "开关24遮光罩热刀2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 24 Shading Hood Hot Knife 2"
+  },
+  {
+   "id": "PDB-C00014.6.1",
+   "bits": "0014.6.1",
+   "name_cn": "开关23太阳翼热刀2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 23 Solar Wing Hot Knife 2"
+  },
+  {
+   "id": "PDB-C00014.5.1",
+   "bits": "0014.5.1",
+   "name_cn": "开关22太阳翼热刀1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 22 Solar Wing Hot Knife 1"
+  },
+  {
+   "id": "PDB-C00014.4.1",
+   "bits": "0014.4.1",
+   "name_cn": "开关21光电传感器",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 21 Photoelectric Sensor"
+  },
+  {
+   "id": "PDB-C00014.3.1",
+   "bits": "0014.3.1",
+   "name_cn": "开关20MEMS惯组",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 20 MEMS Inertial Unit"
+  },
+  {
+   "id": "PDB-C00014.2.1",
+   "bits": "0014.2.1",
+   "name_cn": "开关19CMOS相机",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 19 CMOS Camera"
+  },
+  {
+   "id": "PDB-C00014.1.1",
+   "bits": "0014.1.1",
+   "name_cn": "开关18遮光罩热刀1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 18 Shading Hood Hot Knife 1"
+  },
+  {
+   "id": "PDB-C00014.0.1",
+   "bits": "0014.0.1",
+   "name_cn": "开关17高分相机",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Switch 17 High-Resolution Camera"
+  },
+  {
+   "id": "PDB-C00015.7.16",
+   "bits": "0015.7.16",
+   "name_cn": "开关1电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 1 Current mA"
+  },
+  {
+   "id": "PDB-C00017.7.16",
+   "bits": "0017.7.16",
+   "name_cn": "开关2电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 2 Current mA"
+  },
+  {
+   "id": "PDB-C00019.7.16",
+   "bits": "0019.7.16",
+   "name_cn": "开关3电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 3 Current mA"
+  },
+  {
+   "id": "PDB-C00021.7.16",
+   "bits": "0021.7.16",
+   "name_cn": "开关4电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 4 Current mA"
+  },
+  {
+   "id": "PDB-C00023.7.16",
+   "bits": "0023.7.16",
+   "name_cn": "开关5电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 5 Current mA"
+  },
+  {
+   "id": "PDB-C00025.7.16",
+   "bits": "0025.7.16",
+   "name_cn": "开关6电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 6 Current mA"
+  },
+  {
+   "id": "PDB-C00027.7.16",
+   "bits": "0027.7.16",
+   "name_cn": "开关7电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 7 Current mA"
+  },
+  {
+   "id": "PDB-C00029.7.16",
+   "bits": "0029.7.16",
+   "name_cn": "开关8电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 8 Current mA"
+  },
+  {
+   "id": "PDB-C00031.7.16",
+   "bits": "0031.7.16",
+   "name_cn": "开关9电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 9 Current mA"
+  },
+  {
+   "id": "PDB-C00033.7.16",
+   "bits": "0033.7.16",
+   "name_cn": "开关10电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 10 Current mA"
+  },
+  {
+   "id": "PDB-C00035.7.16",
+   "bits": "0035.7.16",
+   "name_cn": "开关11电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 11 Current mA"
+  },
+  {
+   "id": "PDB-C00037.7.16",
+   "bits": "0037.7.16",
+   "name_cn": "开关12电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 12 Current mA"
+  },
+  {
+   "id": "PDB-C00039.7.16",
+   "bits": "0039.7.16",
+   "name_cn": "开关13电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 13 Current mA"
+  },
+  {
+   "id": "PDB-C00041.7.16",
+   "bits": "0041.7.16",
+   "name_cn": "开关14电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 14 Current mA"
+  },
+  {
+   "id": "PDB-C00043.7.16",
+   "bits": "0043.7.16",
+   "name_cn": "开关15电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 15 Current mA"
+  },
+  {
+   "id": "PDB-C00045.7.16",
+   "bits": "0045.7.16",
+   "name_cn": "开关16电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 16 Current mA"
+  },
+  {
+   "id": "PDB-C00047.7.16",
+   "bits": "0047.7.16",
+   "name_cn": "开关17电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 17 Current mA"
+  },
+  {
+   "id": "PDB-C00049.7.16",
+   "bits": "0049.7.16",
+   "name_cn": "开关18电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 18 Current mA"
+  },
+  {
+   "id": "PDB-C00051.7.16",
+   "bits": "0051.7.16",
+   "name_cn": "开关19电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 19 Current mA"
+  },
+  {
+   "id": "PDB-C00053.7.16",
+   "bits": "0053.7.16",
+   "name_cn": "开关20电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 20 Current mA"
+  },
+  {
+   "id": "PDB-C00055.7.16",
+   "bits": "0055.7.16",
+   "name_cn": "开关21电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 21 Current mA"
+  },
+  {
+   "id": "PDB-C00057.7.16",
+   "bits": "0057.7.16",
+   "name_cn": "开关22电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 22 Current mA"
+  },
+  {
+   "id": "PDB-C00059.7.16",
+   "bits": "0059.7.16",
+   "name_cn": "开关23电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 23 Current mA"
+  },
+  {
+   "id": "PDB-C00061.7.16",
+   "bits": "0061.7.16",
+   "name_cn": "开关24电流mA",
+   "formula": "F=UX",
+   "name_en": "Switch 24 Current mA"
+  },
+  {
+   "id": "PDB-C00063.7.8",
+   "bits": "0063.7.8",
+   "name_cn": "MCU电流mA",
+   "formula": "F=UX",
+   "name_en": "MCU Current mA"
+  },
+  {
+   "id": "PDB-C00064.7.8",
+   "bits": "0064.7.8",
+   "name_cn": "离轨球展开0x4F开0x46关",
+   "formula": "F=X",
+   "name_en": "Deballast Ball Deployment 0x4F Open 0x46 Close"
+  },
+  {
+   "id": "PDB-C00065.7.8",
+   "bits": "0065.7.8",
+   "name_cn": "MPPT1温度",
+   "formula": "F=SX",
+   "name_en": "MPPT1 Temperature"
+  },
+  {
+   "id": "PDB-C00066.7.8",
+   "bits": "0066.7.8",
+   "name_cn": "MPPT2温度",
+   "formula": "F=SX",
+   "name_en": "MPPT2 Temperature"
+  },
+  {
+   "id": "PDB-C00067.7.8",
+   "bits": "0067.7.8",
+   "name_cn": "MPPT3温度",
+   "formula": "F=SX",
+   "name_en": "MPPT3 Temperature"
+  },
+  {
+   "id": "PDB-C00068.7.8",
+   "bits": "0068.7.8",
+   "name_cn": "充电器1温度",
+   "formula": "F=SX",
+   "name_en": "Charger1 Temperature"
+  },
+  {
+   "id": "PDB-C00069.7.8",
+   "bits": "0069.7.8",
+   "name_cn": "充电器2温度",
+   "formula": "F=SX",
+   "name_en": "Charger2 Temperature"
+  },
+  {
+   "id": "PDB-C00070.7.8",
+   "bits": "0070.7.8",
+   "name_cn": "3.3V温度",
+   "formula": "F=SX",
+   "name_en": "3.3V Temperature"
+  },
+  {
+   "id": "PDB-C00071.7.8",
+   "bits": "0071.7.8",
+   "name_cn": "5V温度",
+   "formula": "F=SX",
+   "name_en": "5V Temperature"
+  },
+  {
+   "id": "PDB-C00072.7.8",
+   "bits": "0072.7.8",
+   "name_cn": "12V温度",
+   "formula": "F=SX",
+   "name_en": "12V Temperature"
+  },
+  {
+   "id": "PDB-C00073.7.16",
+   "bits": "0073.7.16",
+   "name_cn": "MPPT1电压mV",
+   "formula": "F=X",
+   "name_en": "MPPT1 Voltage mV"
+  },
+  {
+   "id": "PDB-C00075.7.16",
+   "bits": "0075.7.16",
+   "name_cn": "MPPT2电压mV",
+   "formula": "F=X",
+   "name_en": "MPPT2 Voltage mV"
+  },
+  {
+   "id": "PDB-C00077.7.16",
+   "bits": "0077.7.16",
+   "name_cn": "MPPT3电压mV",
+   "formula": "F=X",
+   "name_en": "MPPT3 Voltage mV"
+  },
+  {
+   "id": "PDB-C00079.7.16",
+   "bits": "0079.7.16",
+   "name_cn": "充电器1电压mV",
+   "formula": "F=X",
+   "name_en": "Charger1 Voltage mV"
+  },
+  {
+   "id": "PDB-C00081.7.16",
+   "bits": "0081.7.16",
+   "name_cn": "充电器2电压mV",
+   "formula": "F=X",
+   "name_en": "Charger2 Voltage mV"
+  },
+  {
+   "id": "PDB-C00083.7.16",
+   "bits": "0083.7.16",
+   "name_cn": "3.3V电压mV",
+   "formula": "F=X",
+   "name_en": "3.3V Voltage mV"
+  },
+  {
+   "id": "PDB-C00085.7.16",
+   "bits": "0085.7.16",
+   "name_cn": "5V电压mV",
+   "formula": "F=X",
+   "name_en": "5V Voltage mV"
+  },
+  {
+   "id": "PDB-C00087.7.16",
+   "bits": "0087.7.16",
+   "name_cn": "12V电压mV",
+   "formula": "F=X",
+   "name_en": "12V Voltage mV"
+  },
+  {
+   "id": "PDB-C00089.7.16",
+   "bits": "0089.7.16",
+   "name_cn": "MPPT1电流mA",
+   "formula": "F=X",
+   "name_en": "MPPT1 Current mA"
+  },
+  {
+   "id": "PDB-C00091.7.16",
+   "bits": "0091.7.16",
+   "name_cn": "MPPT2电流mA",
+   "formula": "F=X",
+   "name_en": "MPPT2 Current mA"
+  },
+  {
+   "id": "PDB-C00093.7.16",
+   "bits": "0093.7.16",
+   "name_cn": "MPPT3电流mA",
+   "formula": "F=X",
+   "name_en": "MPPT3 Current mA"
+  },
+  {
+   "id": "PDB-C00095.7.16",
+   "bits": "0095.7.16",
+   "name_cn": "充电器1电流mA",
+   "formula": "F=SX",
+   "name_en": "Charger1 Current mA"
+  },
+  {
+   "id": "PDB-C00097.7.16",
+   "bits": "0097.7.16",
+   "name_cn": "充电器2电流mA",
+   "formula": "F=SX",
+   "name_en": "Charger2 Current mA"
+  },
+  {
+   "id": "PDB-C00099.7.16",
+   "bits": "0099.7.16",
+   "name_cn": "3.3V电流mA",
+   "formula": "F=X",
+   "name_en": "3.3V Current mA"
+  },
+  {
+   "id": "PDB-C00101.7.16",
+   "bits": "0101.7.16",
+   "name_cn": "5V电流mA",
+   "formula": "F=X",
+   "name_en": "5V Current mA"
+  },
+  {
+   "id": "PDB-C00103.7.16",
+   "bits": "0103.7.16",
+   "name_cn": "12V电流mA",
+   "formula": "F=X",
+   "name_en": "12V Current mA"
+  },
+  {
+   "id": "PDB-C00105.7.16",
+   "bits": "0105.7.16",
+   "name_cn": "分阵1电压mV",
+   "formula": "F=UX",
+   "name_en": "Sub-array1 Voltage mV"
+  },
+  {
+   "id": "PDB-C00107.7.16",
+   "bits": "0107.7.16",
+   "name_cn": "分阵2电压mV",
+   "formula": "F=UX",
+   "name_en": "Sub-array2 Voltage mV"
+  },
+  {
+   "id": "PDB-C00109.7.16",
+   "bits": "0109.7.16",
+   "name_cn": "分阵3电压mV",
+   "formula": "F=UX",
+   "name_en": "Sub-array3 Voltage mV"
+  },
+  {
+   "id": "PDB-C00111.7.16",
+   "bits": "0111.7.16",
+   "name_cn": "执行指令计数",
+   "formula": "F=UX",
+   "name_en": "Execute Command Count"
+  },
+  {
+   "id": "PDB-C00113.7.16",
+   "bits": "0113.7.16",
+   "name_cn": "错误指令计数",
+   "formula": "F=UX",
+   "name_en": "Error Command Count"
+  },
+  {
+   "id": "PDB-C00115.7.1",
+   "bits": "0115.7.1",
+   "name_cn": "最终指令内容开关8GNSS",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 8 GNSS"
+  },
+  {
+   "id": "PDB-C00115.6.1",
+   "bits": "0115.6.1",
+   "name_cn": "最终指令内容开关7",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 7"
+  },
+  {
+   "id": "PDB-C00115.5.1",
+   "bits": "0115.5.1",
+   "name_cn": "最终指令内容开关6",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 6"
+  },
+  {
+   "id": "PDB-C00115.4.1",
+   "bits": "0115.4.1",
+   "name_cn": "最终指令内容开关5时空表",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 5 Space-Time Table"
+  },
+  {
+   "id": "PDB-C00115.3.1",
+   "bits": "0115.3.1",
+   "name_cn": "最终指令内容开关4导航增强",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 4 Navigation Enhancement"
+  },
+  {
+   "id": "PDB-C00115.2.1",
+   "bits": "0115.2.1",
+   "name_cn": "最终指令内容开关3数传通道",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 3 Data Transmission Channel"
+  },
+  {
+   "id": "PDB-C00115.1.1",
+   "bits": "0115.1.1",
+   "name_cn": "最终指令内容开关2数传基带",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 2 Data Transmission Baseband"
+  },
+  {
+   "id": "PDB-C00115.0.1",
+   "bits": "0115.0.1",
+   "name_cn": "最终指令内容开关1存储板",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 1 Storage Board"
+  },
+  {
+   "id": "PDB-C00116.7.1",
+   "bits": "0116.7.1",
+   "name_cn": "最终指令内容开关16飞轮S",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 16 Flywheel S"
+  },
+  {
+   "id": "PDB-C00116.6.1",
+   "bits": "0116.6.1",
+   "name_cn": "最终指令内容开关15飞轮Z",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 15 Flywheel Z"
+  },
+  {
+   "id": "PDB-C00116.5.1",
+   "bits": "0116.5.1",
+   "name_cn": "最终指令内容开关14飞轮Y",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 14 Flywheel Y"
+  },
+  {
+   "id": "PDB-C00116.4.1",
+   "bits": "0116.4.1",
+   "name_cn": "最终指令内容开关13飞轮X",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 13 Flywheel X"
+  },
+  {
+   "id": "PDB-C00116.3.1",
+   "bits": "0116.3.1",
+   "name_cn": "最终指令内容开关12太敏",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 12 Taimin"
+  },
+  {
+   "id": "PDB-C00116.2.1",
+   "bits": "0116.2.1",
+   "name_cn": "最终指令内容开关11增阻球电磁阀2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 11 Throttle Ball Solenoid Valve 2"
+  },
+  {
+   "id": "PDB-C00116.1.1",
+   "bits": "0116.1.1",
+   "name_cn": "最终指令内容开关10增阻球电磁阀1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 10 Throttle Ball Solenoid Valve 1"
+  },
+  {
+   "id": "PDB-C00116.0.1",
+   "bits": "0116.0.1",
+   "name_cn": "最终指令内容开关9增阻球熔断",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 9 Throttle Ball Fuse"
+  },
+  {
+   "id": "PDB-C00117.7.1",
+   "bits": "0117.7.1",
+   "name_cn": "最终指令内容开关24遮光罩热刀2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 24 Shading Hood Hot Knife 2"
+  },
+  {
+   "id": "PDB-C00117.6.1",
+   "bits": "0117.6.1",
+   "name_cn": "最终指令内容开关23太阳翼热刀2",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 23 Solar Wing Hot Knife 2"
+  },
+  {
+   "id": "PDB-C00117.5.1",
+   "bits": "0117.5.1",
+   "name_cn": "最终指令内容开关22太阳翼热刀1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 22 Solar Wing Hot Knife 1"
+  },
+  {
+   "id": "PDB-C00117.4.1",
+   "bits": "0117.4.1",
+   "name_cn": "最终指令内容开关21光电传感器",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 21 Photoelectric Sensor"
+  },
+  {
+   "id": "PDB-C00117.3.1",
+   "bits": "0117.3.1",
+   "name_cn": "最终指令内容开关20MEMS惯组",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 20 MEMS Inertial Unit"
+  },
+  {
+   "id": "PDB-C00117.2.1",
+   "bits": "0117.2.1",
+   "name_cn": "最终指令内容开关19CMOS相机",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 19 CMOS Camera"
+  },
+  {
+   "id": "PDB-C00117.1.1",
+   "bits": "0117.1.1",
+   "name_cn": "最终指令内容开关18遮光罩热刀1",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 18 Shading Hood Hot Knife 1"
+  },
+  {
+   "id": "PDB-C00117.0.1",
+   "bits": "0117.0.1",
+   "name_cn": "最终指令内容开关17高分相机",
+   "formula": "F={UX|1H(开),0H(关)}",
+   "name_en": "Final Command Content Switch 17 High-Resolution Camera"
+  },
+  {
+   "id": "PDB-C00118.7.8",
+   "bits": "0118.7.8",
+   "name_cn": "帧尾CBH",
+   "formula": "F=X",
+   "name_en": "Frame Tail CBH"
+  }
+ ]
+}

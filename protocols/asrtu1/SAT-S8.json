@@ -1,0 +1,362 @@
+{
+ "packet": "SAT-S8",
+ "main_type": 240,
+ "sub_type": 8,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "SAT-C80000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型",
+   "formula": "F={UX|F0H(卫星平台)}"
+  },
+  {
+   "id": "SAT-C80001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|02H(第2类遥测)}"
+  },
+  {
+   "id": "SAT-C80002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=UX<s>"
+  },
+  {
+   "id": "SAT-C80006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=UX<ms>"
+  },
+  {
+   "id": "SAT-C80008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=UX<s>"
+  },
+  {
+   "id": "SAT-C80012.7.32",
+   "bits": "0012.7.32",
+   "name_cn": "飞轮X转速",
+   "formula": "F=SX/10000<rpm>"
+  },
+  {
+   "id": "SAT-C80016.7.32",
+   "bits": "0016.7.32",
+   "name_cn": "飞轮Y转速",
+   "formula": "F=SX/10000<rpm>"
+  },
+  {
+   "id": "SAT-C80020.7.32",
+   "bits": "0020.7.32",
+   "name_cn": "飞轮Z转速",
+   "formula": "F=SX/10000<rpm>"
+  },
+  {
+   "id": "SAT-C80024.7.32",
+   "bits": "0024.7.32",
+   "name_cn": "飞轮S转速",
+   "formula": "F=SX/10000<rpm>"
+  },
+  {
+   "id": "SAT-C80028.7.32",
+   "bits": "0028.7.32",
+   "name_cn": "星敏Yq0",
+   "formula": "F=SX/1073741824"
+  },
+  {
+   "id": "SAT-C80032.7.32",
+   "bits": "0032.7.32",
+   "name_cn": "星敏Yq1",
+   "formula": "F=SX/1073741824"
+  },
+  {
+   "id": "SAT-C80036.7.32",
+   "bits": "0036.7.32",
+   "name_cn": "星敏Yq2",
+   "formula": "F=SX/1073741824"
+  },
+  {
+   "id": "SAT-C80040.7.32",
+   "bits": "0040.7.32",
+   "name_cn": "星敏Yq3",
+   "formula": "F=SX/1073741824"
+  },
+  {
+   "id": "SAT-C80044.7.32",
+   "bits": "0044.7.32",
+   "name_cn": "星敏Y角速度X",
+   "formula": "F=SX*180/3373259368.5889<deg/s>"
+  },
+  {
+   "id": "SAT-C80048.7.32",
+   "bits": "0048.7.32",
+   "name_cn": "星敏Y角速度Y",
+   "formula": "F=SX*180/3373259368.5889<deg/s>"
+  },
+  {
+   "id": "SAT-C80052.7.32",
+   "bits": "0052.7.32",
+   "name_cn": "星敏Y角速度Z",
+   "formula": "F=SX*180/3373259368.5889<deg/s>"
+  },
+  {
+   "id": "SAT-C80056.7.8",
+   "bits": "0056.7.8",
+   "name_cn": "星敏Y识别星个数",
+   "formula": "F=UX"
+  },
+  {
+   "id": "SAT-C80057.7.8",
+   "bits": "0057.7.8",
+   "name_cn": "星敏Y姿态有效性标志",
+   "formula": "F={UX|1H(有效),0H(无效)}"
+  },
+  {
+   "id": "SAT-C80058.7.8",
+   "bits": "0058.7.8",
+   "name_cn": "星敏Y成像器件温度",
+   "formula": "F=SX"
+  },
+  {
+   "id": "SAT-C80059.7.32",
+   "bits": "0059.7.32",
+   "name_cn": "星敏Zq0",
+   "formula": "F=SX/1073741824"
+  },
+  {
+   "id": "SAT-C80063.7.32",
+   "bits": "0063.7.32",
+   "name_cn": "星敏Zq1",
+   "formula": "F=SX/1073741824"
+  },
+  {
+   "id": "SAT-C80067.7.32",
+   "bits": "0067.7.32",
+   "name_cn": "星敏Zq2",
+   "formula": "F=SX/1073741824"
+  },
+  {
+   "id": "SAT-C80071.7.32",
+   "bits": "0071.7.32",
+   "name_cn": "星敏Zq3",
+   "formula": "F=SX/1073741824"
+  },
+  {
+   "id": "SAT-C80075.7.32",
+   "bits": "0075.7.32",
+   "name_cn": "星敏Z角速度X",
+   "formula": "F=SX*180/3373259368.5889<deg/s>"
+  },
+  {
+   "id": "SAT-C80079.7.32",
+   "bits": "0079.7.32",
+   "name_cn": "星敏Z角速度Y",
+   "formula": "F=SX*180/3373259368.5889<deg/s>"
+  },
+  {
+   "id": "SAT-C80083.7.32",
+   "bits": "0083.7.32",
+   "name_cn": "星敏Z角速度Z",
+   "formula": "F=SX*180/3373259368.5889<deg/s>"
+  },
+  {
+   "id": "SAT-C80087.7.8",
+   "bits": "0087.7.8",
+   "name_cn": "星敏Z识别星个数",
+   "formula": "F=UX"
+  },
+  {
+   "id": "SAT-C80088.7.8",
+   "bits": "0088.7.8",
+   "name_cn": "星敏Z姿态有效性标志",
+   "formula": "F={UX|1H(有效),0H(无效)}"
+  },
+  {
+   "id": "SAT-C80089.7.8",
+   "bits": "0089.7.8",
+   "name_cn": "星敏Z成像器件温度",
+   "formula": "F=SX"
+  },
+  {
+   "id": "SAT-C80090.7.32",
+   "bits": "0090.7.32",
+   "name_cn": "光纤陀螺角速度X",
+   "formula": "F=SX/10000<deg/s>"
+  },
+  {
+   "id": "SAT-C80094.7.32",
+   "bits": "0094.7.32",
+   "name_cn": "光纤陀螺角速度Y",
+   "formula": "F=SX/10000<deg/s>"
+  },
+  {
+   "id": "SAT-C80098.7.32",
+   "bits": "0098.7.32",
+   "name_cn": "光纤陀螺角速度Z",
+   "formula": "F=SX/10000<deg/s>"
+  },
+  {
+   "id": "SAT-C80102.7.32",
+   "bits": "0102.7.32",
+   "name_cn": "太敏alpha角",
+   "formula": "F=SX/10000<deg>"
+  },
+  {
+   "id": "SAT-C80106.7.32",
+   "bits": "0106.7.32",
+   "name_cn": "太敏beta角",
+   "formula": "F=SX/10000<deg>"
+  },
+  {
+   "id": "SAT-C80110.7.32",
+   "bits": "0110.7.32",
+   "name_cn": "GPS位置X",
+   "formula": "F=SX*0.1<m>"
+  },
+  {
+   "id": "SAT-C80114.7.32",
+   "bits": "0114.7.32",
+   "name_cn": "GPS位置Y",
+   "formula": "F=SX*0.1<m>"
+  },
+  {
+   "id": "SAT-C80118.7.32",
+   "bits": "0118.7.32",
+   "name_cn": "GPS位置Z",
+   "formula": "F=SX*0.1<m>"
+  },
+  {
+   "id": "SAT-C80122.7.32",
+   "bits": "0122.7.32",
+   "name_cn": "GPS速度X",
+   "formula": "F=SX*0.01<m/s>"
+  },
+  {
+   "id": "SAT-C80126.7.32",
+   "bits": "0126.7.32",
+   "name_cn": "GPS速度Y",
+   "formula": "F=SX*0.01<m/s>"
+  },
+  {
+   "id": "SAT-C80130.7.32",
+   "bits": "0130.7.32",
+   "name_cn": "GPS速度Z",
+   "formula": "F=SX*0.01<m/s>"
+  },
+  {
+   "id": "SAT-C80134.7.16",
+   "bits": "0134.7.16",
+   "name_cn": "磁强计X轴强度",
+   "formula": "F=SX/15000<Gauss>"
+  },
+  {
+   "id": "SAT-C80136.7.16",
+   "bits": "0136.7.16",
+   "name_cn": "磁强计Y轴强度",
+   "formula": "F=SX/15000<Gauss>"
+  },
+  {
+   "id": "SAT-C80138.7.16",
+   "bits": "0138.7.16",
+   "name_cn": "磁强计Z轴强度",
+   "formula": "F=SX/15000<Gauss>"
+  },
+  {
+   "id": "SAT-C80140.7.32",
+   "bits": "0140.7.32",
+   "name_cn": "MEMS陀螺X轴角速度",
+   "formula": "F=SX/10000<deg/s>"
+  },
+  {
+   "id": "SAT-C80144.7.32",
+   "bits": "0144.7.32",
+   "name_cn": "MEMS陀螺Y轴角速度",
+   "formula": "F=SX/10000<deg/s>"
+  },
+  {
+   "id": "SAT-C80148.7.32",
+   "bits": "0148.7.32",
+   "name_cn": "MEMS陀螺Z轴角速度",
+   "formula": "F=SX/10000<deg/s>"
+  },
+  {
+   "id": "SAT-C80152.7.32",
+   "bits": "0152.7.32",
+   "name_cn": "MEMS陀螺X轴加速度",
+   "formula": "F=SX/10000<m/s2>"
+  },
+  {
+   "id": "SAT-C80156.7.32",
+   "bits": "0156.7.32",
+   "name_cn": "MEMS陀螺Y轴加速度",
+   "formula": "F=SX/10000<m/s2>"
+  },
+  {
+   "id": "SAT-C80160.7.32",
+   "bits": "0160.7.32",
+   "name_cn": "MEMS陀螺Z轴加速度",
+   "formula": "F=SX/10000<m/s2>"
+  },
+  {
+   "id": "SAT-C80164.7.32",
+   "bits": "0164.7.32",
+   "name_cn": "对目标偏差四元数q0",
+   "formula": "F=SX/10000"
+  },
+  {
+   "id": "SAT-C80168.7.32",
+   "bits": "0168.7.32",
+   "name_cn": "对目标偏差四元数q1",
+   "formula": "F=SX/10000"
+  },
+  {
+   "id": "SAT-C80172.7.32",
+   "bits": "0172.7.32",
+   "name_cn": "对目标偏差四元数q2",
+   "formula": "F=SX/10000"
+  },
+  {
+   "id": "SAT-C80176.7.32",
+   "bits": "0176.7.32",
+   "name_cn": "对目标偏差四元数q3",
+   "formula": "F=SX/10000"
+  },
+  {
+   "id": "SAT-C80180.7.32",
+   "bits": "0180.7.32",
+   "name_cn": "期望四元数q0",
+   "formula": "F=SX/10000"
+  },
+  {
+   "id": "SAT-C80184.7.32",
+   "bits": "0184.7.32",
+   "name_cn": "期望四元数q1",
+   "formula": "F=SX/10000"
+  },
+  {
+   "id": "SAT-C80188.7.32",
+   "bits": "0188.7.32",
+   "name_cn": "期望四元数q2",
+   "formula": "F=SX/10000"
+  },
+  {
+   "id": "SAT-C80192.7.32",
+   "bits": "0192.7.32",
+   "name_cn": "期望四元数q3",
+   "formula": "F=SX/10000"
+  },
+  {
+   "id": "SAT-C80196.7.32",
+   "bits": "0196.7.32",
+   "name_cn": "待执行延时指令计数",
+   "formula": "F=UX"
+  },
+  {
+   "id": "SAT-C80200.7.8",
+   "bits": "0200.7.8",
+   "name_cn": "帧尾",
+   "formula": "F=UX"
+  }
+ ]
+}

@@ -1,0 +1,610 @@
+{
+ "packet": "ZGK-S0",
+ "main_type": 170,
+ "sub_type": 0,
+ "revision": "public-field-table",
+ "fields": [
+  {
+   "id": "ZGK-C00000.7.8",
+   "bits": "0000.7.8",
+   "name_cn": "遥测主类型",
+   "formula": "F={UX|AAH(姿轨控)}",
+   "name_en": "Telemetry Main Type"
+  },
+  {
+   "id": "ZGK-C00001.7.8",
+   "bits": "0001.7.8",
+   "name_cn": "遥测副类型",
+   "formula": "F={UX|00H(第0类遥测)}",
+   "name_en": "Telemetry Sub Type"
+  },
+  {
+   "id": "ZGK-C00002.7.32",
+   "bits": "0002.7.32",
+   "name_cn": "OBC时间累计秒整数",
+   "formula": "F=UX",
+   "name_en": "OBC Time Accumulated Seconds Integer"
+  },
+  {
+   "id": "ZGK-C00006.7.16",
+   "bits": "0006.7.16",
+   "name_cn": "OBC时间秒小数",
+   "formula": "F=UX",
+   "name_en": "OBC Time Seconds Fraction"
+  },
+  {
+   "id": "ZGK-C00008.7.32",
+   "bits": "0008.7.32",
+   "name_cn": "UTC时间累计秒",
+   "formula": "F=UX",
+   "name_en": "UTC Time Accumulated Seconds"
+  },
+  {
+   "id": "ZGK-C00012.7.8",
+   "bits": "0012.7.8",
+   "name_cn": "飞轮X遥测计数器",
+   "formula": "F=UX",
+   "name_en": "Flywheel X Telemetry Counter"
+  },
+  {
+   "id": "ZGK-C00013.7.8",
+   "bits": "0013.7.8",
+   "name_cn": "飞轮X工作模式0默认1电流2转速3力矩",
+   "formula": "F={UX|3H(力矩模式),2H(转速模式),1H(电流模式),0H(默认值)}",
+   "name_en": "Flywheel X Operating Mode"
+  },
+  {
+   "id": "ZGK-C00014.7.32",
+   "bits": "0014.7.32",
+   "name_cn": "飞轮X最后一次设置值",
+   "formula": "F=FX",
+   "name_en": "Flywheel X Last Set Value"
+  },
+  {
+   "id": "ZGK-C00018.7.32",
+   "bits": "0018.7.32",
+   "name_cn": "飞轮X转速反馈",
+   "formula": "F=FX",
+   "name_en": "Flywheel X Rotational Speed Feedback"
+  },
+  {
+   "id": "ZGK-C00022.7.32",
+   "bits": "0022.7.32",
+   "name_cn": "飞轮X电流反馈",
+   "formula": "F=FX",
+   "name_en": "Flywheel X Current Feedback"
+  },
+  {
+   "id": "ZGK-C00026.7.8",
+   "bits": "0026.7.8",
+   "name_cn": "飞轮X校验和",
+   "formula": "F=HX",
+   "name_en": "Flywheel X Checksum"
+  },
+  {
+   "id": "ZGK-C00027.7.8",
+   "bits": "0027.7.8",
+   "name_cn": "飞轮Y遥测计数器",
+   "formula": "F=UX",
+   "name_en": "Flywheel Y Telemetry Counter"
+  },
+  {
+   "id": "ZGK-C00028.7.8",
+   "bits": "0028.7.8",
+   "name_cn": "飞轮Y工作模式0默认1电流2转速3力矩",
+   "formula": "F={UX|3H(力矩模式),2H(转速模式),1H(电流模式),0H(默认值)}",
+   "name_en": "Flywheel Y Operating Mode"
+  },
+  {
+   "id": "ZGK-C00029.7.32",
+   "bits": "0029.7.32",
+   "name_cn": "飞轮Y最后一次设置值",
+   "formula": "F=FX",
+   "name_en": "Flywheel Y Last Set Value"
+  },
+  {
+   "id": "ZGK-C00033.7.32",
+   "bits": "0033.7.32",
+   "name_cn": "飞轮Y转速反馈",
+   "formula": "F=FX",
+   "name_en": "Flywheel Y Rotational Speed Feedback"
+  },
+  {
+   "id": "ZGK-C00037.7.32",
+   "bits": "0037.7.32",
+   "name_cn": "飞轮Y电流反馈",
+   "formula": "F=FX",
+   "name_en": "Flywheel Y Current Feedback"
+  },
+  {
+   "id": "ZGK-C00041.7.8",
+   "bits": "0041.7.8",
+   "name_cn": "飞轮Y校验和",
+   "formula": "F=HX",
+   "name_en": "Flywheel Y Checksum"
+  },
+  {
+   "id": "ZGK-C00042.7.8",
+   "bits": "0042.7.8",
+   "name_cn": "飞轮Z遥测计数器",
+   "formula": "F=UX",
+   "name_en": "Flywheel Z Telemetry Counter"
+  },
+  {
+   "id": "ZGK-C00043.7.8",
+   "bits": "0043.7.8",
+   "name_cn": "飞轮Z工作模式0默认1电流2转速3力矩",
+   "formula": "F={UX|3H(力矩模式),2H(转速模式),1H(电流模式),0H(默认值)}",
+   "name_en": "Flywheel Z Operating Mode"
+  },
+  {
+   "id": "ZGK-C00044.7.32",
+   "bits": "0044.7.32",
+   "name_cn": "飞轮Z最后一次设置值",
+   "formula": "F=FX",
+   "name_en": "Flywheel Z Last Set Value"
+  },
+  {
+   "id": "ZGK-C00048.7.32",
+   "bits": "0048.7.32",
+   "name_cn": "飞轮Z转速反馈",
+   "formula": "F=FX",
+   "name_en": "Flywheel Z Rotational Speed Feedback"
+  },
+  {
+   "id": "ZGK-C00052.7.32",
+   "bits": "0052.7.32",
+   "name_cn": "飞轮Z电流反馈",
+   "formula": "F=FX",
+   "name_en": "Flywheel Z Current Feedback"
+  },
+  {
+   "id": "ZGK-C00056.7.8",
+   "bits": "0056.7.8",
+   "name_cn": "飞轮Z校验和",
+   "formula": "F=HX",
+   "name_en": "Flywheel Z Checksum"
+  },
+  {
+   "id": "ZGK-C00057.7.8",
+   "bits": "0057.7.8",
+   "name_cn": "飞轮S遥测计数器",
+   "formula": "F=UX",
+   "name_en": "Flywheel S Telemetry Counter"
+  },
+  {
+   "id": "ZGK-C00058.7.8",
+   "bits": "0058.7.8",
+   "name_cn": "飞轮S工作模式0默认1电流2转速3力矩",
+   "formula": "F={UX|3H(力矩模式),2H(转速模式),1H(电流模式),0H(默认值)}",
+   "name_en": "Flywheel S Operating Mode"
+  },
+  {
+   "id": "ZGK-C00059.7.32",
+   "bits": "0059.7.32",
+   "name_cn": "飞轮S最后一次设置值",
+   "formula": "F=FX",
+   "name_en": "Flywheel S Last Set Value"
+  },
+  {
+   "id": "ZGK-C00063.7.32",
+   "bits": "0063.7.32",
+   "name_cn": "飞轮S转速反馈",
+   "formula": "F=FX",
+   "name_en": "Flywheel S Rotational Speed Feedback"
+  },
+  {
+   "id": "ZGK-C00067.7.32",
+   "bits": "0067.7.32",
+   "name_cn": "飞轮S电流反馈",
+   "formula": "F=FX",
+   "name_en": "Flywheel S Current Feedback"
+  },
+  {
+   "id": "ZGK-C00071.7.8",
+   "bits": "0071.7.8",
+   "name_cn": "飞轮S校验和",
+   "formula": "F=HX",
+   "name_en": "Flywheel S Checksum"
+  },
+  {
+   "id": "ZGK-C00072.7.1",
+   "bits": "0072.7.1",
+   "name_cn": "太敏工作是否正常1有效0无效",
+   "formula": "F={UX|1H(有效),0H(失效)}",
+   "name_en": "Sun Sensor Operating Status Normal"
+  },
+  {
+   "id": "ZGK-C00072.6.1",
+   "bits": "0072.6.1",
+   "name_cn": "太敏是否超视场标记1视场内0超视场",
+   "formula": "F={UX|1H(视场内),0H(超视场)}",
+   "name_en": "Sun Sensor Out-of-FOV Flag"
+  },
+  {
+   "id": "ZGK-C00072.5.1",
+   "bits": "0072.5.1",
+   "name_cn": "太敏参数修改标记1参数已改0参数未改",
+   "formula": "F={UX|1H(参数已改),0H(参数未改)}",
+   "name_en": "Sun Sensor Parameter Modification Flag"
+  },
+  {
+   "id": "ZGK-C00072.4.1",
+   "bits": "0072.4.1",
+   "name_cn": "太敏增益标记1高增益0低增益",
+   "formula": "F={UX|1H(高增益),0H(低增益)}",
+   "name_en": "Sun Sensor Gain Flag"
+  },
+  {
+   "id": "ZGK-C00072.3.4",
+   "bits": "0072.3.4",
+   "name_cn": "太敏光点个数",
+   "formula": "F=UX",
+   "name_en": "Sun Sensor Number of Light Points"
+  },
+  {
+   "id": "ZGK-C00073.7.8",
+   "bits": "0073.7.8",
+   "name_cn": "太敏姿态延时",
+   "formula": "F=UX",
+   "name_en": "Sun Sensor Attitude Delay"
+  },
+  {
+   "id": "ZGK-C00074.7.8",
+   "bits": "0074.7.8",
+   "name_cn": "太敏归一化阈值",
+   "formula": "F=X",
+   "name_en": "Sun Sensor Normalization Threshold"
+  },
+  {
+   "id": "ZGK-C00075.7.8",
+   "bits": "0075.7.8",
+   "name_cn": "太敏曝光时间",
+   "formula": "F=UX",
+   "name_en": "Sun Sensor Exposure Time"
+  },
+  {
+   "id": "ZGK-C00076.7.16",
+   "bits": "0076.7.16",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C00078.7.16",
+   "bits": "0078.7.16",
+   "name_cn": "保留",
+   "formula": "F=X",
+   "name_en": "Reserved"
+  },
+  {
+   "id": "ZGK-C00080.7.32",
+   "bits": "0080.7.32",
+   "name_cn": "太敏alpha角度rad",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Alpha Angle (rad)"
+  },
+  {
+   "id": "ZGK-C00084.7.32",
+   "bits": "0084.7.32",
+   "name_cn": "太敏beta角度rad",
+   "formula": "F=FX",
+   "name_en": "Sun Sensor Beta Angle (rad)"
+  },
+  {
+   "id": "ZGK-C00088.7.8",
+   "bits": "0088.7.8",
+   "name_cn": "光纤陀螺识别码",
+   "formula": "F={UX|14H(光纤陀螺)}",
+   "name_en": "Fiber Optic Gyroscope Identification Code"
+  },
+  {
+   "id": "ZGK-C00089.7.8",
+   "bits": "0089.7.8",
+   "name_cn": "光纤陀螺测量数据有效性标志",
+   "formula": "F={UX|00H(陀螺数据无效),0FH(陀螺数据有效),B0H(地测超时)}",
+   "name_en": "Fiber Optic Gyroscope Measurement Data Validity Flag"
+  },
+  {
+   "id": "ZGK-C00090.7.8",
+   "bits": "0090.7.8",
+   "name_cn": "光纤陀螺该帧收到的指令码",
+   "formula": "F=HX",
+   "name_en": "Fiber Optic Gyroscope Received Command Code in This Frame"
+  },
+  {
+   "id": "ZGK-C00091.7.16",
+   "bits": "0091.7.16",
+   "name_cn": "光纤陀螺光功率信号uW",
+   "formula": "F=-0.003323*SX+56.08",
+   "name_en": "Fiber Optic Gyroscope Optical Power Signal (µW)"
+  },
+  {
+   "id": "ZGK-C00093.7.24",
+   "bits": "0093.7.24",
+   "name_cn": "光纤陀螺X轴角速度deg/s",
+   "formula": "F=SX/16670.6616",
+   "name_en": "Fiber Optic Gyroscope X-axis Angular Velocity (deg/s)"
+  },
+  {
+   "id": "ZGK-C00096.7.24",
+   "bits": "0096.7.24",
+   "name_cn": "光纤陀螺Y轴角速度deg/s",
+   "formula": "F=SX/16736.5655",
+   "name_en": "Fiber Optic Gyroscope Y-axis Angular Velocity (deg/s)"
+  },
+  {
+   "id": "ZGK-C00099.7.24",
+   "bits": "0099.7.24",
+   "name_cn": "光纤陀螺Z轴角速度deg/s",
+   "formula": "F=SX/16675.5632",
+   "name_en": "Fiber Optic Gyroscope Z-axis Angular Velocity (deg/s)"
+  },
+  {
+   "id": "ZGK-C00102.7.16",
+   "bits": "0102.7.16",
+   "name_cn": "光纤陀螺X轴温度信号摄氏度",
+   "formula": "F=-0.4907*SX+6849.1",
+   "name_en": "Fiber Optic Gyroscope X-axis Temperature Signal (°C)"
+  },
+  {
+   "id": "ZGK-C00104.7.16",
+   "bits": "0104.7.16",
+   "name_cn": "光纤陀螺Y轴温度信号摄氏度",
+   "formula": "F=-0.4395*SX+6642.9",
+   "name_en": "Fiber Optic Gyroscope Y-axis Temperature Signal (°C)"
+  },
+  {
+   "id": "ZGK-C00106.7.16",
+   "bits": "0106.7.16",
+   "name_cn": "光纤陀螺Z轴温度信号摄氏度",
+   "formula": "F=-0.3814*SX+5587.4",
+   "name_en": "Fiber Optic Gyroscope Z-axis Temperature Signal (°C)"
+  },
+  {
+   "id": "ZGK-C00108.7.8",
+   "bits": "0108.7.8",
+   "name_cn": "光纤陀螺固定数",
+   "formula": "F=HX",
+   "name_en": "Fiber Optic Gyroscope Fixed Number"
+  },
+  {
+   "id": "ZGK-C00109.7.8",
+   "bits": "0109.7.8",
+   "name_cn": "光纤陀螺校验和",
+   "formula": "F=HX",
+   "name_en": "Fiber Optic Gyroscope Checksum"
+  },
+  {
+   "id": "ZGK-C00110.7.32",
+   "bits": "0110.7.32",
+   "name_cn": "GNSS-UTC累计秒整数",
+   "formula": "F=UX",
+   "name_en": "GNSS-UTC Accumulated Seconds Integer"
+  },
+  {
+   "id": "ZGK-C00114.7.32",
+   "bits": "0114.7.32",
+   "name_cn": "GNSS卫星位置X方向m",
+   "formula": "F=SX*0.1",
+   "name_en": "GNSS Satellite Position X-direction (m)"
+  },
+  {
+   "id": "ZGK-C00118.7.32",
+   "bits": "0118.7.32",
+   "name_cn": "GNSS卫星位置Y方向m",
+   "formula": "F=SX*0.1",
+   "name_en": "GNSS Satellite Position Y-direction (m)"
+  },
+  {
+   "id": "ZGK-C00122.7.32",
+   "bits": "0122.7.32",
+   "name_cn": "GNSS卫星位置Z方向m",
+   "formula": "F=SX*0.1",
+   "name_en": "GNSS Satellite Position Z-direction (m)"
+  },
+  {
+   "id": "ZGK-C00126.7.32",
+   "bits": "0126.7.32",
+   "name_cn": "GNSS卫星速度X方向m",
+   "formula": "F=SX*0.01",
+   "name_en": "GNSS Satellite Velocity X-direction (m/s)"
+  },
+  {
+   "id": "ZGK-C00130.7.32",
+   "bits": "0130.7.32",
+   "name_cn": "GNSS卫星速度Y方向m",
+   "formula": "F=SX*0.01",
+   "name_en": "GNSS Satellite Velocity Y-direction (m/s)"
+  },
+  {
+   "id": "ZGK-C00134.7.32",
+   "bits": "0134.7.32",
+   "name_cn": "GNSS卫星速度Z方向m",
+   "formula": "F=SX*0.01",
+   "name_en": "GNSS Satellite Velocity Z-direction (m/s)"
+  },
+  {
+   "id": "ZGK-C00138.7.32",
+   "bits": "0138.7.32",
+   "name_cn": "GNSS轨道半长轴m",
+   "formula": "F=UX*0.1",
+   "name_en": "GNSS Orbital Semi-Major Axis (m)"
+  },
+  {
+   "id": "ZGK-C00142.7.32",
+   "bits": "0142.7.32",
+   "name_cn": "GNSS轨道偏心率m",
+   "formula": "F=3*UX/1000/134217728",
+   "name_en": "GNSS Orbital Eccentricity"
+  },
+  {
+   "id": "ZGK-C00146.7.32",
+   "bits": "0146.7.32",
+   "name_cn": "GNSS轨道倾角rad",
+   "formula": "F=3.1415926*UX/1073741824",
+   "name_en": "GNSS Orbital Inclination (rad)"
+  },
+  {
+   "id": "ZGK-C00150.7.32",
+   "bits": "0150.7.32",
+   "name_cn": "GNSS升交点赤经rad",
+   "formula": "F=3.1415926*UX/1073741824",
+   "name_en": "GNSS Right Ascension of Ascending Node (rad)"
+  },
+  {
+   "id": "ZGK-C00154.7.32",
+   "bits": "0154.7.32",
+   "name_cn": "GNSS近地点角距rad",
+   "formula": "F=3.1415926*UX/1073741824",
+   "name_en": "GNSS Argument of Perigee (rad)"
+  },
+  {
+   "id": "ZGK-C00158.7.32",
+   "bits": "0158.7.32",
+   "name_cn": "GNSS平近点角rad",
+   "formula": "F=3.1415926*UX/1073741824",
+   "name_en": "GNSS Mean Anomaly (rad)"
+  },
+  {
+   "id": "ZGK-C00162.7.4",
+   "bits": "0162.7.4",
+   "name_cn": "GNSS定位标记3非定位9定位",
+   "formula": "F={X|3H(非定位),9H(定位)}",
+   "name_en": "GNSS Positioning Flag"
+  },
+  {
+   "id": "ZGK-C00162.3.2",
+   "bits": "0162.3.2",
+   "name_cn": "GNSS定轨数据类型1GPS定轨2BD定轨3组合定轨",
+   "formula": "F={X|1H(GPS定轨),2H(BD定轨),3H(组合定轨)}",
+   "name_en": "GNSS Orbit Determination Data Type"
+  },
+  {
+   "id": "ZGK-C00162.1.2",
+   "bits": "0162.1.2",
+   "name_cn": "GNSS定位类型0不定位1实时定位2定轨滤波3定轨外推",
+   "formula": "F={X|0H(不定位),1H(实时定位),2H(定轨滤波),3H(定轨外推)}",
+   "name_en": "GNSS Positioning Type"
+  },
+  {
+   "id": "ZGK-C00163.7.4",
+   "bits": "0163.7.4",
+   "name_cn": "GNSS接收间接指令计数",
+   "formula": "F=UX",
+   "name_en": "GNSS Indirect Command Receive Count"
+  },
+  {
+   "id": "ZGK-C00163.3.4",
+   "bits": "0163.3.4",
+   "name_cn": "GNSS累计跳秒数",
+   "formula": "F=UX",
+   "name_en": "GNSS Accumulated Leap Seconds"
+  },
+  {
+   "id": "ZGK-C00164.7.16",
+   "bits": "0164.7.16",
+   "name_cn": "磁强计X轴强度Gauss",
+   "formula": "F=SX/15000",
+   "name_en": "Magnetometer X-axis Intensity (Gauss)"
+  },
+  {
+   "id": "ZGK-C00166.7.16",
+   "bits": "0166.7.16",
+   "name_cn": "磁强计Y轴强度Gauss",
+   "formula": "F=SX/15000",
+   "name_en": "Magnetometer Y-axis Intensity (Gauss)"
+  },
+  {
+   "id": "ZGK-C00168.7.16",
+   "bits": "0168.7.16",
+   "name_cn": "磁强计Z轴强度Gauss",
+   "formula": "F=SX/15000",
+   "name_en": "Magnetometer Z-axis Intensity (Gauss)"
+  },
+  {
+   "id": "ZGK-C00170.7.8",
+   "bits": "0170.7.8",
+   "name_cn": "磁强计帧尾固定为0X0D",
+   "formula": "F=HX",
+   "name_en": "Magnetometer Frame Tail Fixed as 0x0D"
+  },
+  {
+   "id": "ZGK-C00171.7.8",
+   "bits": "0171.7.8",
+   "name_cn": "定位有效标志",
+   "formula": "F=HX",
+   "name_en": "Positioning Validity Flag"
+  },
+  {
+   "id": "ZGK-C00172.7.8",
+   "bits": "0172.7.8",
+   "name_cn": "轨道递推标志",
+   "formula": "F=HX",
+   "name_en": "Orbital Recurrence Flag"
+  },
+  {
+   "id": "ZGK-C00173.7.32",
+   "bits": "0173.7.32",
+   "name_cn": "卫星期望本体角速度X",
+   "formula": "F=FX",
+   "name_en": "Satellite Expected Body Angular Velocity X"
+  },
+  {
+   "id": "ZGK-C00177.7.32",
+   "bits": "0177.7.32",
+   "name_cn": "卫星期望本体角速度Y",
+   "formula": "F=FX",
+   "name_en": "Satellite Expected Body Angular Velocity Y"
+  },
+  {
+   "id": "ZGK-C00181.7.32",
+   "bits": "0181.7.32",
+   "name_cn": "卫星期望本体角速度Z",
+   "formula": "F=FX",
+   "name_en": "Satellite Expected Body Angular Velocity Z"
+  },
+  {
+   "id": "ZGK-C00185.7.16",
+   "bits": "0185.7.16",
+   "name_cn": "启用备份飞轮标记",
+   "formula": "F=SX",
+   "name_en": "Enable Backup Flywheel Flag"
+  },
+  {
+   "id": "ZGK-C00187.7.16",
+   "bits": "0187.7.16",
+   "name_cn": "卸载标记",
+   "formula": "F=SX",
+   "name_en": "Unload Flag"
+  },
+  {
+   "id": "ZGK-C00189.7.16",
+   "bits": "0189.7.16",
+   "name_cn": "单轴对日成功标志",
+   "formula": "F=SX",
+   "name_en": "Single-axis Sun-pointing Success Flag"
+  },
+  {
+   "id": "ZGK-C00191.7.16",
+   "bits": "0191.7.16",
+   "name_cn": "H桥Brake模式",
+   "formula": "F=SX",
+   "name_en": "H-Bridge Brake Mode"
+  },
+  {
+   "id": "ZGK-C00193.7.32",
+   "bits": "0193.7.32",
+   "name_cn": "模式持续时长",
+   "formula": "F=FX",
+   "name_en": "Mode Duration"
+  },
+  {
+   "id": "ZGK-C00197.7.8",
+   "bits": "0197.7.8",
+   "name_cn": "保留",
+   "formula": "F=HX",
+   "name_en": "Reserved"
+  }
+ ]
+}
