@@ -9,6 +9,8 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QDir>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QFont>
 #include <QFormLayout>
 #include <QFrame>
@@ -64,20 +66,16 @@ QGroupBox *statusCard(const QString &title){
     auto *card=new QGroupBox(title);
     card->setObjectName("statusCard");
     auto *layout=new QVBoxLayout(card);
-    layout->setContentsMargins(15,20,15,12);
-    auto *scroll=new QScrollArea(card);
-    scroll->setObjectName("statusScroll");
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    auto *content=new QLabel(QStringLiteral("暂无已识别的遥测参数"));
+    layout->setContentsMargins(10,16,10,8);
+    layout->setSpacing(3);
+    auto *content=new QLabel(QStringLiteral("暂无已识别的遥测参数"),card);
     content->setObjectName("statusContent");
     content->setTextFormat(Qt::RichText);
     content->setAlignment(Qt::AlignTop|Qt::AlignLeft);
     content->setWordWrap(true);
     content->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    scroll->setWidget(content);
-    layout->addWidget(scroll,1);
+    content->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);
+    layout->addWidget(content);
     return card;
 }
 void setupTable(QTableWidget *table){
@@ -174,7 +172,6 @@ void MainWindow::applyStyles(){
         QGroupBox#statusCard::title {subcontrol-origin:margin; left:14px;
                                     padding:0 6px;color:#245b8c;}
         QLabel#statusContent {font-weight:400; color:#38516c; line-height:150%; padding:2px;}
-        QScrollArea#statusScroll {background:transparent;}
         QLabel#attitudeModeLabel {font-size:15px; font-weight:700; color:#174f83;
                                   background:#eaf4ff; border:1px solid #cfe4fb;
                                   border-radius:6px; padding:7px 10px;}
@@ -203,12 +200,20 @@ void MainWindow::buildToolbar(){
     bar->addSeparator();
     bar->addWidget(new QLabel(QStringLiteral("卫星  ")));
     satelliteSelect_=new QComboBox;
+    satelliteSelect_->addItem(QStringLiteral("自动识别"),QStringLiteral("AUTO"));
     satelliteSelect_->addItem("ASRTU-1",QStringLiteral("ASRTU-1"));
     satelliteSelect_->addItem(QStringLiteral("八一04星 · BY04"),QStringLiteral("BY04"));
     bar->addWidget(satelliteSelect_);
     auto *import=bar->addAction(QStringLiteral("开始导入"));
     connect(import,&QAction::triggered,this,[this]{importSession();});
     bar->addSeparator();
+    auto *htmlHistory=bar->addAction(QStringLiteral("打开 HTML 历史"));
+    connect(htmlHistory,&QAction::triggered,this,[this]{
+        updateHtmlHistory();
+        const QString path=htmlHistoryPath();
+        if(!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
+            QMessageBox::warning(this,QStringLiteral("打开历史页面失败"),path);
+    });
     auto *exportCsv=bar->addAction(QStringLiteral("导出遥测 CSV"));
     connect(exportCsv,&QAction::triggered,this,[this]{exportEngineering(true);});
     auto *exportQ=bar->addAction(QStringLiteral("导出四元数"));

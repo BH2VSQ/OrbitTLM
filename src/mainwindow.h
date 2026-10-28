@@ -73,9 +73,12 @@ private:
     QString utcLabel(const QDateTime &dt) const;
     const orbit::BusinessPacket *latestRecognized(int index,const QStringList &prefixes) const;
     void updateFieldCard(QGroupBox *card,const QStringList &prefixes,int index);
+    void updateHtmlHistory();
+    QString htmlHistoryPath() const;
     void setDiagnosticsVisible(bool enabled);
 
     QString logPath_,binPath_;
+    QString detectedSatellite_ = "ASRTU-1";
     orbit::Database db_;
     orbit::BusinessCatalog catalog_;
     orbit::Schema customSchema_;

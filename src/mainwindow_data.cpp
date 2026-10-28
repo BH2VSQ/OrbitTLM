@@ -13,6 +13,11 @@
 #include <QFileInfo>
 #include <QGroupBox>
 #include <QColor>
+#include <QDesktopServices>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QUrl>
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QLabel>
@@ -76,7 +81,9 @@ QTableWidgetItem *item(const QString &text,const QString &tooltip={}){
 }
 }
 QString MainWindow::satellite() const{
-    return satelliteSelect_?satelliteSelect_->currentData().toString():"ASRTU-1";
+    if(!satelliteSelect_)return "ASRTU-1";
+    const QString selected=satelliteSelect_->currentData().toString();
+    return selected=="AUTO"?detectedSatellite_:selected;
 }
 QString MainWindow::qualityLabel(const QString &value) const{
     if(value=="log_fec_reported")return QStringLiteral("日志报告 FEC 成功");
@@ -154,17 +161,53 @@ void MainWindow::importSession(){
         return;
     }
     QString error;
-    const QString sat=satellite();
+    const bool autoDetect=satelliteSelect_->currentData().toString()=="AUTO";
+    const QString parseAs=autoDetect?QStringLiteral("ASRTU-1"):satellite();
     auto log=logPath_.isEmpty()?QVector<orbit::Frame>{}:
-        orbit::Protocol::fromLog(logPath_,sat,&error);
+        orbit::Protocol::fromLog(logPath_,parseAs,&error);
     if(!error.isEmpty()){
         QMessageBox::warning(this,QStringLiteral("日志读取失败"),error);return;
     }
     auto bin=binPath_.isEmpty()?QVector<orbit::Frame>{}:
-        orbit::Protocol::fromBin(binPath_,sat,&error);
+        orbit::Protocol::fromBin(binPath_,parseAs,&error);
     if(!error.isEmpty()){
         QMessageBox::warning(this,QStringLiteral("二进制读取失败"),error);return;
     }
+    if(autoDetect){
+        int asrtu=0,by04=0;
+        auto countScid=[&](const QVector<orbit::Frame> &items){
+            for(const auto &frame:items){
+                if(frame.bytes.size()!=223)continue;
+                const int scid=((quint8(frame.bytes[0])&0x3f)<<4)|(quint8(frame.bytes[1])>>4);
+                if(scid==0x205)++by04;
+                else if(scid==0x032)++asrtu;
+            }
+        };
+        countScid(log);countScid(bin);
+        if(by04==0&&asrtu==0){
+            QMessageBox::warning(this,QStringLiteral("自动识别失败"),
+                QStringLiteral("导入的数据中没有发现已支持的航天器标识（ASRTU-1：0x032，BY04：0x205）。请手动选择卫星。"));
+            return;
+        }
+        detectedSatellite_=by04>asrtu?QStringLiteral("BY04"):QStringLiteral("ASRTU-1");
+        const QString satName=detectedSatellite_;
+        auto reparse=[&](QVector<orbit::Frame> &items){
+            for(auto &frame:items){
+                const auto sources=frame.sources;
+                const auto captured=frame.captureLocal;
+                const auto basis=frame.timeBasis;
+                const auto quality=frame.quality;
+                auto parsed=orbit::Protocol::parse(frame.bytes,satName);
+                parsed.sources=sources;parsed.captureLocal=captured;parsed.timeBasis=basis;
+                parsed.quality=quality;parsed.complete=frame.complete;
+                frame=std::move(parsed);
+            }
+        };
+        reparse(log);reparse(bin);
+        statusBar()->showMessage(QStringLiteral("自动识别结果：%1（ASRTU-1 %2 帧，BY04 %3 帧）")
+            .arg(satName).arg(asrtu).arg(by04),10000);
+    }
+    const QString sat=satellite();
     frames_=orbit::Protocol::fuse(log,bin,&frameStats_);
     if(hasCustomSchema_&&customSchema_.satellite()==sat)
         for(auto &f:frames_)customSchema_.apply(f);
@@ -232,6 +275,7 @@ void MainWindow::rebuildSession(){
     currentIndex_=-1;
     if(!business_.isEmpty())selectEvent(0);
     else showEvent(-1);
+    updateHtmlHistory();
 }
 void MainWindow::populateEvents(){
     QSignalBlocker blocked(eventTable_);
@@ -449,8 +493,11 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
         };
         return priority(a)<priority(b);
     });
-    QString html=QStringLiteral("<div style='color:#68809b;margin-bottom:7px'>显示当前回放位置之前各字段的最新有效值；字段按协议定义换算</div>");
-    for(const auto &key:order){
+    const int totalFields=order.size();
+    const int visibleFields=std::min(totalFields,8);
+    QString html=QStringLiteral("<div style='color:#68809b;margin-bottom:4px'>最新有效值 · 单位按字段表</div>");
+    for(int fieldIndex=0;fieldIndex<visibleFields;++fieldIndex){
+        const QString key=order[fieldIndex];
         const auto field=latest.value(key);
         QString value=field.value.toHtmlEscaped();
         if(!field.unit.isEmpty())value+=QStringLiteral(" ")+field.unit.toHtmlEscaped();
@@ -460,7 +507,8 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
             .arg(field.nameCn.toHtmlEscaped(),source.value(key).toHtmlEscaped(),
                  shortTime(times.value(key)).toHtmlEscaped(),value);
     }
-    html+=QStringLiteral("<div style='color:#8798aa;margin-top:7px'>共 %1 个有效字段 · 应用 CRC 未校验</div>").arg(order.size());
+    html+=QStringLiteral("<div style='color:#8798aa;margin-top:4px'>显示 %1 / %2 项 · 应用 CRC 未校验</div>")
+        .arg(visibleFields).arg(totalFields);
     content->setText(html);
 }
 void MainWindow::populateEngineering(int index){
@@ -797,6 +845,72 @@ void MainWindow::exportFrames(bool csv){
     if(!ok)QMessageBox::warning(this,QStringLiteral("导出失败"),error);
     else statusBar()->showMessage(QStringLiteral("原始传输帧已导出"),8000);
 }
+QString MainWindow::htmlHistoryPath() const{
+    return QDir(QApplication::applicationDirPath()).filePath(QStringLiteral("data/index.html"));
+}
+void MainWindow::updateHtmlHistory(){
+    const QString dataDir=QDir(QApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+    if(!QDir().mkpath(dataDir))return;
+    const QString jsonPath=QDir(dataDir).filePath(QStringLiteral("telemetry.json"));
+    QJsonArray samples;
+    QFile existing(jsonPath);
+    if(existing.open(QIODevice::ReadOnly)){
+        const auto doc=QJsonDocument::fromJson(existing.readAll());
+        if(doc.isArray())samples=doc.array();
+    }
+    QSet<QString> keys;
+    for(const auto &v:samples){
+        const auto o=v.toObject();
+        keys.insert(o.value("key").toString());
+    }
+    for(const auto &packet:business_){
+        const QString time=packet.transport.captureLocal.isValid()?
+            packet.transport.captureLocal.toString(Qt::ISODateWithMs):QString();
+        if(time.isEmpty())continue;
+        for(const auto &field:packet.fields){
+            if(field.nameCn.isEmpty()||field.value.isEmpty()||field.status.startsWith("raw_"))continue;
+            const QString key=QStringLiteral("%1|%2|%3|%4|%5")
+                .arg(satellite(),time,packet.packetName,field.code,field.value);
+            if(keys.contains(key))continue;
+            keys.insert(key);
+            samples.append(QJsonObject{{"key",key},{"time",time},{"satellite",satellite()},
+                {"packet",packet.packetName},{"code",field.code},{"name",field.nameCn},
+                {"value",field.value},{"numeric",field.value.toDouble()},
+                {"isNumeric",[&field]{bool ok=false;field.value.toDouble(&ok);return ok;}()},
+                {"unit",field.unit},{"status",field.status}});
+        }
+    }
+    QSaveFile jsonOut(jsonPath);
+    if(jsonOut.open(QIODevice::WriteOnly)){
+        jsonOut.write(QJsonDocument(samples).toJson(QJsonDocument::Indented));
+        jsonOut.commit();
+    }
+    QString dataJson=QString::fromUtf8(QJsonDocument(samples).toJson(QJsonDocument::Compact));
+    dataJson.replace(QStringLiteral("<"),QStringLiteral("\\u003c"));
+    const QString html=QString::fromUtf8(R"HTML(<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OrbitTLM 遥测历史</title><style>
+:root{font-family:Segoe UI,"Microsoft YaHei",sans-serif;color:#1f3045;background:#f3f6fb}body{margin:0;padding:22px}h1{font-size:24px;margin:0 0 6px}.muted{color:#71839a;font-size:13px}.panel{background:#fff;border:1px solid #e1e8f1;border-radius:12px;padding:16px;margin:14px 0;box-shadow:0 3px 14px #1b3a5c0a}.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:end}label{display:flex;flex-direction:column;gap:5px;color:#60758c;font-size:12px}input,select,button{padding:8px 10px;border:1px solid #d4deeb;border-radius:7px;background:#fff;color:#203750}button{cursor:pointer;background:#256cb4;color:white;border-color:#256cb4}canvas{width:100%;height:300px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:8px;border-bottom:1px solid #edf1f6}th{color:#61768d;background:#f7f9fc}.stats{display:flex;gap:22px;flex-wrap:wrap}.stat strong{font-size:20px;display:block;color:#174f83}#empty{padding:20px;color:#71839a}
+</style></head><body><h1>OrbitTLM · 遥测历史</h1><div class="muted">数据来自程序本地保存的已识别遥测字段。时间为接收端记录时间，未经确认时区不代表星载 UTC。</div>
+<div class="panel filters"><label>卫星<select id="sat"></select></label><label>参数<select id="field"></select></label><label>开始时间<input type="datetime-local" id="from"></label><label>结束时间<input type="datetime-local" id="to"></label><button id="apply">应用筛选</button><button id="csv">导出筛选 CSV</button></div>
+<div class="panel"><div class="stats"><div class="stat"><span class="muted">样本数</span><strong id="count">0</strong></div><div class="stat"><span class="muted">最小值</span><strong id="min">—</strong></div><div class="stat"><span class="muted">最大值</span><strong id="max">—</strong></div><div class="stat"><span class="muted">平均值</span><strong id="avg">—</strong></div></div><canvas id="chart" width="1200" height="320"></canvas><div id="empty"></div></div>
+<div class="panel"><h3>筛选后的数据记录</h3><div style="overflow:auto;max-height:420px"><table><thead><tr><th>记录时间</th><th>卫星</th><th>参数</th><th>分系统</th><th>数值</th><th>单位</th><th>状态</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+<script>const DATA=__DATA__;const $=id=>document.getElementById(id);const fmt=n=>Number.isFinite(n)?Number(n.toPrecision(7)).toString():'—';
+function init(){const sats=[...new Set(DATA.map(x=>x.satellite))].sort();$('sat').innerHTML='<option value="">全部卫星</option>'+sats.map(x=>`<option>${esc(x)}</option>`).join('');const times=DATA.map(x=>x.time).filter(Boolean).sort();if(times.length){$('from').value=times[0].slice(0,16);$('to').value=times[times.length-1].slice(0,16)}updateFields();render()}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function updateFields(){const old=$('field').value;const sat=$('sat').value;const vals=[...new Map(DATA.filter(x=>!sat||x.satellite===sat).map(x=>[x.satellite+'|'+x.packet+'|'+x.code,{id:x.satellite+'|'+x.packet+'|'+x.code,label:x.name+' · '+x.packet+' · '+x.satellite}])).values()];$('field').innerHTML='<option value="">全部参数</option>'+vals.map(x=>`<option value="${esc(x.id)}">${esc(x.label)}</option>`).join('');if(vals.some(x=>x.id===old))$('field').value=old}
+function selected(){const from=$('from').value?new Date($('from').value).getTime():-Infinity;const to=$('to').value?new Date($('to').value).getTime()+59999:Infinity;return DATA.filter(x=>{const t=new Date(x.time).getTime();return (! $('sat').value||x.satellite===$('sat').value)&&(!$('field').value||$('field').value===x.satellite+'|'+x.packet+'|'+x.code)&&t>=from&&t<=to})}
+function render(){const rows=selected();$('count').textContent=rows.length;const nums=rows.filter(x=>x.isNumeric).map(x=>Number(x.numeric));$('min').textContent=nums.length?fmt(Math.min(...nums)):'—';$('max').textContent=nums.length?fmt(Math.max(...nums)):'—';$('avg').textContent=nums.length?fmt(nums.reduce((a,b)=>a+b,0)/nums.length):'—';$('rows').innerHTML=rows.slice().reverse().map(x=>`<tr><td>${esc(x.time)}</td><td>${esc(x.satellite)}</td><td>${esc(x.name)}</td><td>${esc(x.packet)}</td><td>${esc(x.value)}</td><td>${esc(x.unit)}</td><td>${esc(x.status)}</td></tr>`).join('');draw(rows.filter(x=>x.isNumeric));$('empty').textContent=nums.length?'数值型样本绘图；非数值状态仍保留在下方记录表。':'当前筛选没有可绘制的数值型样本。'}
+function draw(rows){const c=$('chart'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);if(!rows.length)return;const vals=rows.map(x=>Number(x.numeric)),min=Math.min(...vals),max=Math.max(...vals),span=max-min||1;ctx.strokeStyle='#dce5ef';ctx.lineWidth=1;for(let i=0;i<5;i++){const y=20+(h-50)*i/4;ctx.beginPath();ctx.moveTo(48,y);ctx.lineTo(w-12,y);ctx.stroke();ctx.fillStyle='#71839a';ctx.fillText(fmt(max-(max-min)*i/4),4,y+4)}ctx.strokeStyle='#287bc0';ctx.lineWidth=2;ctx.beginPath();rows.forEach((x,i)=>{const px=48+(w-64)*(i/Math.max(1,rows.length-1)),py=20+(h-50)*(max-Number(x.numeric))/span;i?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.stroke();ctx.fillStyle='#71839a';ctx.fillText(rows[0].time,48,h-8);ctx.fillText(rows[rows.length-1].time,w-180,h-8)}
+function csv(){const rows=selected(),cols=['time','satellite','packet','code','name','value','unit','status'];const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const text=[cols.join(','),...rows.map(x=>cols.map(k=>quote(x[k])).join(','))].join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+text],{type:'text/csv;charset=utf-8'}));a.download='telemetry-filtered.csv';a.click();URL.revokeObjectURL(a.href)}$('sat').addEventListener('change',()=>{updateFields();render()});$('field').addEventListener('change',render);$('apply').addEventListener('click',render);$('csv').addEventListener('click',csv);init();</script></body></html>)HTML");
+    QString page=html;
+    page.replace(QStringLiteral("__DATA__"),dataJson);
+    QSaveFile htmlOut(htmlHistoryPath());
+    if(htmlOut.open(QIODevice::WriteOnly|QIODevice::Text)){
+        htmlOut.write(page.toUtf8());htmlOut.commit();
+    }
+}
+
 void MainWindow::exportEngineering(bool csv){
     if(business_.isEmpty()){
         QMessageBox::information(this,QStringLiteral("业务遥测"),
