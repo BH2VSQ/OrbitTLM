@@ -463,6 +463,32 @@ private slots:
         QByteArray payload(192,char(0));
         payload[0]=char(0x0f);payload[1]=char(0x12);
         payload[2]=char(0x74);payload[3]=char(0x82);
+        // APID 0x0F1 is not present in the pinned BY04 catalog. Keep this
+        // fixture on the generic CCSDS-header-only path.
+        const QByteArray source=QByteArray::fromHex("08F1FBA100BF")+payload;
+        QByteArray frame=QByteArray::fromHex("2054010100");
+        frame.append(char(0xc0));frame+=source;frame.append(char(0xc0));
+        frame+=QByteArray(223-frame.size(),char(0xaa));
+        const auto f=Protocol::parse(frame,"BY04");
+        const auto packets=Transport::reassemble({f});
+        QCOMPARE(packets.size(),1);
+        QCOMPARE(packets[0].apid,0xf1);
+        QCOMPARE(packets[0].sequence,0x3ba1);
+        QCOMPARE(packets[0].data.size(),192);
+        const auto output=By04Decoder::decodeAll(packets);
+        QCOMPARE(output.size(),1);
+        QCOMPARE(output[0].packetName,QString("BY04-CCSDS"));
+        QCOMPARE(output[0].identification,QString("by04_ccsds_header_only"));
+        QCOMPARE(output[0].fields.size(),7);
+        QCOMPARE(output[0].fields[0].value,QString("241"));
+        QCOMPARE(output[0].fields[3].value,QString("192"));
+        QCOMPARE(output[0].fields[6].status,QString("raw_unverified_business"));
+        QVERIFY(output[0].packetLabel.contains("BY04"));
+    }
+    void by04OBCSFMapDecodesMatchingCcsdsPacket(){
+        QByteArray payload(192,char(0));
+        payload[0]=char(0x0f);payload[1]=char(0x12);
+        payload[2]=char(0x74);payload[3]=char(0x82);
         const QByteArray source=QByteArray::fromHex("08F0FBA100BF")+payload;
         QByteArray frame=QByteArray::fromHex("2054010100");
         frame.append(char(0xc0));frame+=source;frame.append(char(0xc0));
@@ -472,18 +498,18 @@ private slots:
         QCOMPARE(packets.size(),1);
         QCOMPARE(packets[0].apid,0xf0);
         QCOMPARE(packets[0].sequence,0x3ba1);
-        QCOMPARE(packets[0].data.size(),192);
         const auto output=By04Decoder::decodeAll(packets);
         QCOMPARE(output.size(),1);
-        QCOMPARE(output[0].packetName,QString("BY04-CCSDS"));
-        QCOMPARE(output[0].identification,QString("by04_ccsds_header_only"));
-        QCOMPARE(output[0].fields.size(),8);
-        QCOMPARE(output[0].fields[0].value,QString("240"));
-        QCOMPARE(output[0].fields[3].value,QString("192"));
-        QCOMPARE(output[0].fields[6].status,QString("raw_unverified_business"));
-        QCOMPARE(output[0].fields[7].code,QString("candidate.utc_seconds"));
-        QCOMPARE(output[0].fields[7].status,QString("candidate_unverified"));
-        QVERIFY(output[0].packetLabel.contains("BY04"));
+        QCOMPARE(output[0].packetName,QString("BY04-OBC-SF"));
+        QCOMPARE(output[0].identification,QString("by04_kiss_envelope"));
+        QCOMPARE(output[0].mainType,0xf0);
+        QCOMPARE(output[0].subType,0x0f);
+        QVERIFY(!output[0].fields.isEmpty());
+        QCOMPARE(output[0].fields[0].code,QString("OBC-CF0000.7.32"));
+        QCOMPARE(output[0].fields[0].nameCn,QString("UTC时间"));
+        QCOMPARE(output[0].fields[0].value,QString("309625344"));
+        QCOMPARE(output[0].fields[0].unit,QString("s"));
+        QCOMPARE(output[0].fields[0].status,QString("table_formula"));
     }
     void by04DslwpNativeVcidOneImageWithSourceVerifiedCrc(){
         QByteArray frame(223,char(0));
