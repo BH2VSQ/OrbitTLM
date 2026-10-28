@@ -36,6 +36,9 @@ private:
     void buildWorkspace();
     void buildOverview(QTabWidget *tabs);
     void buildEngineering(QTabWidget *tabs);
+    void buildComponentTabs(QTabWidget *tabs);
+    void updateComponentTabs(int index);
+    void updateWebHistory();
     void buildAttitude(QTabWidget *tabs);
     void buildImages(QTabWidget *tabs);
     void buildRaw(QTabWidget *tabs);
@@ -67,18 +70,16 @@ private:
     void scanSsdv();
     void updateImageProgress(int imageId);
     QString satellite() const;
+    QString resolvedSatellite() const;
     QString eventTitle(const orbit::BusinessPacket &packet) const;
     QString qualityLabel(const QString &status) const;
     QString sourceLabel(const QStringList &sources) const;
     QString utcLabel(const QDateTime &dt) const;
     const orbit::BusinessPacket *latestRecognized(int index,const QStringList &prefixes) const;
     void updateFieldCard(QGroupBox *card,const QStringList &prefixes,int index);
-    void updateHtmlHistory();
-    QString htmlHistoryPath() const;
     void setDiagnosticsVisible(bool enabled);
 
     QString logPath_,binPath_;
-    QString detectedSatellite_ = "ASRTU-1";
     orbit::Database db_;
     orbit::BusinessCatalog catalog_;
     orbit::Schema customSchema_;
@@ -114,6 +115,9 @@ private:
     QTabWidget *pages_=nullptr;
     int diagnosticTab_=-1;
     QGroupBox *powerCard_=nullptr,*attitudeCard_=nullptr,*thermalCard_=nullptr,*payloadCard_=nullptr;
+    QHash<QGroupBox*,QTableWidget*> overviewTables_;
+    QHash<QString,QTableWidget*> componentTables_;
+    QHash<QString,QStringList> componentPrefixes_,componentKeywords_;
     QLabel *quaternion_[4]{};
     QLabel *normLabel_=nullptr;
     QSpinBox *imageApid_=nullptr;

@@ -38,6 +38,33 @@ QByteArray syntheticFrame(bool escaping=false) {
 class ProtocolTest:public QObject {
     Q_OBJECT
 private slots:
+    void automaticSatelliteRecognitionUsesSpacecraftId() {
+        Frame f=Protocol::parse(syntheticFrame(),"AUTO");
+        QVERIFY(f.complete);
+        QCOMPARE(By04Decoder::spacecraftId(f.bytes),0x205);
+        QCOMPARE(f.satellite,QString("BY04"));
+        QCOMPARE(f.vcid,2);
+    }
+    void timestampedTcpArchiveCanBeReimportedAsLog() {
+        QTemporaryDir temp;QVERIFY(temp.isValid());
+        const QByteArray frame=syntheticFrame();
+        QString log=QStringLiteral("2026-10-28 12:34:56.789 TCP frame #1 [tcp]\n")+
+                    QStringLiteral("pdu length = 223 bytes\npdu vector contents =\n");
+        for(int offset=0;offset<frame.size();offset+=16){
+            const QStringList octets=QString::fromLatin1(frame.mid(offset,16).toHex(' ').toUpper()).split(' ');
+            log+=QStringLiteral("%1: %2\n").arg(offset,4,16,QChar('0')).arg(octets.join(' '));
+        }
+        QFile file(temp.filePath("tcp.log"));
+        QVERIFY(file.open(QIODevice::WriteOnly|QIODevice::Text));
+        file.write(log.toUtf8());file.close();
+        QString error;
+        const auto restored=Protocol::fromLog(file.fileName(),"AUTO",&error);
+        QVERIFY2(error.isEmpty(),qPrintable(error));
+        QCOMPARE(restored.size(),1);
+        QCOMPARE(restored[0].satellite,QString("BY04"));
+        QCOMPARE(restored[0].captureLocal,QDateTime::fromString("2026-10-28 12:34:56.789","yyyy-MM-dd HH:mm:ss.zzz"));
+        QCOMPARE(restored[0].quality,QString("structural_only"));
+    }
     void parseKnownStructure() {
         Frame f=Protocol::parse(syntheticFrame(),"ASRTU-1");
         QVERIFY2(f.complete,qPrintable(f.error));
@@ -242,6 +269,20 @@ private slots:
         QCOMPARE(packets[0].data,QByteArray(1,char(0x42)));
         QCOMPARE(packets[0].integrity,QString("not_crc_verified"));
     }
+    void optionalInnerHeaderRetainsOneByteOpaqueSuffix(){
+        QByteArray frame(223,char(0xaa));
+        frame.replace(0,5,QByteArray::fromHex("2054010100"));
+        const QByteArray packet=QByteArray::fromHex("08F0FBA1000042EE");
+        frame[5]=char(0xc0);
+        frame.replace(6,packet.size(),packet);
+        frame[6+packet.size()]=char(0xc0);
+        const auto packets=Transport::reassemble({Protocol::parse(frame,"BY04")});
+        QCOMPARE(packets.size(),1);
+        QCOMPARE(packets[0].classification,QString("ccsds_space_packet_candidate"));
+        QCOMPARE(packets[0].apid,0xf0);
+        QCOMPARE(packets[0].opaqueSuffixBytes,1);
+        QCOMPARE(packets[0].data,QByteArray::fromHex("42"));
+    }
     void all27AsrtuCatalogPacketsLoad(){
         BusinessCatalog catalog;QString error;
         const QString folder=QCoreApplication::applicationDirPath()+"/protocols/asrtu1";
@@ -436,10 +477,12 @@ private slots:
         QCOMPARE(output.size(),1);
         QCOMPARE(output[0].packetName,QString("BY04-CCSDS"));
         QCOMPARE(output[0].identification,QString("by04_ccsds_header_only"));
-        QCOMPARE(output[0].fields.size(),7);
+        QCOMPARE(output[0].fields.size(),8);
         QCOMPARE(output[0].fields[0].value,QString("240"));
         QCOMPARE(output[0].fields[3].value,QString("192"));
         QCOMPARE(output[0].fields[6].status,QString("raw_unverified_business"));
+        QCOMPARE(output[0].fields[7].code,QString("candidate.utc_seconds"));
+        QCOMPARE(output[0].fields[7].status,QString("candidate_unverified"));
         QVERIFY(output[0].packetLabel.contains("BY04"));
     }
     void by04DslwpNativeVcidOneImageWithSourceVerifiedCrc(){

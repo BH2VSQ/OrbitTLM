@@ -34,18 +34,24 @@ if(BUILD_TESTING)
 endif()
 install(TARGETS OrbitTLM OrbitTLM-cli RUNTIME DESTINATION bin BUNDLE DESTINATION .)
 
-# Keep all 27 mission field catalogs available offline, including Windows CI artifacts.
+# Keep offline telemetry catalog and the standalone HTML history template available next to the application.
 foreach(target OrbitTLM OrbitTLM-cli orbit_tests)
   if(TARGET ${target})
     add_custom_command(TARGET ${target} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/protocols/asrtu1"
         "$<TARGET_FILE_DIR:${target}>/protocols/asrtu1"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target}>/web"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/web/index.template.html"
+        "$<TARGET_FILE_DIR:${target}>/web/index.template.html"
       VERBATIM)
   endif()
 endforeach()
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/protocols/asrtu1"
         DESTINATION "bin/protocols")
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/web/index.template.html"
+        DESTINATION "bin/web")
 
 # Public BY04 VC1 DSLWP capture fixture used for decoder regression.
 if(TARGET orbit_tests)

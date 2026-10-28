@@ -1,6 +1,8 @@
 #include "by04.h"
 #include <QSet>
 #include <algorithm>
+#include <bit>
+#include <cmath>
 namespace orbit {
 namespace {
 int u8(const QByteArray &data,int index){return int(quint8(data.at(index)));}
@@ -65,12 +67,53 @@ BusinessPacket By04Decoder::decode(const ApplicationPacket &packet){
                                   std::max(0,packet.opaqueSuffixBytes),1));
     if(!packet.data.isEmpty()){
         const QString preview=QString::fromLatin1(packet.data.left(32).toHex(' ').toUpper());
-        result.fields.push_back({"by04.payload.preview","","业务数据前 32 字节（未定义字段）","","",
+        result.fields.push_back({"by04.payload.preview","",QStringLiteral("业务数据前 32 字节（未定义字段）"),"","",
                                  QString::fromLatin1(packet.data.left(32).toHex().toUpper()),
                                  "",preview,"","raw_unverified_business"});
         result.fields.push_back(field("by04.payload.first_octet",
              QStringLiteral("业务载荷首字节（含义未确认）"),u8(packet.data,0),1,
              "raw_unverified_business"));
+        // In the captured F0/0F packets, bytes 1..4 form a monotonic-looking
+        // 32-bit value consistent with a cumulative-seconds field. Expose it
+        // only as an explicitly unverified candidate until the BY04 field map
+        // and epoch are recovered from the working decoder.
+        if(packet.apid==0x0f0 && packet.data.size()>=5 && u8(packet.data,0)==0x0f){
+            const quint32 seconds=(quint32(u8(packet.data,1))<<24)|
+                (quint32(u8(packet.data,2))<<16)|(quint32(u8(packet.data,3))<<8)|
+                quint32(u8(packet.data,4));
+            const QByteArray raw=packet.data.mid(1,4);
+            result.fields.push_back({"candidate.utc_seconds","1.7.32",
+                QStringLiteral("UTC累计秒候选值（未验证）"),"",
+                QStringLiteral("BE uint32 at payload offset 1; epoch not confirmed"),
+                QString::fromLatin1(raw.toHex().toUpper()),QString::number(seconds),
+                QString::number(seconds),QStringLiteral("s"),QStringLiteral("candidate_unverified")});
+        }
+        // The received BY70-4 APID 0x0F0 samples contain four normalized
+        // float32BE values at this offset. Keep them marked as candidates.
+        if(packet.apid==0x0f0 && packet.data.size()>=156){
+            double q[4]{};double norm=0.0;bool valid=true;
+            for(int i=0;i<4;++i){
+                const int k=140+4*i;
+                const quint32 bits=(quint32(u8(packet.data,k))<<24)|
+                    (quint32(u8(packet.data,k+1))<<16)|
+                    (quint32(u8(packet.data,k+2))<<8)|quint32(u8(packet.data,k+3));
+                const float value=std::bit_cast<float>(bits);
+                if(!std::isfinite(value)){valid=false;break;}
+                q[i]=value;norm+=q[i]*q[i];
+            }
+            if(valid && std::abs(norm-1.0)<=0.001){
+                for(int i=0;i<4;++i){
+                    const QByteArray raw=packet.data.mid(140+4*i,4);
+                    result.fields.push_back({QString("candidate.quaternion.q%1").arg(i),"",
+                        QString("候选四元数 q%1（未验证）").arg(i),"","",
+                        QString::fromLatin1(raw.toHex().toUpper()),QString(),
+                        QString::number(q[i],'g',10),QString(),QStringLiteral("candidate_unverified")});
+                }
+                result.fields.push_back({"candidate.quaternion.norm","",
+                    QStringLiteral("候选四元数模长（未验证）"),"","",QString(),QString(),
+                    QString::number(std::sqrt(norm),'g',10),QString(),QStringLiteral("candidate_unverified")});
+            }
+        }
     }
     return result;
 }

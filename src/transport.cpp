@@ -47,7 +47,7 @@ void recognizeOptionalSpacePacket(ApplicationPacket &packet) {
     const int suffix=b.size()-expected;
     // Application CRC may be appended, but is NOT checked. These are merely
     // candidate layouts, never a claim of checksum validity.
-    if(suffix!=0 && suffix!=2 && suffix!=4)return;
+    if(suffix<0 || suffix>4)return;
     packet.apid=id&0x7ff;
     packet.sequence=seq&0x3fff;
     packet.data=b.mid(6,length);
@@ -62,7 +62,7 @@ QByteArray Transport::frameData(const QByteArray &frame) {
 QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,TransportStats *stats){
     QVector<ApplicationPacket> out;
     TransportStats observed;
-    QHash<int,State> states;
+    QHash<QString,State> states;
     constexpr int MaximumKissPacket=65536;
     // The original recorder clock may be absent for BIN-only frames. A bounded
     // sequence window can be ordered by the TM master counter without inventing time.
@@ -102,7 +102,8 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,Tr
             // DSLWP SSDV image service, NOT KISS. VC0/VC2 may carry KISS.
             if(scid!=0x205 || frame.vcid==1)continue;
         }
-        State &s=states[frame.vcid];
+        const QString stateKey=frame.satellite+QLatin1Char(':')+QString::number(frame.vcid);
+        State &s=states[stateKey];
         // Only the per-VC counter can assess continuity; master count interleaves VCs.
         if(s.haveCount && frame.virtualCount>=0 && ((s.previousCount+1)&0xff)!=frame.virtualCount){
             if(s.started && !s.buffer.isEmpty() && !isPaddingOnly(s.buffer))

@@ -10,6 +10,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QDesktopServices>
+#include <QCoreApplication>
 #include <QUrl>
 #include <QFont>
 #include <QFormLayout>
@@ -66,16 +67,23 @@ QGroupBox *statusCard(const QString &title){
     auto *card=new QGroupBox(title);
     card->setObjectName("statusCard");
     auto *layout=new QVBoxLayout(card);
-    layout->setContentsMargins(10,16,10,8);
-    layout->setSpacing(3);
-    auto *content=new QLabel(QStringLiteral("暂无已识别的遥测参数"),card);
-    content->setObjectName("statusContent");
-    content->setTextFormat(Qt::RichText);
-    content->setAlignment(Qt::AlignTop|Qt::AlignLeft);
-    content->setWordWrap(true);
-    content->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    content->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);
-    layout->addWidget(content);
+    layout->setContentsMargins(5,16,5,5);
+    layout->setSpacing(0);
+    auto *table=new QTableWidget(0,3,card);
+    table->setObjectName("statusTable");
+    table->setHorizontalHeaderLabels({QStringLiteral("参数"),QStringLiteral("当前值"),QStringLiteral("状态")});
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table->setSelectionMode(QAbstractItemView::NoSelection);
+    table->verticalHeader()->hide();
+    table->verticalHeader()->setDefaultSectionSize(20);
+    table->setShowGrid(true);
+    table->setWordWrap(false);
+    table->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    table->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
+    table->horizontalHeader()->setSectionResizeMode(1,QHeaderView::ResizeToContents);
+    table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::Stretch);
+    layout->addWidget(table,1);
     return card;
 }
 void setupTable(QTableWidget *table){
@@ -126,6 +134,7 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
     }
     updatePaths();
     updateMetrics();
+    updateWebHistory();
     showEvent(-1);
     setDiagnosticsVisible(false);
 }
@@ -155,8 +164,8 @@ void MainWindow::applyStyles(){
         QLabel#note {color:#6b7f96; font-size:12px;}
         QTabWidget::pane {background:white; border:1px solid #e1e8f1;
                          border-radius:8px;}
-        QTabBar::tab {background:#edf2f8; border:0; border-radius:6px;
-                      margin-right:4px; padding:10px 14px; min-width:70px;}
+        QTabBar::tab {background:#edf2f8; border:0; border-radius:4px;
+                      margin-right:2px; padding:5px 8px; min-width:48px;}
         QTabBar::tab:selected {background:#dcecff; color:#18558f; font-weight:700;}
         QTabBar::tab:hover {background:#e3effb;}
         QTableWidget,QTreeWidget,QPlainTextEdit {background:white;
@@ -164,14 +173,15 @@ void MainWindow::applyStyles(){
                      border-radius:6px; gridline-color:#edf2f6;}
         QHeaderView::section {background:#f5f8fc; border:none;
                               border-bottom:1px solid #e1e8f1;
-                              color:#56718b; font-weight:600; padding:8px 5px;}
-        QTableWidget::item {padding:6px 4px; border-bottom:1px solid #eff2f7;}
+                              color:#56718b; font-weight:600; padding:3px 4px;}
+        QTableWidget::item {padding:1px 3px; border-bottom:1px solid #eff2f7;}
         QTableWidget::item:selected,QTreeWidget::item:selected {background:#e2f1ff;color:#183c64;}
         QGroupBox#statusCard {background:#ffffff; border:1px solid #e1e8f1;
                              border-radius:9px; margin-top:12px; font-weight:700;}
         QGroupBox#statusCard::title {subcontrol-origin:margin; left:14px;
                                     padding:0 6px;color:#245b8c;}
         QLabel#statusContent {font-weight:400; color:#38516c; line-height:150%; padding:2px;}
+        QScrollArea#statusScroll {background:transparent;}
         QLabel#attitudeModeLabel {font-size:15px; font-weight:700; color:#174f83;
                                   background:#eaf4ff; border:1px solid #cfe4fb;
                                   border-radius:6px; padding:7px 10px;}
@@ -201,19 +211,12 @@ void MainWindow::buildToolbar(){
     bar->addWidget(new QLabel(QStringLiteral("卫星  ")));
     satelliteSelect_=new QComboBox;
     satelliteSelect_->addItem(QStringLiteral("自动识别"),QStringLiteral("AUTO"));
-    satelliteSelect_->addItem("ASRTU-1",QStringLiteral("ASRTU-1"));
+    satelliteSelect_->addItem(QStringLiteral("阿斯图系列 · ASRTU-1"),QStringLiteral("ASRTU-1"));
     satelliteSelect_->addItem(QStringLiteral("八一04星 · BY04"),QStringLiteral("BY04"));
     bar->addWidget(satelliteSelect_);
     auto *import=bar->addAction(QStringLiteral("开始导入"));
     connect(import,&QAction::triggered,this,[this]{importSession();});
     bar->addSeparator();
-    auto *htmlHistory=bar->addAction(QStringLiteral("打开 HTML 历史"));
-    connect(htmlHistory,&QAction::triggered,this,[this]{
-        updateHtmlHistory();
-        const QString path=htmlHistoryPath();
-        if(!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
-            QMessageBox::warning(this,QStringLiteral("打开历史页面失败"),path);
-    });
     auto *exportCsv=bar->addAction(QStringLiteral("导出遥测 CSV"));
     connect(exportCsv,&QAction::triggered,this,[this]{exportEngineering(true);});
     auto *exportQ=bar->addAction(QStringLiteral("导出四元数"));
@@ -231,10 +234,24 @@ void MainWindow::buildToolbar(){
     });
     auto *stop=bar->addAction(QStringLiteral("断开"));
     connect(stop,&QAction::triggered,live_,&orbit::LiveTcp::stop);
+    bar->addSeparator();
+    auto *openWeb=bar->addAction(QStringLiteral("HTML 历史"));
+    connect(openWeb,&QAction::triggered,this,[this]{
+        updateWebHistory();
+        const QString path=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data/index.html"));
+        if(!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
+            QMessageBox::warning(this,QStringLiteral("打开 HTML 历史失败"),path);
+    });
 }
 void MainWindow::buildMenus(){
     auto *file=menuBar()->addMenu(QStringLiteral("文件(&F)"));
     file->addAction(QStringLiteral("打开 SQLite 历史会话"),[this]{loadHistory();});
+    file->addAction(QStringLiteral("打开 HTML 遥测历史"),[this]{
+        updateWebHistory();
+        const QString path=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data/index.html"));
+        if(!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
+            QMessageBox::warning(this,QStringLiteral("打开 HTML 历史失败"),path);
+    });
     file->addSeparator();
     file->addAction(QStringLiteral("导出传输帧 CSV"),[this]{exportFrames(true);});
     file->addAction(QStringLiteral("导出传输帧 JSON"),[this]{exportFrames(false);});
@@ -250,7 +267,7 @@ void MainWindow::buildMenus(){
         if(p.isEmpty())return;
         orbit::Schema candidate;QString error;
         if(!candidate.load(p,&error)){QMessageBox::warning(this,QStringLiteral("字段规则错误"),error);return;}
-        if(candidate.satellite()!=satellite()){
+        if(candidate.satellite()!=resolvedSatellite()){
             QMessageBox::warning(this,QStringLiteral("卫星不匹配"),QStringLiteral("该规则属于另一颗卫星"));return;
         }
         customSchema_=candidate;hasCustomSchema_=true;
@@ -360,48 +377,47 @@ void MainWindow::buildWorkspace(){
     statusBar()->showMessage(QStringLiteral("就绪 · 传输帧 FEC 证据与应用层 CRC 状态独立显示"));
 }
 void MainWindow::buildOverview(QTabWidget *tabs){
-    auto *page=new QWidget;auto *layout=new QVBoxLayout(page);
-    layout->setContentsMargins(12,13,12,13);layout->setSpacing(10);
-    auto *metrics=new QWidget;auto *grid=new QGridLayout(metrics);
-    grid->setContentsMargins(0,0,0,0);grid->setSpacing(8);
-    grid->addWidget(metricCard(QStringLiteral("时间范围"),timeMetric_),0,0);
-    grid->addWidget(metricCard(QStringLiteral("去重传输帧"),frameMetric_),0,1);
-    grid->addWidget(metricCard(QStringLiteral("已识别业务包"),recognizedMetric_),0,2);
-    grid->addWidget(metricCard(QStringLiteral("未识别业务包"),unknownMetric_),1,0);
-    grid->addWidget(metricCard(QStringLiteral("SSDV 候选分片"),imageMetric_),1,1);
-    grid->addWidget(metricCard(QStringLiteral("重组状态"),transportMetric_),1,2);
-    layout->addWidget(metrics);
+    auto *page=new QWidget;
+    auto *layout=new QVBoxLayout(page);
+    layout->setContentsMargins(5,5,5,5);
+    layout->setSpacing(4);
+
     auto *hero=new QFrame;hero->setObjectName("heroCard");
-    auto *heroLayout=new QVBoxLayout(hero);
-    heroLayout->setContentsMargins(18,13,18,13);
-    currentTitle_=new QLabel(QStringLiteral("尚未载入遥测会话"));
+    auto *heroLayout=new QHBoxLayout(hero);
+    heroLayout->setContentsMargins(8,5,8,5);
+    heroLayout->setSpacing(8);
+    currentTitle_=new QLabel(QStringLiteral("当前数据包：未解析"));
     currentTitle_->setObjectName("currentHeading");
-    heroLayout->addWidget(currentTitle_);
-    attitudeModeLabel_=new QLabel(QStringLiteral("当前姿态模式：等待遥测"));
+    currentTitle_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    heroLayout->addWidget(currentTitle_,1);
+    attitudeModeLabel_=new QLabel(QStringLiteral("UTC累计秒：未解析"));
     attitudeModeLabel_->setObjectName("attitudeModeLabel");
-    attitudeModeLabel_->setWordWrap(true);
+    attitudeModeLabel_->setMinimumWidth(220);
+    attitudeModeLabel_->setAlignment(Qt::AlignRight|Qt::AlignVCenter);
     attitudeModeLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     heroLayout->addWidget(attitudeModeLabel_);
-    currentMeta_=subtitle(QStringLiteral("导入 decoder.log 与 223 字节 BIN，开始时间轴回放"));
-    heroLayout->addWidget(currentMeta_);
-    integrityLabel_=subtitle(QStringLiteral("没有载入数据；不会推断星载 UTC"));
-    heroLayout->addWidget(integrityLabel_);
-    layout->addWidget(hero);
+    layout->addWidget(hero,0);
+
     auto *cards=new QWidget;
     auto *cardsLayout=new QGridLayout(cards);
     cardsLayout->setContentsMargins(0,0,0,0);
-    cardsLayout->setHorizontalSpacing(9);cardsLayout->setVerticalSpacing(9);
-    powerCard_=statusCard(QStringLiteral("电源与配电"));
-    attitudeCard_=statusCard(QStringLiteral("姿态与轨道"));
-    thermalCard_=statusCard(QStringLiteral("热控与温度"));
-    payloadCard_=statusCard(QStringLiteral("载荷与通信"));
+    cardsLayout->setHorizontalSpacing(4);cardsLayout->setVerticalSpacing(4);
+    powerCard_=statusCard(QStringLiteral("总线电压与电流"));
+    attitudeCard_=statusCard(QStringLiteral("UTC、姿态四元数、GPS速度与轨道参数"));
+    thermalCard_=statusCard(QStringLiteral("各总线与部件温度"));
+    payloadCard_=statusCard(QStringLiteral("部件开关状态"));
+    for(auto *card:{powerCard_,attitudeCard_,thermalCard_,payloadCard_})
+        overviewTables_.insert(card,card->findChild<QTableWidget*>("statusTable"));
     cardsLayout->addWidget(powerCard_,0,0);
     cardsLayout->addWidget(attitudeCard_,0,1);
     cardsLayout->addWidget(thermalCard_,1,0);
     cardsLayout->addWidget(payloadCard_,1,1);
+    cardsLayout->setRowStretch(0,1);cardsLayout->setRowStretch(1,1);
+    cardsLayout->setColumnStretch(0,1);cardsLayout->setColumnStretch(1,1);
     layout->addWidget(cards,1);
     tabs->addTab(page,QStringLiteral("总览"));
 }
+
 void MainWindow::buildEngineering(QTabWidget *tabs){
     auto *page=new QWidget;auto *layout=new QVBoxLayout(page);
     engineeringSummary_=subtitle(QStringLiteral("选择一条已识别的业务包，查看分系统字段与工程量"));
@@ -470,6 +486,54 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
         }
     });
     tabs->addTab(page,QStringLiteral("业务遥测"));
+    buildComponentTabs(tabs);
+}
+void MainWindow::buildComponentTabs(QTabWidget *tabs){
+    auto *page=new QWidget;
+    auto *layout=new QVBoxLayout(page);
+    layout->setContentsMargins(4,4,4,4);layout->setSpacing(3);
+    auto *parts=new QTabWidget(page);
+    parts->setDocumentMode(true);
+    struct Spec { QString title; QStringList prefixes; QStringList keywords; };
+    const QVector<Spec> specs={
+        {QStringLiteral("全部字段"),{},{}},
+        {QStringLiteral("卫星平台"),{"SAT"},{ }},
+        {QStringLiteral("电源配电"),{"PDB"},{QStringLiteral("母线"),QStringLiteral("总线"),QStringLiteral("电压"),QStringLiteral("电流"),QStringLiteral("配电"),QStringLiteral("电源")}},
+        {QStringLiteral("姿态与轨控"),{"ZGK","SAT-S3"},{QStringLiteral("姿态"),QStringLiteral("四元数"),QStringLiteral("轨道"),QStringLiteral("半长轴"),QStringLiteral("偏心率"),QStringLiteral("升交点赤经"),QStringLiteral("近地点角距"),QStringLiteral("倾角"),QStringLiteral("GPS速度")}},
+        {QStringLiteral("热控温度"),{"TCB"},{QStringLiteral("温度"),QStringLiteral("热控"),QStringLiteral("热敏"),QStringLiteral("加热带")}},
+        {QStringLiteral("GNSS"),{"GPS"},{QStringLiteral("GNSS"),QStringLiteral("GPS")}},
+        {QStringLiteral("数传通道"),{}, {QStringLiteral("数传通道")}},
+        {QStringLiteral("数传基带"),{"BBB"},{QStringLiteral("数传基带"),QStringLiteral("基带")}},
+        {QStringLiteral("太阳敏感器"),{}, {QStringLiteral("太阳敏感器")}},
+        {QStringLiteral("CMOS相机"),{"CMS"},{QStringLiteral("CMOS")}},
+        {QStringLiteral("高分相机"),{"CAM"},{QStringLiteral("高分相机")}},
+        {QStringLiteral("光纤陀螺"),{}, {QStringLiteral("光纤陀螺")}},
+        {QStringLiteral("MEMS惯组"),{}, {QStringLiteral("MEMS")}},
+        {QStringLiteral("磁强计"),{}, {QStringLiteral("磁强计")}},
+        {QStringLiteral("星敏感器Y"),{"SSY"},{QStringLiteral("星敏Y"),QStringLiteral("星敏感器Y")}},
+        {QStringLiteral("星敏感器Z"),{"SSZ"},{QStringLiteral("星敏Z"),QStringLiteral("星敏感器Z")}}
+    };
+    for(const auto &spec:specs){
+        auto *table=new QTableWidget(0,6,parts);
+        table->setObjectName("componentTable");
+        table->setHorizontalHeaderLabels({QStringLiteral("数据包"),QStringLiteral("字段"),QStringLiteral("当前值"),
+                                          QStringLiteral("单位"),QStringLiteral("接收时间"),QStringLiteral("解析状态")});
+        setupTable(table);
+        table->verticalHeader()->setDefaultSectionSize(20);
+        table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+        table->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
+        table->horizontalHeader()->setSectionResizeMode(1,QHeaderView::ResizeToContents);
+        table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::ResizeToContents);
+        table->horizontalHeader()->setSectionResizeMode(3,QHeaderView::ResizeToContents);
+        table->horizontalHeader()->setSectionResizeMode(4,QHeaderView::ResizeToContents);
+        table->horizontalHeader()->setSectionResizeMode(5,QHeaderView::Stretch);
+        parts->addTab(table,spec.title);
+        componentTables_.insert(spec.title,table);
+        componentPrefixes_.insert(spec.title,spec.prefixes);
+        componentKeywords_.insert(spec.title,spec.keywords);
+    }
+    layout->addWidget(parts,1);
+    tabs->addTab(page,QStringLiteral("分系统数据"));
 }
 void MainWindow::buildAttitude(QTabWidget *tabs){
     auto *page=new QWidget;auto *layout=new QVBoxLayout(page);

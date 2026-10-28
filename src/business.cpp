@@ -203,6 +203,24 @@ QVector<QPair<int,int>> BusinessCatalog::packetTypeIds()const{
     for(const auto &packet:kinds_)ids.push_back({packet.main,packet.sub});
     return ids;
 }
+QVector<BusinessPacket> BusinessCatalog::definitionPackets()const{
+    QVector<BusinessPacket> result;
+    result.reserve(kinds_.size());
+    for(auto it=kinds_.cbegin();it!=kinds_.cend();++it){
+        const Kind &kind=it.value();
+        BusinessPacket packet;
+        packet.packetName=kind.name;packet.packetLabel=kind.name;
+        packet.mainType=kind.main;packet.subType=kind.sub;
+        packet.identification=QStringLiteral("catalog_definition");
+        packet.fields.reserve(kind.fields.size());
+        for(const Definition &d:kind.fields){
+            packet.fields.push_back({d.code,d.bits,d.nameCn,d.nameEn,d.formula,
+                                     {},{},{},{},QStringLiteral("catalog_definition")});
+        }
+        result.push_back(std::move(packet));
+    }
+    return result;
+}
 int BusinessCatalog::fieldDefinitions()const{
     int total=0;for(const auto &k:kinds_)total+=k.fields.size();return total;
 }
@@ -221,7 +239,18 @@ BusinessPacket BusinessCatalog::decode(const ApplicationPacket &packet)const{
     if(native!=kinds_.constEnd()){
         kind=&native.value();payload=bytes;
         out.identification="native_type_prefix";
-    }else if(bytes.size()>8){
+    }else if(packet.classification=="ccsds_space_packet_candidate" &&
+             packet.apid>=0 && !packet.data.isEmpty()){
+        // ASRTU-compatible receivers wrap the subsystem ID in a CCSDS APID
+        // and put the subtype in the first user-data octet. Field bit offsets
+        // start after that subtype byte, matching the legacy soundmodem decoder.
+        const auto ccsdsKind=kinds_.constFind(key(packet.apid,at(packet.data,0)));
+        if(ccsdsKind!=kinds_.constEnd()){
+            kind=&ccsdsKind.value();payload=packet.data.mid(1);
+            out.identification="ccsds_apid_subtype";
+        }
+    }
+    if(!kind && bytes.size()>8){
         const auto legacy=kinds_.constFind(key(at(bytes,1),at(bytes,6)));
         if(legacy!=kinds_.constEnd()){
             kind=&legacy.value();payload=bytes.mid(7);

@@ -1,5 +1,7 @@
 #include "core.h"
 #include <QCryptographicHash>
+#include <QCoreApplication>
+#include <QDir>
 #include <QFile>
 #include <QHash>
 #include <QJsonArray>
@@ -75,6 +77,9 @@ Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
     f.quality="structural_only";
     f.error="TM frame accepted; application CRC and RS parity not verified here";
     const int scid=((first&0x3f)<<4)|(second>>4);
+    if(satellite=="AUTO")
+        f.satellite=(scid==0x205?QStringLiteral("BY04"):QStringLiteral("ASRTU-1"));
+    const QString effectiveSatellite=f.satellite;
     f.fields.push_back({"tm.spacecraft_id",QString::number(scid),"","verified_protocol"});
     f.fields.push_back({"tm.vcid",QString::number(f.vcid),"","verified_protocol"});
     f.fields.push_back({"tm.first_header_pointer",QString::number(byte(raw,4)),"","verified_protocol"});
@@ -86,7 +91,7 @@ Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
     f.payload=zone;
     // BY04 VC1 is a binary DSLWP SSDV stream; arbitrary 0xC0 bytes
     // inside compressed image data must never be treated as KISS delimiters.
-    if(satellite=="BY04" && f.vcid==1)return f;
+    if(effectiveSatellite=="BY04" && f.vcid==1)return f;
     const int open=zone.indexOf(char(0xc0));
     if(open<0)return f;
     const int close=zone.indexOf(char(0xc0),open+1);
@@ -97,10 +102,14 @@ Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
     const int header=(byte(packet,0)<<8)|byte(packet,1);
     const int seq=(byte(packet,2)<<8)|byte(packet,3);
     const int length=1+(byte(packet,4)<<8)+byte(packet,5);
-    if((header>>13)!=0 || length+6!=packet.size())return f;
+    const int suffix=packet.size()-(length+6);
+    // Receiver packets may append an opaque 2-byte or 4-byte trailer. Keep
+    // the bounded CCSDS payload and preserve the trailer in frame bytes.
+    if((header>>13)!=0 || length<1 ||
+       (suffix<0 || suffix>4))return f;
     f.apid=header&0x7ff;
     f.sequence=seq&0x3fff;
-    f.payload=packet.mid(6);
+    f.payload=packet.mid(6,length);
     f.fields.push_back({"candidate.ccsds.apid",QString::number(f.apid),"","header_candidate"});
     f.fields.push_back({"candidate.ccsds.sequence",QString::number(f.sequence),"","header_candidate"});
     candidateQuaternion(f); // experimental offset within *candidate* inner payload
@@ -112,16 +121,16 @@ QVector<Frame> Protocol::fromLog(const QString &path,const QString &satellite,QS
         if(error)*error=file.errorString();return {};
     }
     const QRegularExpression tag(
-        R"(^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+) FEC frame #\d+ \[([^\]]+)\])");
+        R"(^([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.\d+) (FEC frame|TCP frame) #\d+ \[([^\]]+)\])");
     const QRegularExpression row(R"(^[0-9A-Fa-f]{4}:\s+((?:[0-9A-Fa-f]{2}\s*){1,16})$)");
-    QVector<Frame> records;QByteArray buffer;QString when,route;bool active=false;
+    QVector<Frame> records;QByteArray buffer;QString when,route;bool active=false,hasFecEvidence=false;
     auto flush=[&]{
         if(buffer.isEmpty())return;
         Frame f=parse(buffer,satellite);
         f.sources.push_back("log:"+route);
         f.captureLocal=QDateTime::fromString(when,"yyyy-MM-dd HH:mm:ss.zzz");
         f.timeBasis="logger_local_unverified";
-        if(f.complete)f.quality="log_fec_reported";
+        if(f.complete && hasFecEvidence)f.quality="log_fec_reported";
         records.push_back(std::move(f));buffer.clear();
     };
     QTextStream in(&file);
@@ -129,7 +138,9 @@ QVector<Frame> Protocol::fromLog(const QString &path,const QString &satellite,QS
         const QString line=in.readLine().trimmed();
         const auto hdr=tag.match(line);
         if(hdr.hasMatch()){
-            flush();active=true;when=hdr.captured(1);route=hdr.captured(2);continue;
+            flush();active=true;when=hdr.captured(1);
+            hasFecEvidence=hdr.captured(2)==QStringLiteral("FEC frame");
+            route=hdr.captured(3);continue;
         }
         if(!active)continue;
         const auto hexRow=row.match(line);
@@ -363,17 +374,80 @@ LiveTcp::LiveTcp(QObject *parent):QObject(parent){
         while(queued_.size()>=223){
             const QByteArray bytes=queued_.left(223);queued_.remove(0,223);
             Frame frame=Protocol::parse(bytes,satellite_);
-            frame.sources<<"live:tcp";frame.captureLocal=QDateTime::currentDateTime();
+            frame.sources<<"live:tcp";
+            frame.captureLocal=QDateTime::currentDateTime();
             frame.timeBasis="receiver_local";
+            if(!archiveBin_.isOpen())openArchive(frame.satellite);
+            if(archiveBin_.isOpen()){
+                archiveBin_.write(bytes);
+                archiveBin_.flush();
+            }
+            if(archiveLog_.isOpen()){
+                QString text=frame.captureLocal.toString("yyyy-MM-dd HH:mm:ss.zzz")+
+                    QStringLiteral(" TCP frame #%1 [tcp]\n").arg(++archivedFrames_);
+                text+=QStringLiteral("pdu length = 223 bytes\npdu vector contents =\n");
+                for(int offset=0;offset<bytes.size();offset+=16){
+                    QStringList octets;
+                    for(int j=offset;j<qMin(offset+16,bytes.size());++j)
+                        octets<<QStringLiteral("%1").arg(quint8(bytes.at(j)),2,16,QChar('0')).toUpper();
+                    text+=QStringLiteral("%1: %2\n").arg(offset,4,16,QChar('0')).arg(octets.join(' '));
+                }
+                text+=QLatin1Char('\n');
+                archiveLog_.write(text.toUtf8());
+                archiveLog_.flush();
+            }
             emit received(frame);
         }
     });
-    connect(&socket_,&QTcpSocket::connected,this,[this]{emit status("Connected");});
-    connect(&socket_,&QTcpSocket::disconnected,this,[this]{emit status("Disconnected");});
+    connect(&socket_,&QTcpSocket::connected,this,[this]{
+        connectionTime_=QDateTime::currentDateTime();
+        archivedFrames_=0;
+        if(satellite_!="AUTO")openArchive(satellite_);
+        emit status(QStringLiteral("Connected")+
+            (archiveStem_.isEmpty()?QString():QStringLiteral("，记录文件 data/%1.log 与 data/%1.bin").arg(archiveStem_)));
+    });
+    connect(&socket_,&QTcpSocket::disconnected,this,[this]{closeArchive();emit status("Disconnected");});
     connect(&socket_,&QTcpSocket::errorOccurred,this,[this](auto){emit status(socket_.errorString());});
 }
+void LiveTcp::openArchive(const QString &satellite){
+    if(archiveLog_.isOpen()||archiveBin_.isOpen())return;
+    if(!connectionTime_.isValid())connectionTime_=QDateTime::currentDateTime();
+    const QString safeSat=satellite.isEmpty()?QStringLiteral("UNKNOWN"):satellite;
+    const QString stamp=connectionTime_.toString("yyyyMMdd_HHmmss_zzz");
+    archiveStem_=stamp+QLatin1Char('_')+safeSat;
+    const QString directory=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+    if(!QDir().mkpath(directory)){archiveStem_.clear();emit status(QStringLiteral("无法创建 data 记录目录"));return;}
+    const QString baseStem=archiveStem_;
+    int suffix=1;
+    while(QFile::exists(QDir(directory).filePath(archiveStem_+QStringLiteral(".log"))) ||
+          QFile::exists(QDir(directory).filePath(archiveStem_+QStringLiteral(".bin")))){
+        archiveStem_=baseStem+QStringLiteral("_%1").arg(suffix++);
+    }
+    archiveLog_.setFileName(QDir(directory).filePath(archiveStem_+QStringLiteral(".log")));
+    archiveBin_.setFileName(QDir(directory).filePath(archiveStem_+QStringLiteral(".bin")));
+    const QString logPath=QDir(directory).filePath(archiveStem_+QStringLiteral(".log"));
+    const QString binPath=QDir(directory).filePath(archiveStem_+QStringLiteral(".bin"));
+    const bool logOk=archiveLog_.open(QIODevice::WriteOnly|QIODevice::NewOnly);
+    const bool binOk=logOk && archiveBin_.open(QIODevice::WriteOnly|QIODevice::NewOnly);
+    if(!logOk||!binOk){
+        const QString reason=!logOk?archiveLog_.errorString():archiveBin_.errorString();
+        closeArchive();
+        // Remove only files created by this attempt. NewOnly may fail because
+        // another process already owns the candidate path.
+        if(logOk)QFile::remove(logPath);
+        if(binOk)QFile::remove(binPath);
+        archiveStem_.clear();
+        emit status(QStringLiteral("TCP 已连接，但创建自动记录文件失败：")+reason);return;
+    }
+    emit status(QStringLiteral("开始自动记录：data/%1.log 与 data/%1.bin").arg(archiveStem_));
+}
+void LiveTcp::closeArchive(){
+    if(archiveLog_.isOpen()){archiveLog_.flush();archiveLog_.close();}
+    if(archiveBin_.isOpen()){archiveBin_.flush();archiveBin_.close();}
+}
 void LiveTcp::start(const QString &host,quint16 port,const QString &satellite){
+    closeArchive();archiveStem_.clear();connectionTime_={};archivedFrames_=0;
     socket_.abort();queued_.clear();satellite_=satellite;socket_.connectToHost(host,port);
 }
-void LiveTcp::stop(){socket_.disconnectFromHost();queued_.clear();}
+void LiveTcp::stop(){socket_.disconnectFromHost();closeArchive();queued_.clear();}
 }
