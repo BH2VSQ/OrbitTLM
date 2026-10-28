@@ -24,9 +24,10 @@ private slots:
         QVERIFY(tabs->count()>=6);
         QCOMPARE(tabs->tabText(0),QStringLiteral("总览"));
         QCOMPARE(tabs->tabText(1),QStringLiteral("业务遥测"));
-        QCOMPARE(tabs->tabText(2),QStringLiteral("姿态与轨道"));
-        QCOMPARE(tabs->tabText(3),QStringLiteral("图像数据"));
-        QCOMPARE(tabs->tabText(4),QStringLiteral("原始数据"));
+        QCOMPARE(tabs->tabText(2),QStringLiteral("分系统数据"));
+        QCOMPARE(tabs->tabText(3),QStringLiteral("姿态与轨道"));
+        QCOMPARE(tabs->tabText(4),QStringLiteral("图像数据"));
+        QCOMPARE(tabs->tabText(5),QStringLiteral("原始数据"));
         QVERIFY(!tabs->isTabVisible(tabs->count()-1));
         const auto *event=window.findChild<QTableWidget*>("eventTimeline");
         QVERIFY(event!=nullptr);
@@ -36,7 +37,7 @@ private slots:
         QVERIFY(event->rowCount()==0);
         const auto *overview=window.findChild<QLabel*>("currentHeading");
         QVERIFY(overview!=nullptr);
-        QVERIFY(overview->text().contains(QStringLiteral("尚未")));
+        QVERIFY(overview->text().contains(QStringLiteral("未解析")));
     }
     void switchingTabsWithEmptyDataDoesNotCrash() {
         MainWindow window;

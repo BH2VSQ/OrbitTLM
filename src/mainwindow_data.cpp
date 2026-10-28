@@ -341,19 +341,25 @@ void MainWindow::updateMetrics(){
         if(!earliest.isValid()||f.captureLocal<earliest)earliest=f.captureLocal;
         if(!latest.isValid()||f.captureLocal>latest)latest=f.captureLocal;
     }
-    if(earliest.isValid()){
-        timeMetric_->setText(earliest.date()==latest.date()?
-            earliest.toString("HH:mm")+" — "+latest.toString("HH:mm"):
-            earliest.toString("MM-dd HH:mm")+"—"+latest.toString("MM-dd HH:mm"));
-    }else timeMetric_->setText(QStringLiteral("未记录"));
-    frameMetric_->setText(QString::number(frames_.size()));
+    // The compact UI no longer creates the legacy metric-card labels. Keep
+    // their updates optional so startup and live refreshes do not dereference
+    // null QLabel pointers when those cards are absent.
+    if(timeMetric_){
+        if(earliest.isValid()){
+            timeMetric_->setText(earliest.date()==latest.date()?
+                earliest.toString("HH:mm")+" — "+latest.toString("HH:mm"):
+                earliest.toString("MM-dd HH:mm")+"—"+latest.toString("MM-dd HH:mm"));
+        }else timeMetric_->setText(QStringLiteral("未记录"));
+    }
+    if(frameMetric_)frameMetric_->setText(QString::number(frames_.size()));
     int good=0;
     for(const auto &p:business_)
         if(!p.packetName.isEmpty())++good;
     const bool by04=resolvedSatellite()==QStringLiteral("BY04");
-    recognizedOnly_->setText(QStringLiteral("仅显示已识别数据"));
+    if(recognizedOnly_)recognizedOnly_->setText(QStringLiteral("仅显示已识别数据"));
     auto label=[](QLabel *value){
-        return value->parentWidget()->findChild<QLabel*>("subtitle");
+        return value&&value->parentWidget()?
+            value->parentWidget()->findChild<QLabel*>("subtitle"):nullptr;
     };
     if(auto *caption=label(recognizedMetric_))
         caption->setText(by04?QStringLiteral("已解析 CCSDS 包头"):
@@ -361,10 +367,10 @@ void MainWindow::updateMetrics(){
     if(auto *caption=label(unknownMetric_))
         caption->setText(by04?QStringLiteral("未分类 KISS 业务包"):
                              QStringLiteral("未识别业务包"));
-    recognizedMetric_->setText(QString::number(good));
-    unknownMetric_->setText(QString::number(business_.size()-good));
-    imageMetric_->setText(QString::number(images_.size()));
-    transportMetric_->setText(QStringLiteral("%1 包").arg(packets_.size()));
+    if(recognizedMetric_)recognizedMetric_->setText(QString::number(good));
+    if(unknownMetric_)unknownMetric_->setText(QString::number(business_.size()-good));
+    if(imageMetric_)imageMetric_->setText(QString::number(images_.size()));
+    if(transportMetric_)transportMetric_->setText(QStringLiteral("%1 包").arg(packets_.size()));
     message_->setText(by04?
         QStringLiteral("BY04 · 应用包 %1 · 已匹配字段表 %2 · VC1 SSDV %3")
             .arg(packets_.size()).arg(good).arg(images_.size()):
