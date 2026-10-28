@@ -1,11 +1,111 @@
 #pragma once
 #include <QPainter>
+#include <QFontMetrics>
+#include <QResizeEvent>
+#include <QTabBar>
+#include <QTabWidget>
+#include <QVector>
 #include <QPixmap>
 #include <QQuaternion>
 #include <QVector3D>
 #include <QWidget>
 #include <algorithm>
 #include <cmath>
+class AutoWrapTabBar final : public QTabBar {
+public:
+    using QTabBar::QTabBar;
+
+    void refreshWrapping(){applyWrapping();}
+    void setOriginalText(int index,const QString &text){
+        if(index<0||index>=count())return;
+        while(originalTexts_.size()<count())originalTexts_.push_back(QTabBar::tabText(originalTexts_.size()));
+        originalTexts_[index]=text;
+        updating_=true;
+        QTabBar::setTabText(index,text);
+        updating_=false;
+        applyWrapping();
+    }
+
+protected:
+    void tabInserted(int index) override {
+        QTabBar::tabInserted(index);
+        originalTexts_.insert(qBound(0,index,originalTexts_.size()),QTabBar::tabText(index));
+        applyWrapping();
+    }
+    void tabRemoved(int index) override {
+        QTabBar::tabRemoved(index);
+        if(index>=0&&index<originalTexts_.size())originalTexts_.removeAt(index);
+        applyWrapping();
+    }
+    void resizeEvent(QResizeEvent *event) override {
+        QTabBar::resizeEvent(event);
+        applyWrapping();
+    }
+
+private:
+    QVector<QString> originalTexts_;
+    bool updating_=false;
+
+    static QString wrapText(const QString &text){
+        if(text.contains(QLatin1Char('\n')))return text;
+        // Keep common Latin acronyms together, then wrap their Chinese suffix.
+        int latinPrefix=0;
+        while(latinPrefix<text.size()&&text.at(latinPrefix).isLetterOrNumber()&&
+              text.at(latinPrefix).unicode()<128)++latinPrefix;
+        if(latinPrefix>=3&&latinPrefix<text.size())
+            return text.left(latinPrefix)+QLatin1Char('\n')+text.mid(latinPrefix);
+        const int split=qBound(1,text.size()/2,text.size()-1);
+        return text.left(split)+QLatin1Char('\n')+text.mid(split);
+    }
+    void applyWrapping(){
+        if(updating_||count()==0||width()<80)return;
+        while(originalTexts_.size()<count())originalTexts_.push_back(QTabBar::tabText(originalTexts_.size()));
+        while(originalTexts_.size()>count())originalTexts_.removeLast();
+        const QFontMetrics metrics(font());
+        auto tabWidth=[&](const QString &text){
+            int widest=0;
+            for(const QString &line:text.split(QLatin1Char('\n')))
+                widest=qMax(widest,metrics.horizontalAdvance(line));
+            return widest+22;
+        };
+        QVector<QString> display=originalTexts_;
+        int total=0;
+        for(const auto &text:display)total+=tabWidth(text);
+        if(total>width()){
+            QVector<int> candidates;
+            for(int i=0;i<display.size();++i)
+                if(display[i].size()>=5)candidates.push_back(i);
+            std::sort(candidates.begin(),candidates.end(),[&](int a,int b){
+                return metrics.horizontalAdvance(display[a])>metrics.horizontalAdvance(display[b]);
+            });
+            for(int i:candidates){
+                if(total<=width())break;
+                display[i]=wrapText(originalTexts_[i]);
+                total=0;
+                for(const auto &text:display)total+=tabWidth(text);
+            }
+        }
+        updating_=true;
+        for(int i=0;i<count();++i)
+            if(QTabBar::tabText(i)!=display[i])QTabBar::setTabText(i,display[i]);
+        updating_=false;
+    }
+};
+
+class AutoWrapTabWidget final : public QTabWidget {
+public:
+    explicit AutoWrapTabWidget(QWidget *parent=nullptr):QTabWidget(parent){
+        wrappingBar_=new AutoWrapTabBar(this);
+        wrappingBar_->setElideMode(Qt::ElideNone);
+        wrappingBar_->setExpanding(false);
+        setTabBar(wrappingBar_);
+    }
+    void refreshTabWrapping(){wrappingBar_->refreshWrapping();}
+    void setWrappedTabText(int index,const QString &text){wrappingBar_->setOriginalText(index,text);}
+private:
+    AutoWrapTabBar *wrappingBar_=nullptr;
+};
+
 class AttitudeWidget final : public QWidget {
 public:
     explicit AttitudeWidget(QWidget *parent=nullptr):QWidget(parent){setMinimumSize(220,210);}

@@ -78,6 +78,10 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
         decoded.error=QStringLiteral("所选图像没有可用的 SSDV 分片，或分片长度与解码模式不匹配。");
         return decoded;
     }
+    if(ordered.find(0)==ordered.end()){
+        decoded.error=QStringLiteral("缺少 SSDV 首包（序号 0），无法初始化 JPEG 头。请导入更完整的 log 或 BIN 记录。");
+        return decoded;
+    }
     decoded.receivedPackets=int(ordered.size());
     for(const auto &entry:ordered){
         const auto &packet=entry.second;
@@ -105,6 +109,10 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
         for(const auto &entry:ordered){
             const auto *bytes=reinterpret_cast<const std::uint8_t*>(entry.second.bytes.constData());
             const char result=ssdv_dec_feed(&decoder,bytes,mode);
+            if(result==SSDV_BUFFER_FULL){
+                decoded.error=QStringLiteral("SSDV JPEG 输出缓冲区已满。");
+                return decoded;
+            }
             if(result!=SSDV_FEED_ME&&result!=SSDV_OK){
                 rejectedId=entry.first;
                 break;
@@ -112,6 +120,7 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
             ssdv_packet_info_t info{};
             ssdv_dec_header(&info,bytes,mode);
             decoded.complete=decoded.complete||info.eoi!=0;
+            if(result==SSDV_OK)break;
         }
         if(rejectedId>=0){
             ordered.erase(rejectedId);

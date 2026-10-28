@@ -451,6 +451,14 @@ private slots:
         QByteArray vc1(223,char(0));vc1[0]=char(0x20);vc1[1]=char(0x52);
         vc1[2]=char(1);vc1[3]=char(1);
         QByteArray vc2=vc1;vc2[1]=char(0x54);
+        QCOMPARE(canonicalSatelliteName(QStringLiteral("BY70-4")),QStringLiteral("BY04"));
+        QCOMPARE(canonicalSatelliteName(QStringLiteral("BY-04")),QStringLiteral("BY04"));
+        QCOMPARE(canonicalSatelliteName(QStringLiteral("BY04uv")),QStringLiteral("BY04"));
+        QCOMPARE(canonicalSatelliteName(QStringLiteral("ASRTU1")),QStringLiteral("ASRTU-1"));
+        const Frame aliasFrame=Protocol::parse(vc1,QStringLiteral("BY70-4"));
+        QCOMPARE(aliasFrame.satellite,QStringLiteral("BY04"));
+        const Frame knownId=Protocol::parse(vc1,QStringLiteral("ASRTU-1"));
+        QCOMPARE(knownId.satellite,QStringLiteral("BY04"));
         Frame f1=Protocol::parse(vc1,"BY04");
         Frame f2=Protocol::parse(vc2,"BY04");
         QCOMPARE(By04Decoder::spacecraftId(vc1),0x205);

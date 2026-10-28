@@ -1,10 +1,14 @@
 #include "by04.h"
+extern "C" {
+#include <third_party/ssdv_dslwp/ssdv.h>
+}
 #include <QSet>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QResource>
 #include <algorithm>
+#include <cstdint>
 #include <bit>
 #include <cmath>
 // Keep Qt resource registration outside namespace orbit for static linking.
@@ -21,9 +25,10 @@ EngineeringField field(const QString &code,const QString &name,
     return {code,"",name,"","",raw,QString::number(value),
             QString::number(value),"",status};
 }
-quint32 crc32Dslwp(const QByteArray &frame) {
-    // Applies ONLY to 218-byte VC1 DSLWP SSDV image packets.
-    quint32 crc=0x4EE4FDE1u;
+quint32 crc32Ssdv(const QByteArray &frame,quint32 initial) {
+    // DSLWP and JAMX use the same 218-byte image packet format with different CRC seeds.
+    if(frame.size()!=218)return 0;
+    quint32 crc=initial;
     for(int i=0;i<214;++i){
         quint32 part=(crc ^ quint8(frame.at(i)))&0xffu;
         for(int bit=0;bit<8;++bit)
@@ -48,7 +53,7 @@ const QVector<QJsonObject> &by04Catalog(){
     return catalog;
 }
 bool decodeBusiness(const ApplicationPacket &packet,BusinessPacket &result){
-    if(packet.satellite!="BY04")return false;
+    if(canonicalSatelliteName(packet.satellite)!=QStringLiteral("BY04"))return false;
     const QByteArray &bytes=packet.assembledBytes.isEmpty()?packet.bytes:packet.assembledBytes;
     if(bytes.size()<7||(u8(bytes,2)>>6)!=3)return false;
     const int identity=(u8(bytes,0)<<8)|u8(bytes,1);
@@ -90,6 +95,7 @@ int By04Decoder::spacecraftId(const QByteArray &tm){
 BusinessPacket By04Decoder::decode(const ApplicationPacket &packet){
     BusinessPacket result;
     result.transport=packet;
+    result.transport.satellite=canonicalSatelliteName(packet.satellite);
     result.packetLabel=QStringLiteral("BY04 未分类应用数据包");
     if(packet.assemblyStatus=="incomplete_segments"){
         result.identification="by04_incomplete_segments";
@@ -150,6 +156,35 @@ QVector<BusinessPacket> By04Decoder::decodeAll(const QVector<ApplicationPacket> 
     });
     return decoded;
 }
+QVector<BusinessPacket> By04Decoder::definitionPackets(){
+    QVector<BusinessPacket> result;
+    for(const auto &definition:by04Catalog()){
+        BusinessPacket packet;
+        const QString code=definition.value("packet").toString();
+        packet.packetName=QStringLiteral("BY04-")+code;
+        packet.packetLabel=definition.value("label_cn").toString();
+        packet.identification=QStringLiteral("catalog_definition");
+        packet.definitionEvidence=definition.value("identification_evidence").toString();
+        packet.fieldBaseKissOctet=definition.value("field_base_kiss_octet").toInt(7);
+        packet.transport.satellite=QStringLiteral("BY04");
+        for(const auto &entry:definition.value("fields").toArray()){
+            const auto object=entry.toObject();
+            EngineeringField field;
+            field.code=object.value("id").toString();
+            field.bits=object.value("bits").toString();
+            field.nameCn=object.value("name_cn").toString();
+            field.nameEn=object.value("name_en").toString();
+            field.formula=object.value("formula").toString();
+            field.unit=object.value("unit").toString();
+            field.dataType=object.value("data_type").toString();
+            field.definitionEvidence=object.value("formula_source").toString();
+            field.status=QStringLiteral("catalog_definition");
+            packet.fields.push_back(std::move(field));
+        }
+        result.push_back(std::move(packet));
+    }
+    return result;
+}
 QVector<ImagePacket> By04Decoder::images(const QVector<Frame> &frames){
     QVector<ImagePacket> packets;
     QSet<QByteArray> seen;
@@ -159,26 +194,26 @@ QVector<ImagePacket> By04Decoder::images(const QVector<Frame> &frames){
            spacecraftId(f.bytes)!=SpacecraftId)continue;
         const QByteArray data=f.bytes.mid(5,218);
         if(seen.contains(data))continue;
-        // DSLWP SSDV header (9 octets), defined separately from KISS.
-        const int width=u8(data,3)*16, height=u8(data,4)*16;
-        const int mcuMode=u8(data,5)&3;
-        const int mcuOffset=u8(data,6);
-        const int mcuId=(u8(data,7)<<8)|u8(data,8);
-        int mcuCount=u8(data,3)*u8(data,4);
-        mcuCount*=mcuMode==3?4:(mcuMode==1||mcuMode==2?2:1);
+        // Match metadata validation to the upstream SSDV implementation used to
+        // reconstruct the JPEG, rather than duplicating its header interpretation.
+        const auto *bytes=reinterpret_cast<const std::uint8_t*>(data.constData());
+        ssdv_packet_info_t info{};
+        ssdv_dec_header(&info,bytes,ssdv_dslwp_mode);
+        const int width=info.width,height=info.height;
         if(width<=0||height<=0||width>8192||height>8192||
-           mcuCount<=0||mcuCount>65535||
-           (mcuId!=0xffff && (mcuId>=mcuCount||mcuOffset>=205)))continue;
+           info.mcu_count==0||info.mcu_count>65535||
+           (info.mcu_id!=0xffff &&
+            (info.mcu_id>=info.mcu_count||info.mcu_offset>=205)))continue;
         seen.insert(data);
         ImagePacket image;
         image.bytes=data;image.apid=-1;
-        image.imageId=u8(data,0);
-        image.packetId=(u8(data,1)<<8)|u8(data,2);
+        image.imageId=info.image_id;
+        image.packetId=info.packet_id;
         image.width=width;image.height=height;
         const quint32 expected=(quint32(u8(data,214))<<24)|
                                (quint32(u8(data,215))<<16)|
                                (quint32(u8(data,216))<<8)|quint32(u8(data,217));
-        image.status=crc32Dslwp(data)==expected?
+        image.status=crc32Ssdv(data,0x4EE4FDE1u)==expected?
                         "dslwp_crc32_pass":"dslwp_crc32_failed";
         packets.push_back(image);
     }

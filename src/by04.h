@@ -13,5 +13,6 @@ public:
     static QVector<BusinessPacket> decodeAll(const QVector<ApplicationPacket> &packets);
     // VC1 carries raw 218-byte DSLWP-style SSDV image packets, NOT KISS.
     static QVector<ImagePacket> images(const QVector<Frame> &frames);
+    static QVector<BusinessPacket> definitionPackets();
 };
 }

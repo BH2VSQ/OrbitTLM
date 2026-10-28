@@ -9,6 +9,8 @@
 #include <QStringList>
 #include <QTcpSocket>
 namespace orbit {
+// Normalize aliases for the same spacecraft before protocol routing.
+QString canonicalSatelliteName(const QString &name);
 struct Field {
     QString name;
     QString value;

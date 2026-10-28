@@ -116,9 +116,12 @@ private:
     int diagnosticTab_=-1;
     QGroupBox *powerCard_=nullptr,*attitudeCard_=nullptr,*thermalCard_=nullptr,*payloadCard_=nullptr;
     QHash<QGroupBox*,QTableWidget*> overviewTables_;
+    QString fieldTreeSatellite_;
+    QHash<QString,QTreeWidgetItem*> fieldTreeFieldItems_;
     QHash<QString,QTableWidget*> componentTables_;
     QHash<QString,QStringList> componentPrefixes_,componentKeywords_;
     QLabel *quaternion_[4]{};
+    QLabel *angularVelocity_[3]{};
     QLabel *normLabel_=nullptr;
     QSpinBox *imageApid_=nullptr;
     QProgressBar *imageCoverage_=nullptr;

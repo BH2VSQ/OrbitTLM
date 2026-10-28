@@ -15,6 +15,7 @@
 #include <QFont>
 #include <QFormLayout>
 #include <QFrame>
+#include <functional>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -214,7 +215,7 @@ void MainWindow::buildToolbar(){
     satelliteSelect_=new QComboBox;
     satelliteSelect_->addItem(QStringLiteral("自动识别"),QStringLiteral("AUTO"));
     satelliteSelect_->addItem(QStringLiteral("阿斯图系列 · ASRTU-1"),QStringLiteral("ASRTU-1"));
-    satelliteSelect_->addItem(QStringLiteral("八一04星 · BY04"),QStringLiteral("BY04"));
+    satelliteSelect_->addItem(QStringLiteral("BY70-4（BY04）"),QStringLiteral("BY04"));
     bar->addWidget(satelliteSelect_);
     auto *import=bar->addAction(QStringLiteral("开始导入"));
     connect(import,&QAction::triggered,this,[this]{importSession();});
@@ -405,7 +406,7 @@ void MainWindow::buildOverview(QTabWidget *tabs){
     cardsLayout->setContentsMargins(0,0,0,0);
     cardsLayout->setHorizontalSpacing(4);cardsLayout->setVerticalSpacing(4);
     powerCard_=statusCard(QStringLiteral("总线电压与电流"));
-    attitudeCard_=statusCard(QStringLiteral("UTC、姿态四元数、GPS速度与轨道参数"));
+    attitudeCard_=statusCard(QStringLiteral("姿态与 GPS 轨道"));
     thermalCard_=statusCard(QStringLiteral("各总线与部件温度"));
     payloadCard_=statusCard(QStringLiteral("部件开关状态"));
     for(auto *card:{powerCard_,attitudeCard_,thermalCard_,payloadCard_})
@@ -468,25 +469,33 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
         if(item->data(0,Qt::UserRole).isNull())return;
         const QString code=item->data(0,Qt::UserRole).toString();
         const QString packet=item->data(0,Qt::UserRole+1).toString();
+        fieldDetail_->setText(QStringLiteral("字段编号 %1 · 位位置 %2 · 换算公式 %3\n英文名：%4\n定义来源：%5\n当前会话尚未找到该字段的已解码样本。")
+            .arg(code,item->data(0,Qt::UserRole+2).toString(),item->data(0,Qt::UserRole+3).toString(),
+                 item->data(0,Qt::UserRole+4).toString(),item->data(0,Qt::UserRole+5).toString()));
+        bool hasSample=false;
         for(int i=0;i<business_.size();++i)if(i<=currentIndex_ && business_[i].packetName==packet)
             for(const auto &f:business_[i].fields)if(f.code==code){
-                fieldDetail_->setText(QStringLiteral("字段编号 %1  ·  位位置 %2\n原始值 %3  ·  换算公式 %4")
-                    .arg(f.code,f.bits,f.rawHex,f.formula));
+                fieldDetail_->setText(QStringLiteral("字段编号 %1 · 位位置 %2\n原始 HEX：%3 · 原始值：%4\n当前工程值：%5 %6\n换算公式：%7\n定义来源：%8")
+                    .arg(f.code,f.bits,f.rawHex,f.rawNumber,f.value,f.unit,f.formula,f.definitionEvidence));
+                hasSample=true;
+                break;
             }
+        Q_UNUSED(hasSample);
         plotEngineering(packet,code,currentIndex_);
     });
     connect(engineeringSearch_,&QLineEdit::textChanged,this,[this](const QString &needle){
         if(!fieldTree_)return;
-        for(int i=0;i<fieldTree_->topLevelItemCount();++i){
-            auto *group=fieldTree_->topLevelItem(i);int shown=0;
-            for(int j=0;j<group->childCount();++j){
-                auto *field=group->child(j);
-                const bool matches=needle.isEmpty()||field->text(0).contains(needle,Qt::CaseInsensitive)||
-                    field->data(0,Qt::UserRole).toString().contains(needle,Qt::CaseInsensitive);
-                field->setHidden(!matches);if(matches)shown++;
-            }
-            group->setHidden(shown==0);
-        }
+        std::function<bool(QTreeWidgetItem*)> filter=[&](QTreeWidgetItem *node){
+            bool childVisible=false;
+            for(int i=0;i<node->childCount();++i)
+                if(filter(node->child(i)))childVisible=true;
+            const bool selfMatch=needle.isEmpty()||node->text(0).contains(needle,Qt::CaseInsensitive)||
+                node->data(0,Qt::UserRole).toString().contains(needle,Qt::CaseInsensitive);
+            const bool visible=selfMatch||childVisible;
+            node->setHidden(!visible);
+            return visible;
+        };
+        for(int i=0;i<fieldTree_->topLevelItemCount();++i)filter(fieldTree_->topLevelItem(i));
     });
     tabs->addTab(page,QStringLiteral("业务遥测"));
     buildComponentTabs(tabs);
@@ -495,7 +504,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
     auto *page=new QWidget;
     auto *layout=new QVBoxLayout(page);
     layout->setContentsMargins(4,4,4,4);layout->setSpacing(3);
-    auto *parts=new QTabWidget(page);
+    auto *parts=new AutoWrapTabWidget(page);
     parts->setDocumentMode(true);
     struct Spec { QString title; QStringList prefixes; QStringList keywords; };
     const QVector<Spec> specs={
@@ -533,6 +542,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
         componentPrefixes_.insert(spec.title,spec.prefixes);
         componentKeywords_.insert(spec.title,spec.keywords);
     }
+    parts->refreshTabWrapping();
     layout->addWidget(parts,1);
     tabs->addTab(page,QStringLiteral("分系统数据"));
 }
@@ -553,6 +563,12 @@ void MainWindow::buildAttitude(QTabWidget *tabs){
     auto *explanation=new QLabel(QStringLiteral("SAT-S3：有符号 32 位整数 / 10000\n仅作数值与相对姿态展示，未定义绝对旋转参考系"));
     explanation->setWordWrap(true);
     grid->addWidget(explanation,1,2,1,2);
+    const QStringList axes={QStringLiteral("X"),QStringLiteral("Y"),QStringLiteral("Z")};
+    for(int i=0;i<3;++i){
+        QLabel *rate=nullptr;
+        grid->addWidget(metricCard(QStringLiteral("角速度 %1").arg(axes[i]),rate),2,i);
+        angularVelocity_[i]=rate;
+    }
     layout->addWidget(quats);
     auto *views=new QSplitter(Qt::Horizontal);
     attitudeWidget_=new AttitudeWidget;

@@ -357,9 +357,11 @@ QVector<BusinessPacket> BusinessCatalog::decodeBySatellite(const QVector<Applica
     QVector<ApplicationPacket> by04Packets;
     decoded.reserve(packets.size());
     for(const auto &packet:packets){
-        if(packet.satellite=="BY04")by04Packets.push_back(packet);
-        else if(packet.satellite=="ASRTU-1")decoded.push_back(decode(packet));
-        else { BusinessPacket unknown; unknown.transport=packet; unknown.identification="unknown_satellite"; decoded.push_back(unknown); }
+        ApplicationPacket normalized=packet;
+        normalized.satellite=canonicalSatelliteName(packet.satellite);
+        if(normalized.satellite==QStringLiteral("BY04"))by04Packets.push_back(normalized);
+        else if(normalized.satellite==QStringLiteral("ASRTU-1"))decoded.push_back(decode(normalized));
+        else { BusinessPacket unknown; unknown.transport=normalized; unknown.identification="unknown_satellite"; decoded.push_back(unknown); }
     }
     decoded+=By04Decoder::decodeAll(by04Packets);
     std::stable_sort(decoded.begin(),decoded.end(),[](const BusinessPacket &a,const BusinessPacket &b){

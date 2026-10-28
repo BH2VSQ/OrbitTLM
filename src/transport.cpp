@@ -94,15 +94,16 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,Tr
     }
     for(const Frame *source:ordered){
         const Frame &frame=*source;
+        const QString canonicalSatellite=canonicalSatelliteName(frame.satellite);
         if(frame.vcid<0)continue;
-        if(frame.satellite=="BY04"){
+        if(canonicalSatellite==QStringLiteral("BY04")){
             if(frame.bytes.size()!=223)continue;
             const int scid=((quint8(frame.bytes[0])&0x3f)<<4)|(quint8(frame.bytes[1])>>4);
             // BY04 uses spacecraft ID 0x205. VC1 is the native 218-byte
             // DSLWP SSDV image service, NOT KISS. VC0/VC2 may carry KISS.
             if(scid!=0x205 || frame.vcid==1)continue;
         }
-        const QString stateKey=frame.satellite+QLatin1Char(':')+QString::number(frame.vcid);
+        const QString stateKey=canonicalSatellite+QLatin1Char(':')+QString::number(frame.vcid);
         State &s=states[stateKey];
         // Only the per-VC counter can assess continuity; master count interleaves VCs.
         if(s.haveCount && frame.virtualCount>=0 && ((s.previousCount+1)&0xff)!=frame.virtualCount){
@@ -128,7 +129,7 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,Tr
                 if(s.started && !s.buffer.isEmpty() && !s.oversized &&
                    !s.escaped && !isPaddingOnly(s.buffer)){
                     ApplicationPacket pkt;
-                    pkt.bytes=s.buffer;pkt.satellite=frame.satellite;
+                    pkt.bytes=s.buffer;pkt.satellite=canonicalSatellite;
                     pkt.vcid=frame.vcid;
                     pkt.firstMaster=s.firstMaster;
                     pkt.lastMaster=s.lastMaster;
@@ -195,7 +196,10 @@ QVector<ApplicationPacket> Transport::assembleSegments(const QVector<Application
         pending.erase(it);
     };
     int inputOrder=0;
-    for(const auto &packet:packets){
+    for(const auto &inputPacket:packets){
+        ApplicationPacket normalizedPacket=inputPacket;
+        normalizedPacket.satellite=canonicalSatelliteName(inputPacket.satellite);
+        const ApplicationPacket &packet=normalizedPacket;
         const int order=inputOrder++;
         const QByteArray &bytes=packet.bytes;
         if(packet.classification!="ccsds_space_packet_candidate"||bytes.size()<7||
