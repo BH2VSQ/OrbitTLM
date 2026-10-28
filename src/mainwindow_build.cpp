@@ -65,13 +65,19 @@ QGroupBox *statusCard(const QString &title){
     card->setObjectName("statusCard");
     auto *layout=new QVBoxLayout(card);
     layout->setContentsMargins(15,20,15,12);
+    auto *scroll=new QScrollArea(card);
+    scroll->setObjectName("statusScroll");
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     auto *content=new QLabel(QStringLiteral("暂无已识别的遥测参数"));
     content->setObjectName("statusContent");
     content->setTextFormat(Qt::RichText);
     content->setAlignment(Qt::AlignTop|Qt::AlignLeft);
     content->setWordWrap(true);
     content->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    layout->addWidget(content);
+    scroll->setWidget(content);
+    layout->addWidget(scroll,1);
     return card;
 }
 void setupTable(QTableWidget *table){
@@ -167,7 +173,11 @@ void MainWindow::applyStyles(){
                              border-radius:9px; margin-top:12px; font-weight:700;}
         QGroupBox#statusCard::title {subcontrol-origin:margin; left:14px;
                                     padding:0 6px;color:#245b8c;}
-        QLabel#statusContent {font-weight:400; color:#38516c; line-height:150%;}
+        QLabel#statusContent {font-weight:400; color:#38516c; line-height:150%; padding:2px;}
+        QScrollArea#statusScroll {background:transparent;}
+        QLabel#attitudeModeLabel {font-size:15px; font-weight:700; color:#174f83;
+                                  background:#eaf4ff; border:1px solid #cfe4fb;
+                                  border-radius:6px; padding:7px 10px;}
         QSplitter::handle {background:#edf1f7;}
         QStatusBar {background:#ffffff; color:#61768d; border-top:1px solid #e0e7f0;}
         QSlider::groove:horizontal {height:6px; background:#d9e4f0; border-radius:3px;}
@@ -362,6 +372,11 @@ void MainWindow::buildOverview(QTabWidget *tabs){
     currentTitle_=new QLabel(QStringLiteral("尚未载入遥测会话"));
     currentTitle_->setObjectName("currentHeading");
     heroLayout->addWidget(currentTitle_);
+    attitudeModeLabel_=new QLabel(QStringLiteral("当前姿态模式：等待遥测"));
+    attitudeModeLabel_->setObjectName("attitudeModeLabel");
+    attitudeModeLabel_->setWordWrap(true);
+    attitudeModeLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    heroLayout->addWidget(attitudeModeLabel_);
     currentMeta_=subtitle(QStringLiteral("导入 decoder.log 与 223 字节 BIN，开始时间轴回放"));
     heroLayout->addWidget(currentMeta_);
     integrityLabel_=subtitle(QStringLiteral("没有载入数据；不会推断星载 UTC"));

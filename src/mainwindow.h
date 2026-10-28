@@ -91,7 +91,7 @@ private:
     QString imagePath_;
     int currentIndex_=-1;
     QLabel *sourceLabel_=nullptr,*message_=nullptr,*currentTitle_=nullptr,
-           *currentMeta_=nullptr,*integrityLabel_=nullptr,*frameMetric_=nullptr,
+           *currentMeta_=nullptr,*integrityLabel_=nullptr,*attitudeModeLabel_=nullptr,*frameMetric_=nullptr,
            *recognizedMetric_=nullptr,*unknownMetric_=nullptr,*timeMetric_=nullptr,
            *imageMetric_=nullptr,*transportMetric_=nullptr,*positionLabel_=nullptr,
            *engineeringSummary_=nullptr,*fieldDetail_=nullptr,*attitudeInfo_=nullptr,

@@ -342,6 +342,7 @@ void MainWindow::updateOverview(int index){
         currentTitle_->setText(QStringLiteral("尚未载入可回放的业务数据"));
         currentMeta_->setText(QStringLiteral("通过上方工具栏导入 LOG 与 BIN，然后开始回放"));
         integrityLabel_->setText(QStringLiteral("星载 UTC：未知 · 应用 CRC：未校验"));
+        attitudeModeLabel_->setText(QStringLiteral("当前姿态模式：等待遥测"));
     }else{
         const auto &b=business_[index];
         currentTitle_->setText(eventTitle(b));
@@ -350,36 +351,117 @@ void MainWindow::updateOverview(int index){
             .arg(b.transport.vcid));
         integrityLabel_->setText(QStringLiteral("传输状态：%1　　应用 CRC：未校验　　星载 UTC：未知")
            .arg(qualityLabel(b.transport.fecEvidence)));
+        QString mode;
+        QDateTime modeTime;
+        for(int i=index;i>=0&&mode.isEmpty();--i){
+            const auto &packet=business_[i];
+            if(packet.packetName.isEmpty())continue;
+            for(const auto &field:packet.fields){
+                if(field.nameCn.contains(QStringLiteral("姿态工作模式")) &&
+                   !field.value.isEmpty() && !field.status.startsWith("raw_")){
+                    mode=field.value;
+                    modeTime=packet.transport.captureLocal;
+                    break;
+                }
+            }
+        }
+        if(mode.isEmpty())
+            attitudeModeLabel_->setText(QStringLiteral("当前姿态模式：暂无有效的姿态工作模式字段"));
+        else
+            attitudeModeLabel_->setText(QStringLiteral("当前姿态模式：%1　　更新时间：%2")
+                .arg(mode.toHtmlEscaped(),shortTime(modeTime).toHtmlEscaped()));
     }
     updateFieldCard(powerCard_,{"PDB","SAT"},index);
-    updateFieldCard(attitudeCard_,{"SAT-S3","ZGK","SSY","SSZ","GPS"},index);
+    updateFieldCard(attitudeCard_,{"SAT","ZGK","SSY","SSZ","GPS"},index);
     updateFieldCard(thermalCard_,{"TCB"},index);
     updateFieldCard(payloadCard_,{"CAM","CMS","TTC","BBB"},index);
 }
 void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int index){
     auto *content=card->findChild<QLabel*>("statusContent");
     if(!content)return;
-    const BusinessPacket *chosen=latestRecognized(index,prefixes);
-    if(!chosen){
+    if(index<0||business_.isEmpty()){
         content->setText(QStringLiteral("暂无已识别的遥测参数<br><span style='color:#8190a3'>等待匹配分系统数据包</span>"));
         return;
     }
-    QString text=QStringLiteral("<span style='color:#68809b'>来源 %1 · 接收 %2</span><br>")
-        .arg(chosen->packetName.toHtmlEscaped(),
-             shortTime(chosen->transport.captureLocal).toHtmlEscaped());
-    int shown=0;
-    for(const auto &f:chosen->fields){
-        if(f.value.isEmpty()||f.status.startsWith("raw_")||f.status=="invalid_source_bit_position")
-            continue;
-        if(f.nameCn.isEmpty())continue;
-        text+=QStringLiteral("<div style='margin-top:5px'><b>%1</b>：%2 %3</div>")
-            .arg(f.nameCn.toHtmlEscaped(),f.value.toHtmlEscaped(),
-                 f.unit.toHtmlEscaped());
-        if(++shown>=4)break;
+    auto belongsToCard=[&](const BusinessPacket &packet,const EngineeringField &field){
+        bool packetMatch=false;
+        for(const auto &prefix:prefixes)
+            if(packet.packetName.startsWith(prefix)){packetMatch=true;break;}
+        if(!packetMatch)return false;
+        const QString n=field.nameCn;
+        if(card==powerCard_)
+            return n.contains(QStringLiteral("电压"))||n.contains(QStringLiteral("电流"))||
+                   n.contains(QStringLiteral("电源"))||n.contains(QStringLiteral("配电"))||
+                   n.contains(QStringLiteral("电池"))||n.contains(QStringLiteral("充电"))||
+                   n.contains(QStringLiteral("放电"))||n.contains(QStringLiteral("开关"))||
+                   n.contains(QStringLiteral("功率"));
+        if(card==attitudeCard_)
+            return n.contains(QStringLiteral("姿态"))||n.contains(QStringLiteral("角速度"))||
+                   n.contains(QStringLiteral("四元数"))||n.contains(QStringLiteral("飞轮"))||
+                   n.contains(QStringLiteral("磁场"))||n.contains(QStringLiteral("星敏"))||
+                   n.contains(QStringLiteral("太阳敏感"))||n.contains(QStringLiteral("轨道"))||
+                   n.contains(QStringLiteral("工作模式"))||n.contains(QStringLiteral("控制模式"))||
+                   n.contains(QStringLiteral("控制状态"))||n.contains(QStringLiteral("陀螺"));
+        if(card==thermalCard_)
+            return n.contains(QStringLiteral("温度"))||n.contains(QStringLiteral("热控"))||
+                   n.contains(QStringLiteral("加热"))||n.contains(QStringLiteral("热敏"));
+        if(card==payloadCard_)
+            return n.contains(QStringLiteral("状态"))||n.contains(QStringLiteral("模式"))||
+                   n.contains(QStringLiteral("开关"))||n.contains(QStringLiteral("工作"))||
+                   n.contains(QStringLiteral("故障"))||n.contains(QStringLiteral("错误"))||
+                   n.contains(QStringLiteral("成像"))||n.contains(QStringLiteral("载荷"))||
+                   n.contains(QStringLiteral("通信"))||n.contains(QStringLiteral("发射"))||
+                   n.contains(QStringLiteral("接收"))||n.contains(QStringLiteral("温度"))||
+                   n.contains(QStringLiteral("电压"))||n.contains(QStringLiteral("电流"));
+        return false;
+    };
+    // Keep the newest value for every packet-field pair at the current replay position.
+    QStringList order;
+    QHash<QString,EngineeringField> latest;
+    QHash<QString,QString> source;
+    QHash<QString,QDateTime> times;
+    for(int i=0;i<=std::min(index,int(business_.size())-1);++i){
+        const auto &packet=business_[i];
+        if(packet.packetName.isEmpty())continue;
+        for(const auto &field:packet.fields){
+            if(!belongsToCard(packet,field)||field.nameCn.isEmpty()||field.value.isEmpty()||
+               field.status.startsWith("raw_")||field.status=="invalid_source_bit_position")continue;
+            const QString key=packet.packetName+QStringLiteral("/")+field.code;
+            if(!latest.contains(key))order.push_back(key);
+            latest.insert(key,field);
+            source.insert(key,packet.packetName);
+            times.insert(key,packet.transport.captureLocal);
+        }
     }
-    if(!shown)text+=QStringLiteral("字段存在，但暂未取得可显示的工程量");
-    text+=QStringLiteral("<br><span style='color:#8798aa'>应用 CRC 未校验</span>");
-    content->setText(text);
+    if(order.isEmpty()){
+        content->setText(QStringLiteral("暂无符合本分区的有效工程量<br><span style='color:#8190a3'>可在“工程量”页查看全部已识别字段</span>"));
+        return;
+    }
+    // Most recent packets are encountered last. Render recent values first, with
+    // state/mode fields promoted above ordinary numeric measurements.
+    std::reverse(order.begin(),order.end());
+    std::stable_sort(order.begin(),order.end(),[&](const QString &a,const QString &b){
+        auto priority=[&](const QString &key){
+            const QString n=latest.value(key).nameCn;
+            return (n.contains(QStringLiteral("姿态工作模式"))||n.contains(QStringLiteral("工作模式"))||
+                    n.contains(QStringLiteral("控制模式"))||n.contains(QStringLiteral("状态"))||
+                    n.contains(QStringLiteral("故障")))?0:1;
+        };
+        return priority(a)<priority(b);
+    });
+    QString html=QStringLiteral("<div style='color:#68809b;margin-bottom:7px'>显示当前回放位置之前各字段的最新有效值；字段按协议定义换算</div>");
+    for(const auto &key:order){
+        const auto field=latest.value(key);
+        QString value=field.value.toHtmlEscaped();
+        if(!field.unit.isEmpty())value+=QStringLiteral(" ")+field.unit.toHtmlEscaped();
+        html+=QStringLiteral("<table width='100%' cellspacing='0' cellpadding='3' style='border-bottom:1px solid #edf2f7'>"
+                             "<tr><td width='57%' valign='top'><b>%1</b><br><span style='color:#8190a3;font-size:10px'>%2 · %3</span></td>"
+                             "<td valign='top' align='right'><b>%4</b></td></tr></table>")
+            .arg(field.nameCn.toHtmlEscaped(),source.value(key).toHtmlEscaped(),
+                 shortTime(times.value(key)).toHtmlEscaped(),value);
+    }
+    html+=QStringLiteral("<div style='color:#8798aa;margin-top:7px'>共 %1 个有效字段 · 应用 CRC 未校验</div>").arg(order.size());
+    content->setText(html);
 }
 void MainWindow::populateEngineering(int index){
     QSignalBlocker block(engineeringTable_);
