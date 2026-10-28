@@ -58,7 +58,7 @@ protected:
         if(image_.isNull()){
             p.setPen(QColor("#758397"));
             p.drawText(rect().adjusted(20,20,-20,-20),Qt::AlignCenter|Qt::TextWordWrap,
-                QStringLiteral("暂无恢复图像\n\n可扫描 SSDV 候选数据包，\n使用外部解码器还原图片"));
+                QStringLiteral("暂无恢复图像\n\n扫描 SSDV 分片后选择图像 ID，\n即可在软件内重建 JPEG"));
             return;
         }
         const QSize scaled=image_.size().scaled(size()-QSize(20,20),Qt::KeepAspectRatio);

@@ -3,6 +3,7 @@
 #include "by04.h"
 #include <QApplication>
 #include <QCoreApplication>
+#include <QImage>
 #include <QDesktopServices>
 #include <QUrl>
 #include <QChart>
@@ -99,6 +100,33 @@ QString fieldStatusText(const QString &status){
     if(status.startsWith("raw_"))return QStringLiteral("原始值，含义未验证");
     if(status=="table_enum_unknown_value")return QStringLiteral("未知枚举值");
     return status.isEmpty()?QStringLiteral("未解析"):status;
+}
+QString telemetryValue(const EngineeringField &field,const QString &value,const QString &unit){
+    QString shown=value;
+    const bool switchField=field.nameCn.contains(QStringLiteral("开关"))||
+        field.nameCn.contains(QStringLiteral("使能"))||field.nameCn.contains(QStringLiteral("状态"));
+    bool widthOk=false;
+    const int width=field.bits.section('.',2,2).toInt(&widthOk);
+    if(switchField&&widthOk&&width==1&&field.status==QStringLiteral("raw_bits")){
+        if(field.rawNumber==QStringLiteral("0"))shown=QStringLiteral("关");
+        else if(field.rawNumber==QStringLiteral("1"))shown=QStringLiteral("开");
+    }
+    if(!unit.isEmpty()&&unit!=QStringLiteral("1"))shown+=QLatin1Char(' ')+unit;
+    return shown;
+}
+int telemetrySwitchState(const EngineeringField &field,const QString &value){
+    const bool switchField=field.nameCn.contains(QStringLiteral("开关"))||
+        field.nameCn.contains(QStringLiteral("使能"))||field.nameCn.contains(QStringLiteral("状态"));
+    if(!switchField)return -1;
+    if(value.contains(QStringLiteral("开")))return 1;
+    if(value.contains(QStringLiteral("关")))return 0;
+    bool widthOk=false;
+    const int width=field.bits.section('.',2,2).toInt(&widthOk);
+    if(widthOk&&width==1&&field.status==QStringLiteral("raw_bits")){
+        if(field.rawNumber==QStringLiteral("1"))return 1;
+        if(field.rawNumber==QStringLiteral("0"))return 0;
+    }
+    return -1;
 }
 }
 QString MainWindow::satellite() const{
@@ -246,17 +274,9 @@ void MainWindow::rebuildSession(){
     timer_->stop();
     packets_=orbit::Transport::reassemble(frames_,&transportStats_);
     orbit::BusinessStats bs;
-    business_.clear();business_.reserve(packets_.size());
-    for(const auto &packet:packets_){
-        BusinessPacket decoded;
-        if(catalogReady_&&(packet.satellite=="ASRTU-1"||packet.satellite=="BY04"))
-            decoded=catalog_.decode(packet);
-        if(decoded.packetName.isEmpty()&&packet.satellite=="BY04")
-            decoded=orbit::By04Decoder::decode(packet);
-        if(decoded.packetLabel.isEmpty()&&decoded.packetName.isEmpty())
-            decoded.packetLabel=QStringLiteral("未匹配的卫星业务包");
-        business_.push_back(std::move(decoded));
-    }
+    // BY04 packets take an independent mission map and segmented-packet path.
+    // The ASRTU-1 catalog is never used to decode BY04 APIDs or field offsets.
+    business_=catalog_.decodeBySatellite(packets_,&bs);
     populateEvents();
     updateFrameList();
     scanSsdv();
@@ -421,7 +441,31 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
         seen.insert(key);rows.push_back({name,packet,field,manual});
     };
     const auto definitions=catalog_.definitionPackets();
-    if(title==QStringLiteral("总线电压与电流")){
+    if(resolvedSatellite()==QStringLiteral("BY04")){
+        // Build BY04 overview rows from the fields actually decoded by its own
+        // catalogs. Do not inherit ASRTU-1 packet names or field indices.
+        for(int i=0;i<=index&&i<business_.size();++i){
+            const auto &packet=business_[i];
+            for(const auto &field:packet.fields){
+                const QString &name=field.nameCn;
+                const QString group=categoryFor(name);
+                bool keep=false;
+                if(card==powerCard_)keep=group==QStringLiteral("电源与配电");
+                else if(card==attitudeCard_)keep=group==QStringLiteral("时间与计数")||
+                    group==QStringLiteral("姿态与测量");
+                else if(card==thermalCard_){
+                    const bool rail=name.contains(QStringLiteral("12V"))||
+                        name.contains(QStringLiteral("5V"))||name.contains(QStringLiteral("3.3V"));
+                    const bool mppt=name.contains(QStringLiteral("MPPT"));
+                    keep=name.contains(QStringLiteral("温度"))&&(rail||mppt)&&!excludedLimitField(name);
+                }else if(card==payloadCard_){
+                    keep=name.contains(QStringLiteral("开关"))||name.contains(QStringLiteral("状态"))||
+                         name.contains(QStringLiteral("使能"));
+                }
+                if(keep)add(name,packet.packetName,field);
+            }
+        }
+    }else if(title==QStringLiteral("总线电压与电流")){
         for(const auto &packet:definitions)for(const auto &field:packet.fields){
             const QString &name=field.nameCn;
             if((name.contains(QStringLiteral("母线"))||name.contains(QStringLiteral("总线"))) &&
@@ -432,7 +476,10 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     }else if(title==QStringLiteral("各总线与部件温度")){
         for(const auto &packet:definitions)for(const auto &field:packet.fields){
             const QString &name=field.nameCn;
-            if((name.contains(QStringLiteral("温度"))||name.contains(QStringLiteral("热敏")))&&!excludedLimitField(name))
+            const bool rail=name.contains(QStringLiteral("12V"))||name.contains(QStringLiteral("5V"))||
+                            name.contains(QStringLiteral("3.3V"));
+            const bool mppt=name.contains(QStringLiteral("MPPT"));
+            if(name.contains(QStringLiteral("温度"))&&(rail||mppt)&&!excludedLimitField(name))
                 add(name,packet.packetName,field);
         }
     }else if(title==QStringLiteral("UTC、姿态四元数、GPS速度与轨道参数")){
@@ -478,13 +525,16 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
             add(device.first,QString(),EngineeringField{device.first,{},device.first,{},{},{},{},{},{},QStringLiteral("catalog_definition")},true);
     }
 
-    table->setRowCount(rows.size());
+    const int rowsPerColumn=(rows.size()+1)/2;
+    table->setRowCount(rowsPerColumn);
     for(int r=0;r<rows.size();++r){
         const Row &row=rows[r];
         QString value=QStringLiteral("未解析"),unit,status=QStringLiteral("未解析"),when;
+        EngineeringField resolvedField=row.definition;
         int from=qMin(index,int(business_.size())-1);
         for(int i=from;i>=0&&(value==QStringLiteral("未解析")||value.isEmpty());--i){
             const auto &packet=business_[i];
+            if(!row.packet.isEmpty()&&packet.packetName!=row.packet)continue;
             for(const auto &field:packet.fields){
                 bool matched=false;
                 if(row.manual && title==QStringLiteral("部件开关状态")){
@@ -525,17 +575,26 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
                 }else{
                     matched=field.nameCn==row.name;
                 }
-                if(!matched||field.value.isEmpty()||field.status.startsWith("raw_")||field.status=="invalid_source_bit_position")continue;
-                value=field.value;unit=field.unit;status=fieldStatusText(field.status);
+                const bool allowMappedRaw=resolvedSatellite()==QStringLiteral("BY04")&&field.status==QStringLiteral("raw_bits");
+                if(!matched||field.value.isEmpty()||
+                   (field.status.startsWith("raw_")&&!allowMappedRaw)||field.status=="invalid_source_bit_position")continue;
+                value=field.value;unit=field.unit;status=fieldStatusText(field.status);resolvedField=field;
                 when=shortTime(packet.transport.captureLocal);break;
             }
             if(value!=QStringLiteral("未解析")&&!value.isEmpty())break;
         }
         auto *nameItem=item(row.name,row.packet.isEmpty()?QString():row.packet+QStringLiteral(" · ")+row.definition.code);
-        auto *valueItem=item(value);
-        auto *statusItem=item(status);
-        table->setItem(r,0,nameItem);table->setItem(r,1,valueItem);table->setItem(r,2,statusItem);
-        if(value==QStringLiteral("未解析"))statusItem->setForeground(QColor("#64748b"));
+        auto *valueItem=item(telemetryValue(resolvedField,value,unit),status);
+        const int rowIndex=r%rowsPerColumn;
+        const int columnOffset=(r/rowsPerColumn)*2;
+        table->setItem(rowIndex,columnOffset,nameItem);
+        table->setItem(rowIndex,columnOffset+1,valueItem);
+        if(title==QStringLiteral("部件开关状态")){
+            const int switchState=telemetrySwitchState(resolvedField,value);
+            if(switchState==1)valueItem->setForeground(QColor("#16803d"));
+            else if(switchState==0)valueItem->setForeground(QColor("#c62828"));
+        }
+        if(value==QStringLiteral("未解析"))valueItem->setForeground(QColor("#64748b"));
         if(!when.isEmpty())valueItem->setToolTip(QStringLiteral("接收时间：%1").arg(when));
     }
     table->verticalHeader()->setDefaultSectionSize(20);
@@ -543,6 +602,7 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
 void MainWindow::updateComponentTabs(int index){
     if(!catalogReady_||componentTables_.isEmpty())return;
     const auto definitions=catalog_.definitionPackets();
+    const bool by04=resolvedSatellite()==QStringLiteral("BY04");
     for(auto it=componentTables_.begin();it!=componentTables_.end();++it){
         const QString title=it.key();
         QTableWidget *table=it.value();
@@ -551,9 +611,27 @@ void MainWindow::updateComponentTabs(int index){
         struct Row { QString packet; EngineeringField field; };
         QVector<Row> rows;QSet<QString> seen;
         auto matches=[&](const QString &packet,const QString &name){
+            if(by04){
+                if(prefixes.isEmpty()&&keywords.isEmpty())return true;
+                return containsAny(name,keywords);
+            }
             if(prefixes.isEmpty()&&keywords.isEmpty())return true;
             return startsWithAny(packet,prefixes)||containsAny(name,keywords);
         };
+        if(by04){
+            // The BY04 table is generated exclusively from decoded BY04 fields.
+            // ASRTU packet prefixes and byte offsets are intentionally ignored.
+            for(int i=0;i<=index&&i<business_.size();++i){
+                const auto &packet=business_[i];
+                if(packet.transport.satellite!="BY04")continue;
+                for(const auto &field:packet.fields){
+                    if(field.nameCn.isEmpty()||!matches(packet.packetName,field.nameCn))continue;
+                    const QString key=packet.packetName+QLatin1Char('|')+field.code;
+                    if(seen.contains(key))continue;
+                    seen.insert(key);rows.push_back({packet.packetName,field});
+                }
+            }
+        }else{
         for(const auto &packet:definitions)for(const auto &field:packet.fields){
             if(!matches(packet.packetName,field.nameCn))continue;
             const QString key=packet.packetName+QLatin1Char('|')+field.code;
@@ -561,6 +639,7 @@ void MainWindow::updateComponentTabs(int index){
             seen.insert(key);rows.push_back({packet.packetName,field});
         }
         // Include decoded fields unknown to the public catalog, such as the
+        }
         // BY04 quaternion candidate, without removing any catalog placeholders.
         for(int i=0;i<=index&&i<business_.size();++i){
             const auto &packet=business_[i];
@@ -575,19 +654,22 @@ void MainWindow::updateComponentTabs(int index){
         for(int r=0;r<rows.size();++r){
             const Row &row=rows[r];
             QString value=QStringLiteral("未解析"),unit,status=QStringLiteral("未解析"),when;
+            EngineeringField resolvedField=row.field;
             for(int i=qMin(index,int(business_.size())-1);i>=0&&value==QStringLiteral("未解析");--i){
                 const auto &packet=business_[i];
                 if(packet.packetName!=row.packet)continue;
                 for(const auto &field:packet.fields)if(field.code==row.field.code){
-                    if(field.value.isEmpty()||field.status.startsWith("raw_")||field.status=="invalid_source_bit_position")continue;
+                    if(field.value.isEmpty()||(!by04&&field.status.startsWith("raw_"))||
+                       field.status=="invalid_source_bit_position")continue;
                     value=field.value;unit=field.unit;status=fieldStatusText(field.status);
+                    resolvedField=field;
                     when=shortTime(packet.transport.captureLocal);break;
                 }
             }
             table->setItem(r,0,item(row.packet));
             table->setItem(r,1,item(row.field.nameCn.isEmpty()?row.field.code:row.field.nameCn,row.field.code+QStringLiteral(" · ")+row.field.bits+QStringLiteral(" · ")+row.field.formula));
-            table->setItem(r,2,item(value));table->setItem(r,3,item(unit));
-            table->setItem(r,4,item(when));table->setItem(r,5,item(status));
+            table->setItem(r,2,item(telemetryValue(resolvedField,value,unit),status));
+            table->setItem(r,3,item(when));
         }
         table->verticalHeader()->setDefaultSectionSize(20);
     }
@@ -913,7 +995,7 @@ void MainWindow::scanSsdv(){
     imageInfo_->setText(by04?
         QStringLiteral("BY04 · VC1 218 字节 DSLWP SSDV · %1 个有效结构分片；仅通过独立 DSLWP CRC 的分片标记为已校验。")
             .arg(images_.size()):
-        QStringLiteral("APID %1：发现 %2 个 SSDV 候选分片；JPEG 还原需要外部解码工具。")
+        QStringLiteral("APID %1：发现 %2 个 SSDV 候选分片；选择图像 ID 后可在软件内重建 JPEG。")
             .arg(imageApid_->value()).arg(images_.size()));
     if(imageMetric_)imageMetric_->setText(QString::number(images_.size()));
     if(!images_.isEmpty())updateImageProgress(images_.first().imageId);
@@ -957,36 +1039,48 @@ void MainWindow::exportSsdv(){
     else statusBar()->showMessage(QStringLiteral("已保存候选分片；未独立完成图像 CRC 验证"),9500);
 }
 void MainWindow::decodeSsdv(){
-    const QString tool=QFileDialog::getOpenFileName(this,
-        QStringLiteral("选择可信任的 SSDV 外部解码程序"));
-    if(tool.isEmpty())return;
-    const QString input=QFileDialog::getOpenFileName(this,
-        QStringLiteral("选择已提取的 SSDV 数据文件"),{},
-        QStringLiteral("SSDV (*.ssdv *.bin);;全部文件 (*)"));
-    if(input.isEmpty())return;
-    const QString output=QFileDialog::getSaveFileName(this,
-        QStringLiteral("指定 JPEG 输出文件"),"decoded.jpg",
+    if(images_.isEmpty())scanSsdv();
+    if(images_.isEmpty()){
+        QMessageBox::information(this,QStringLiteral("SSDV 图片重建"),
+            QStringLiteral("没有可解码的 SSDV 分片，请先扫描数据。"));
+        return;
+    }
+    int row=imageTable_->currentRow();
+    if(row<0||row>=images_.size())row=0;
+    const int imageId=images_[row].imageId;
+    const bool by04=resolvedSatellite()==QStringLiteral("BY04");
+    const auto rebuilt=orbit::ImageTools::decodeImage(images_,imageId,by04);
+    if(rebuilt.jpeg.isEmpty()){
+        QMessageBox::warning(this,QStringLiteral("SSDV 图片重建失败"),
+            rebuilt.error.isEmpty()?QStringLiteral("当前分片无法重建 JPEG。"):rebuilt.error);
+        return;
+    }
+    const QImage image=QImage::fromData(rebuilt.jpeg,"JPEG");
+    if(image.isNull()){
+        QMessageBox::warning(this,QStringLiteral("SSDV 图片重建失败"),
+            QStringLiteral("解码器返回的数据不是可读取的 JPEG 图像。"));
+        return;
+    }
+    decodedImage_=QPixmap::fromImage(image);
+    imagePreview_->setImage(decodedImage_);
+    imageInfo_->setText(QStringLiteral("图像 ID %1 · %2 × %3 · 已送入解码器 %4 个分片 · %5。CRC 通过数量仅表示已通过对应格式校验的分片，不代表整幅图像完整。")
+        .arg(imageId).arg(image.width()).arg(image.height()).arg(rebuilt.receivedPackets)
+        .arg(rebuilt.complete?QStringLiteral("检测到图像结束标志"):QStringLiteral("当前为可恢复预览")));
+
+    const QString outputPath=QFileDialog::getSaveFileName(this,
+        QStringLiteral("保存重建的 JPEG"),QStringLiteral("BY70-4_ID%1.jpg").arg(imageId),
         QStringLiteral("JPEG 图像 (*.jpg *.jpeg)"));
-    if(output.isEmpty())return;
-    auto *process=new QProcess(this);
-    connect(process,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,
-        [this,process,output](int exitCode,QProcess::ExitStatus status){
-            QPixmap pixmap(output);
-            if(exitCode==0&&status==QProcess::NormalExit&&!pixmap.isNull()){
-                decodedImage_=pixmap;imagePath_=output;
-                imagePreview_->setImage(decodedImage_);
-                imageInfo_->setText(QStringLiteral("JPEG 已由外部工具生成：%1 × %2 像素。"
-                    "这不代表星载应用 CRC 已经验证。")
-                    .arg(pixmap.width()).arg(pixmap.height()));
-                statusBar()->showMessage(QStringLiteral("外部 JPEG 解码完成"),9000);
-            }else{
-                QMessageBox::warning(this,QStringLiteral("SSDV 解码失败"),
-                    QStringLiteral("外部工具未成功输出可读取的 JPEG。\n")+
-                    QString::fromUtf8(process->readAllStandardError()));
-            }
-            process->deleteLater();
-        });
-    process->start(tool,{"-d",input,output});
+    if(outputPath.isEmpty()){
+        statusBar()->showMessage(QStringLiteral("JPEG 已在软件内重建并显示，尚未保存到磁盘"),9000);
+        return;
+    }
+    QSaveFile output(outputPath);
+    if(!output.open(QIODevice::WriteOnly)||output.write(rebuilt.jpeg)!=rebuilt.jpeg.size()||!output.commit()){
+        QMessageBox::warning(this,QStringLiteral("JPEG 保存失败"),output.errorString());
+        return;
+    }
+    imagePath_=outputPath;
+    statusBar()->showMessage(QStringLiteral("JPEG 重建完成并已保存：")+outputPath,9000);
 }
 void MainWindow::exportFrames(bool csv){
     if(frames_.isEmpty())return;

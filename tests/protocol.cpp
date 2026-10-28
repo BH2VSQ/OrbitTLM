@@ -561,6 +561,15 @@ private slots:
         QVERIFY(f.fields.size()>=4);
         for(const auto &x:f.fields)QVERIFY(!x.name.startsWith("candidate.quaternion"));
     }
+    void malformedDslwpPacketIsRejectedByEmbeddedDecoder(){
+        ImagePacket packet;
+        packet.imageId=7;packet.packetId=0;packet.width=640;packet.height=480;
+        packet.bytes=QByteArray(217,char(0));
+        packet.status="dslwp_crc32_failed";
+        const auto decoded=ImageTools::decodeImage({packet},7,true);
+        QVERIFY(decoded.jpeg.isEmpty());
+        QVERIFY(!decoded.error.isEmpty());
+    }
 };
 QTEST_GUILESS_MAIN(ProtocolTest)
 #include "protocol.moc"

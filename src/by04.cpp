@@ -1,8 +1,14 @@
 #include "by04.h"
 #include <QSet>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QResource>
 #include <algorithm>
 #include <bit>
 #include <cmath>
+// Keep Qt resource registration outside namespace orbit for static linking.
+static void registerBy04Catalog(){Q_INIT_RESOURCE(by04_catalog);}
 namespace orbit {
 namespace {
 int u8(const QByteArray &data,int index){return int(quint8(data.at(index)));}
@@ -26,6 +32,56 @@ quint32 crc32Dslwp(const QByteArray &frame) {
     }
     return crc ^ 0xffffffffu;
 }
+const QVector<QJsonObject> &by04Catalog(){
+    static const auto catalog=[](){
+        registerBy04Catalog();
+        QVector<QJsonObject> definitions;
+        for(const auto &name:{"OBC-SF","BUV-S0"}){
+            QFile file(QString(":/by04/%1.json").arg(name));
+            if(file.open(QIODevice::ReadOnly)){
+                const auto doc=QJsonDocument::fromJson(file.readAll());
+                if(doc.isObject())definitions.push_back(doc.object());
+            }
+        }
+        return definitions;
+    }();
+    return catalog;
+}
+bool decodeBusiness(const ApplicationPacket &packet,BusinessPacket &result){
+    if(packet.satellite!="BY04")return false;
+    const QByteArray &bytes=packet.assembledBytes.isEmpty()?packet.bytes:packet.assembledBytes;
+    if(bytes.size()<7||(u8(bytes,2)>>6)!=3)return false;
+    const int identity=(u8(bytes,0)<<8)|u8(bytes,1);
+    const int declaredOctets=((u8(bytes,4)<<8)|u8(bytes,5))+7;
+    const int suffix=bytes.size()-declaredOctets;
+    if(suffix!=0&&suffix!=2&&suffix!=4)return false;
+    for(const auto &definition:by04Catalog()){
+        if(identity!=definition.value("identity").toInt()||
+           packet.vcid!=definition.value("vcid").toInt()||
+           declaredOctets!=definition.value("kiss_octets").toInt()||
+           u8(bytes,6)!=definition.value("subtype").toInt())continue;
+        const QString code=definition.value("packet").toString();
+        result.packetName="BY04-"+code;
+        result.packetLabel=code=="OBC-SF"?QStringLiteral("计算机 · 关键遥测"):
+                                            QStringLiteral("基带板 · UV 遥测");
+        result.identification="by04_kiss_envelope";
+        result.mainType=u8(bytes,1);
+        result.subType=u8(bytes,6);
+        result.fieldBaseKissOctet=7;
+        result.definitionEvidence=definition.value("identification_evidence").toString();
+        const QByteArray payload=bytes.mid(7,declaredOctets-7);
+        for(const auto &entry:definition.value("fields").toArray()){
+            auto field=BusinessCatalog::decodeField(entry.toObject(),payload);
+            if(field.status=="truncated_field"){
+                ++result.skippedFields;
+                continue;
+            }
+            result.fields.push_back(std::move(field));
+        }
+        return true;
+    }
+    return false;
+}
 }
 int By04Decoder::spacecraftId(const QByteArray &tm){
     if(tm.size()!=223)return -1;
@@ -35,6 +91,12 @@ BusinessPacket By04Decoder::decode(const ApplicationPacket &packet){
     BusinessPacket result;
     result.transport=packet;
     result.packetLabel=QStringLiteral("BY04 未分类应用数据包");
+    if(packet.assemblyStatus=="incomplete_segments"){
+        result.identification="by04_incomplete_segments";
+        result.packetLabel=QStringLiteral("分块数据 · 未收齐");
+        return result;
+    }
+    if(decodeBusiness(packet,result))return result;
     if(packet.classification!="ccsds_space_packet_candidate" ||
        packet.apid<0 || packet.bytes.size()<6) {
         result.identification="by04_opaque_kiss";
@@ -73,54 +135,13 @@ BusinessPacket By04Decoder::decode(const ApplicationPacket &packet){
         result.fields.push_back(field("by04.payload.first_octet",
              QStringLiteral("业务载荷首字节（含义未确认）"),u8(packet.data,0),1,
              "raw_unverified_business"));
-        // In the captured F0/0F packets, bytes 1..4 form a monotonic-looking
-        // 32-bit value consistent with a cumulative-seconds field. Expose it
-        // only as an explicitly unverified candidate until the BY04 field map
-        // and epoch are recovered from the working decoder.
-        if(packet.apid==0x0f0 && packet.data.size()>=5 && u8(packet.data,0)==0x0f){
-            const quint32 seconds=(quint32(u8(packet.data,1))<<24)|
-                (quint32(u8(packet.data,2))<<16)|(quint32(u8(packet.data,3))<<8)|
-                quint32(u8(packet.data,4));
-            const QByteArray raw=packet.data.mid(1,4);
-            result.fields.push_back({"candidate.utc_seconds","1.7.32",
-                QStringLiteral("UTC累计秒候选值（未验证）"),"",
-                QStringLiteral("BE uint32 at payload offset 1; epoch not confirmed"),
-                QString::fromLatin1(raw.toHex().toUpper()),QString::number(seconds),
-                QString::number(seconds),QStringLiteral("s"),QStringLiteral("candidate_unverified")});
-        }
-        // The received BY70-4 APID 0x0F0 samples contain four normalized
-        // float32BE values at this offset. Keep them marked as candidates.
-        if(packet.apid==0x0f0 && packet.data.size()>=156){
-            double q[4]{};double norm=0.0;bool valid=true;
-            for(int i=0;i<4;++i){
-                const int k=140+4*i;
-                const quint32 bits=(quint32(u8(packet.data,k))<<24)|
-                    (quint32(u8(packet.data,k+1))<<16)|
-                    (quint32(u8(packet.data,k+2))<<8)|quint32(u8(packet.data,k+3));
-                const float value=std::bit_cast<float>(bits);
-                if(!std::isfinite(value)){valid=false;break;}
-                q[i]=value;norm+=q[i]*q[i];
-            }
-            if(valid && std::abs(norm-1.0)<=0.001){
-                for(int i=0;i<4;++i){
-                    const QByteArray raw=packet.data.mid(140+4*i,4);
-                    result.fields.push_back({QString("candidate.quaternion.q%1").arg(i),"",
-                        QString("候选四元数 q%1（未验证）").arg(i),"","",
-                        QString::fromLatin1(raw.toHex().toUpper()),QString(),
-                        QString::number(q[i],'g',10),QString(),QStringLiteral("candidate_unverified")});
-                }
-                result.fields.push_back({"candidate.quaternion.norm","",
-                    QStringLiteral("候选四元数模长（未验证）"),"","",QString(),QString(),
-                    QString::number(std::sqrt(norm),'g',10),QString(),QStringLiteral("candidate_unverified")});
-            }
-        }
     }
     return result;
 }
 QVector<BusinessPacket> By04Decoder::decodeAll(const QVector<ApplicationPacket> &packets){
     QVector<BusinessPacket> decoded;
     decoded.reserve(packets.size());
-    for(const auto &packet:packets)decoded.push_back(decode(packet));
+    for(const auto &packet:Transport::assembleSegments(packets,1))decoded.push_back(decode(packet));
     std::stable_sort(decoded.begin(),decoded.end(),[](const BusinessPacket &a,const BusinessPacket &b){
         const QDateTime &ta=a.transport.captureLocal,&tb=b.transport.captureLocal;
         if(ta.isValid()!=tb.isValid())return ta.isValid();

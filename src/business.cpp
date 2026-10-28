@@ -1,4 +1,5 @@
 #include "business.h"
+#include "by04.h"
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
@@ -149,8 +150,39 @@ QJsonObject fieldJson(const EngineeringField &f){
     return {{"code",f.code},{"bits",f.bits},{"name_cn",f.nameCn},
         {"name_en",f.nameEn},{"formula",f.formula},{"raw_hex",f.rawHex},
         {"raw_number",f.rawNumber},{"value",f.value},
-        {"unit",f.unit},{"status",f.status}};
+        {"unit",f.unit},{"status",f.status},{"data_type",f.dataType},
+        {"definition_evidence",f.definitionEvidence}};
 }
+}
+EngineeringField BusinessCatalog::decodeField(const QJsonObject &definition,const QByteArray &payload){
+    EngineeringField field;
+    field.code=definition.value("id").toString();
+    field.bits=definition.value("bits").toString();
+    field.nameCn=definition.value("name_cn").toString();
+    field.nameEn=definition.value("name_en").toString();
+    field.formula=definition.value("formula").toString();
+    field.dataType=definition.value("data_type").toString();
+    field.definitionEvidence=definition.value("formula_source").toString();
+    const QStringList address=field.bits.split('.');
+    Raw raw;bool octetOk=false,bitOk=false,widthOk=false;
+    const int octet=address.value(0).toInt(&octetOk);
+    const int highBit=address.value(1).toInt(&bitOk);
+    const int width=address.value(2).toInt(&widthOk);
+    if(address.size()!=3||!octetOk||!bitOk||!widthOk||
+       !readBits(payload,octet,highBit,width,raw)){
+        field.status="truncated_field";
+        return field;
+    }
+    const auto converted=convert(field.formula,raw,width);
+    field.rawHex=raw.hex;
+    field.rawNumber=raw.hasNumber?QString::number(raw.bits):QString();
+    field.value=converted.value;
+    field.unit=converted.unit;
+    field.status=converted.status;
+    if(field.dataType=="raw_bits"&&!field.status.startsWith("raw_"))field.status="raw_bits";
+    if((field.dataType=="sample_checked_linear"||field.dataType=="adapted_unit_reference")&&
+       field.status=="table_formula")field.status="reference_formula";
+    return field;
 }
 bool BusinessCatalog::loadDirectory(const QString &directory,QString *error){
     QDir dir(directory);
@@ -319,16 +351,52 @@ QVector<BusinessPacket> BusinessCatalog::decodeAll(const QVector<ApplicationPack
     if(stats)*stats=counts;
     return decoded;
 }
+QVector<BusinessPacket> BusinessCatalog::decodeBySatellite(const QVector<ApplicationPacket> &packets,
+                                                           BusinessStats *stats)const{
+    QVector<BusinessPacket> decoded;
+    QVector<ApplicationPacket> by04Packets;
+    decoded.reserve(packets.size());
+    for(const auto &packet:packets){
+        if(packet.satellite=="BY04")by04Packets.push_back(packet);
+        else if(packet.satellite=="ASRTU-1")decoded.push_back(decode(packet));
+        else { BusinessPacket unknown; unknown.transport=packet; unknown.identification="unknown_satellite"; decoded.push_back(unknown); }
+    }
+    decoded+=By04Decoder::decodeAll(by04Packets);
+    std::stable_sort(decoded.begin(),decoded.end(),[](const BusinessPacket &a,const BusinessPacket &b){
+        const auto &ta=a.transport.captureLocal,&tb=b.transport.captureLocal;
+        if(ta.isValid()!=tb.isValid())return ta.isValid();
+        if(!ta.isValid())return false;
+        return ta<tb;
+    });
+    BusinessStats counts;
+    for(const auto &packet:decoded){
+        if(packet.packetName.isEmpty()||packet.identification=="by04_ccsds_header_only")++counts.unknown;
+        else ++counts.recognized;
+        counts.truncatedFields+=packet.skippedFields;
+        for(const auto &field:packet.fields){
+            if(field.status.startsWith("raw_"))++counts.unsupportedFields;
+            if(packet.transport.satellite=="ASRTU-1"||field.status=="table_formula"||
+               field.status=="reference_formula"||field.status=="table_enum")++counts.decodedFields;
+        }
+    }
+    if(stats)*stats=counts;
+    return decoded;
+}
 QJsonObject BusinessCatalog::toJson(const BusinessPacket &packet){
-    QJsonArray fields,sources;
+    QJsonArray fields,sources,segments;
+    for(const auto &segment:packet.transport.segments)segments.append(QString::fromLatin1(segment.toHex()));
     for(const auto &f:packet.fields)fields.append(fieldJson(f));
     for(const auto &s:packet.transport.sources)sources.append(s);
     return {
         {"packet",packet.packetName},{"packet_label",packet.packetLabel},
+        {"satellite",packet.transport.satellite},
         {"main_type",packet.mainType},{"sub_type",packet.subType},
         {"ccsds_apid",packet.transport.apid},
         {"ccsds_packet_sequence",packet.transport.sequence},
         {"identification",packet.identification},
+        {"assembly_status",packet.transport.assemblyStatus},
+        {"raw_segments_hex",segments},
+        {"assembled_packet_hex",QString::fromLatin1(packet.transport.assembledBytes.toHex())},
         {"skipped_fields",packet.skippedFields},{"fields",fields},
         {"vcid",packet.transport.vcid},{"fec_evidence",packet.transport.fecEvidence},
         {"integrity",packet.transport.integrity},{"sources",sources},

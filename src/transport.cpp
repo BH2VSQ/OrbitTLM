@@ -183,6 +183,87 @@ QVector<ApplicationPacket> Transport::reassemble(const QVector<Frame> &frames,Tr
     if(stats)*stats=observed;
     return out;
 }
+QVector<ApplicationPacket> Transport::assembleSegments(const QVector<ApplicationPacket> &packets,int secondaryHeaderOctets){
+    struct Group {ApplicationPacket first;QByteArray payload,lastBytes;int last=-1,order=0;};
+    QHash<QString,Group> pending;
+    QVector<ApplicationPacket> out;
+    auto flush=[&](const QString &key){
+        auto it=pending.find(key);
+        if(it==pending.end())return;
+        it->first.assemblyStatus="incomplete_segments";
+        out.push_back(it->first);
+        pending.erase(it);
+    };
+    int inputOrder=0;
+    for(const auto &packet:packets){
+        const int order=inputOrder++;
+        const QByteArray &bytes=packet.bytes;
+        if(packet.classification!="ccsds_space_packet_candidate"||bytes.size()<7||
+           (packet.opaqueSuffixBytes!=0&&packet.opaqueSuffixBytes!=2&&packet.opaqueSuffixBytes!=4)||
+           secondaryHeaderOctets<0||packet.data.size()<secondaryHeaderOctets){
+            out.push_back(packet);continue;
+        }
+        const int identity=(octet(bytes[0])<<8)|octet(bytes[1]);
+        if((identity>>13)!=0||(identity&0x1000)!=0||
+           ((octet(bytes[4])<<8)|octet(bytes[5]))+7+packet.opaqueSuffixBytes!=bytes.size()||
+           packet.data!=bytes.mid(6,bytes.size()-6-packet.opaqueSuffixBytes)){
+            out.push_back(packet);continue;
+        }
+        const int sequence=(octet(bytes[2])<<8)|octet(bytes[3]);
+        const int flags=sequence>>14;
+        const int count=sequence&0x3fff;
+        const QString key=packet.satellite+":"+QString::number(packet.vcid)+":"+
+            QString::number(identity)+":"+packet.sources.join(QLatin1Char('|'));
+        if(flags==3){flush(key);out.push_back(packet);continue;}
+        if(flags==1){
+            if(pending.contains(key)&&pending[key].lastBytes==bytes)continue;
+            flush(key);
+            Group group;group.order=order;group.first=packet;group.first.segments={bytes};
+            group.payload=packet.data;group.last=count;group.lastBytes=bytes;
+            pending.insert(key,group);continue;
+        }
+        if(!pending.contains(key)){
+            auto orphan=packet;orphan.assemblyStatus="incomplete_segments";orphan.segments={bytes};
+            out.push_back(orphan);continue;
+        }
+        auto &group=pending[key];
+        if(group.last==count&&group.lastBytes==bytes)continue;
+        if(((group.last+1)&0x3fff)!=count||
+           packet.data.left(secondaryHeaderOctets)!=group.payload.left(secondaryHeaderOctets)||
+           group.payload.size()+packet.data.size()-secondaryHeaderOctets>65536||
+           group.first.segments.size()>=4096){
+            flush(key);
+            auto orphan=packet;orphan.assemblyStatus="incomplete_segments";orphan.segments={bytes};
+            out.push_back(orphan);continue;
+        }
+        group.payload+=packet.data.mid(secondaryHeaderOctets);
+        group.last=count;group.lastBytes=bytes;
+        group.first.segments.push_back(bytes);
+        group.first.lastMaster=packet.lastMaster;
+        group.first.contributingFrames+=packet.contributingFrames;
+        for(const auto &source:packet.sources)
+            if(!group.first.sources.contains(source))group.first.sources<<source;
+        if(group.first.fecEvidence!=packet.fecEvidence)group.first.fecEvidence="mixed_fec_unverified";
+        if(flags==2){
+            auto complete=group.first;
+            complete.data=group.payload;
+            complete.assembledBytes=complete.bytes.left(6);
+            complete.assembledBytes[2]=char((quint8(complete.assembledBytes[2])&0x3f)|0xc0);
+            const int length=complete.data.size()-1;
+            complete.assembledBytes[4]=char(length>>8);
+            complete.assembledBytes[5]=char(length&255);
+            complete.assembledBytes+=complete.data;
+            complete.assemblyStatus="reassembled_segments";
+            out.push_back(std::move(complete));
+            pending.remove(key);
+        }
+    }
+    QVector<QPair<int,QString>> pendingKeys;
+    for(auto it=pending.cbegin();it!=pending.cend();++it)pendingKeys.push_back({it.value().order,it.key()});
+    std::sort(pendingKeys.begin(),pendingKeys.end(),[](const auto &a,const auto &b){return a.first<b.first;});
+    for(const auto &entry:pendingKeys)flush(entry.second);
+    return out;
+}
 bool Transport::exportJson(const QString &path,const QVector<ApplicationPacket> &packets,QString *error){
     QJsonArray a;
     for(const auto &p:packets){

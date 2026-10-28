@@ -69,9 +69,10 @@ QGroupBox *statusCard(const QString &title){
     auto *layout=new QVBoxLayout(card);
     layout->setContentsMargins(5,16,5,5);
     layout->setSpacing(0);
-    auto *table=new QTableWidget(0,3,card);
+    auto *table=new QTableWidget(0,4,card);
     table->setObjectName("statusTable");
-    table->setHorizontalHeaderLabels({QStringLiteral("参数"),QStringLiteral("当前值"),QStringLiteral("状态")});
+    table->setHorizontalHeaderLabels({QStringLiteral("参数"),QStringLiteral("当前值"),
+                                      QStringLiteral("参数"),QStringLiteral("当前值")});
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionMode(QAbstractItemView::NoSelection);
     table->verticalHeader()->hide();
@@ -81,8 +82,9 @@ QGroupBox *statusCard(const QString &title){
     table->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     table->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
-    table->horizontalHeader()->setSectionResizeMode(1,QHeaderView::ResizeToContents);
-    table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::Stretch);
+    table->horizontalHeader()->setSectionResizeMode(1,QHeaderView::Stretch);
+    table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::ResizeToContents);
+    table->horizontalHeader()->setSectionResizeMode(3,QHeaderView::Stretch);
     layout->addWidget(table,1);
     return card;
 }
@@ -427,7 +429,7 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
     layout->addWidget(engineeringSearch_);
     auto *split=new QSplitter(Qt::Horizontal);
     engineeringTable_=new QTableWidget(0,3);
-    engineeringTable_->setHorizontalHeaderLabels({QStringLiteral("时间"),QStringLiteral("分系统"),QStringLiteral("状态")});
+    engineeringTable_->setHorizontalHeaderLabels({QStringLiteral("时间"),QStringLiteral("分系统"),QStringLiteral("字段数")});
     setupTable(engineeringTable_);
     engineeringTable_->horizontalHeader()->setSectionResizeMode(1,QHeaderView::Stretch);
     engineeringTable_->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
@@ -437,6 +439,7 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
     rightLayout->setContentsMargins(5,2,5,2);
     fieldTree_=new QTreeWidget;
     fieldTree_->setHeaderLabels({QStringLiteral("参数"),QStringLiteral("数值"),QStringLiteral("单位"),QStringLiteral("解析状态")});
+    fieldTree_->setColumnHidden(3,true);
     fieldTree_->setColumnWidth(0,245);
     fieldTree_->setColumnWidth(1,132);
     fieldTree_->setRootIsDecorated(true);
@@ -514,19 +517,17 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
         {QStringLiteral("星敏感器Z"),{"SSZ"},{QStringLiteral("星敏Z"),QStringLiteral("星敏感器Z")}}
     };
     for(const auto &spec:specs){
-        auto *table=new QTableWidget(0,6,parts);
+        auto *table=new QTableWidget(0,4,parts);
         table->setObjectName("componentTable");
-        table->setHorizontalHeaderLabels({QStringLiteral("数据包"),QStringLiteral("字段"),QStringLiteral("当前值"),
-                                          QStringLiteral("单位"),QStringLiteral("接收时间"),QStringLiteral("解析状态")});
+        table->setHorizontalHeaderLabels({QStringLiteral("数据包"),QStringLiteral("字段"),
+                                          QStringLiteral("当前值"),QStringLiteral("接收时间")});
         setupTable(table);
         table->verticalHeader()->setDefaultSectionSize(20);
         table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
         table->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
         table->horizontalHeader()->setSectionResizeMode(1,QHeaderView::ResizeToContents);
-        table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::ResizeToContents);
+        table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::Stretch);
         table->horizontalHeader()->setSectionResizeMode(3,QHeaderView::ResizeToContents);
-        table->horizontalHeader()->setSectionResizeMode(4,QHeaderView::ResizeToContents);
-        table->horizontalHeader()->setSectionResizeMode(5,QHeaderView::Stretch);
         parts->addTab(table,spec.title);
         componentTables_.insert(spec.title,table);
         componentPrefixes_.insert(spec.title,spec.prefixes);
@@ -576,7 +577,7 @@ void MainWindow::buildImages(QTabWidget *tabs){
     row->addWidget(scan);
     auto *save=new QPushButton(QStringLiteral("保存 SSDV 数据"));
     row->addWidget(save);
-    auto *decode=new QPushButton(QStringLiteral("外部解码为 JPEG"));
+    auto *decode=new QPushButton(QStringLiteral("重建 JPEG"));
     row->addWidget(decode);
     row->addStretch(1);
     layout->addLayout(row);
