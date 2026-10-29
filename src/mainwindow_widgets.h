@@ -32,22 +32,6 @@
 #include <limits>
 // Runtime translator used by custom-painted widgets and tab strips that do not
 // expose their text through QLabel/QPushButton for the normal localization pass.
-inline QString orbitWidgetText(const QString &source){
-    auto *app=QCoreApplication::instance();
-    if(!app||app->property("orbitTlmLanguage").toString()!=QStringLiteral("en-US"))return source;
-    const QJsonObject map=app->property("orbitTlmTranslations").value<QJsonObject>();
-    const auto exact=map.constFind(source);
-    if(exact!=map.constEnd())return exact.value().toString(source);
-    QString translated=source;
-    QStringList keys=map.keys();
-    std::sort(keys.begin(),keys.end(),[](const QString &a,const QString &b){return a.size()>b.size();});
-    for(const QString &key:keys){
-        const QString value=map.value(key).toString();
-        if(key.isEmpty()||key==value||!translated.contains(key))continue;
-        translated.replace(key,value);
-    }
-    return translated;
-}
 inline bool orbitContainsCjk(const QString &text){
     for(const QChar ch:text){
         const ushort u=ch.unicode();
@@ -55,14 +39,38 @@ inline bool orbitContainsCjk(const QString &text){
     }
     return false;
 }
-inline QString orbitEnglishFieldLabel(const QString &source,const QString &catalogEnglish,const QString &code){
-    if(!catalogEnglish.isEmpty()&&!orbitContainsCjk(catalogEnglish))return catalogEnglish;
-    const QString translated=orbitWidgetText(source);
-    if(!orbitContainsCjk(translated))return translated;
-    // Some mission catalogs contain no English metadata for a field. Keep the
-    // English UI free of untranslated CJK; the stable official field code lets
-    // operators locate and cross-reference the exact catalog entry.
-    return code.isEmpty()?QStringLiteral("Telemetry field"):QStringLiteral("Field %1").arg(code);
+// Runtime translator used by custom-painted widgets and table builders. The
+// former hot path scanned every translation phrase for every telemetry value,
+// including numeric/ASCII-only values. Cache repeated strings and skip phrase
+// matching when the input contains no CJK characters.
+inline QString orbitWidgetText(const QString &source){
+    auto *app=QCoreApplication::instance();
+    if(!app||app->property("orbitTlmLanguage").toString()!=QStringLiteral("en-US"))return source;
+    static QString cacheLanguage;
+    static QHash<QString,QString> cache;
+    const QString language=app->property("orbitTlmLanguage").toString();
+    if(cacheLanguage!=language){cache.clear();cacheLanguage=language;}
+    const auto cached=cache.constFind(source);
+    if(cached!=cache.constEnd())return cached.value();
+    const QJsonObject map=app->property("orbitTlmTranslations").value<QJsonObject>();
+    const auto exact=map.constFind(source);
+    if(exact!=map.constEnd()){
+        const QString result=exact.value().toString(source);
+        if(source.size()<=256&&cache.size()<20000)cache.insert(source,result);
+        return result;
+    }
+    if(!orbitContainsCjk(source))return source;
+    QString translated=source;
+    const QStringList keys=app->property("orbitTlmTranslationKeys").toStringList();
+    for(const QString &key:keys){
+        if(key.isEmpty()||!translated.contains(key))continue;
+        const QString value=map.value(key).toString();
+        if(key==value)continue;
+        translated.replace(key,value);
+        if(!orbitContainsCjk(translated))break;
+    }
+    if(source.size()<=256&&cache.size()<20000)cache.insert(source,translated);
+    return translated;
 }
 // ORBITTLM_ROUND4_PACKET_ARROWS
 class FlowLayout final : public QLayout {
@@ -211,8 +219,27 @@ public:
         labels_[index]=text;buttons_[index]->setText(text);applyTabButtonStyle(buttons_[index]);
         buttons_[index]->adjustSize();buttons_[index]->setFixedSize(buttons_[index]->sizeHint());refreshTabWrapping();
     }
+    void setTabTexts(const QStringList &texts){
+        const int n=qMin(count(),texts.size());
+        bool changed=false;
+        for(int i=0;i<n;++i){
+            if(labels_[i]==texts.at(i)&&buttons_[i]->text()==texts.at(i))continue;
+            labels_[i]=texts.at(i);
+            buttons_[i]->setText(texts.at(i));
+            buttons_[i]->setToolTip(orbitWidgetText(buttons_[i]->property("orbitSourceToolTip").toString().isEmpty()?texts.at(i):buttons_[i]->property("orbitSourceToolTip").toString()));
+            applyTabButtonStyle(buttons_[i]);
+            buttons_[i]->adjustSize();
+            buttons_[i]->setFixedSize(buttons_[i]->sizeHint());
+            changed=true;
+        }
+        if(changed)refreshTabWrapping();
+    }
     QString tabText(int index) const { return index>=0&&index<count()?labels_.at(index):QString(); }
-    void setTabToolTip(int index,const QString &tip){if(index>=0&&index<count())buttons_[index]->setToolTip(tip);}
+    void setTabToolTip(int index,const QString &tip){
+        if(index<0||index>=count())return;
+        buttons_[index]->setProperty("orbitSourceToolTip",tip);
+        buttons_[index]->setToolTip(orbitWidgetText(tip));
+    }
     void setWrappedTabText(int index,const QString &text){setTabText(index,text);}
     void refreshTabWrapping(){
         if(tabLayout_){tabLayout_->invalidate();tabLayout_->activate();}

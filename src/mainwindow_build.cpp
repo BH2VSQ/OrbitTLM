@@ -334,15 +334,17 @@ void MainWindow::buildMenus(){
     tools->addAction(QStringLiteral("TCP 服务器设置…"),[this]{configureTcpServer();});
     languageMenu_=tools->addMenu(QStringLiteral("界面语言"));
     languageMenu_->setObjectName(QStringLiteral("languageMenu"));
-    // Always expose supported languages even when the executable is launched
-    // from a folder that does not contain the external i18n directory.
-    const QList<QPair<QString,QString>> supportedLanguages={
-        {QStringLiteral("zh-CN"),QStringLiteral("简体中文")},
-        {QStringLiteral("en-US"),QStringLiteral("English")}
-    };
-    for(const auto &language:supportedLanguages){
-        const QString code=language.first;
-        auto *languageAction=languageMenu_->addAction(language.second);
+    // Locale names are metadata in the embedded dictionaries; language codes
+    // remain stable identifiers in source code and settings.
+    const QStringList supportedLanguages={QStringLiteral("zh-CN"),QStringLiteral("en-US")};
+    for(const QString &code:supportedLanguages){
+        QString displayName=code;
+        QFile localeFile(QStringLiteral(":/i18n/")+code+QStringLiteral(".json"));
+        if(localeFile.open(QIODevice::ReadOnly)){
+            const QJsonObject localeRoot=QJsonDocument::fromJson(localeFile.readAll()).object();
+            displayName=localeRoot.value(QStringLiteral("displayName")).toString(code);
+        }
+        auto *languageAction=languageMenu_->addAction(displayName);
         languageAction->setObjectName(QStringLiteral("languageAction_")+code);
         languageAction->setCheckable(true);
         languageAction->setData(code);
@@ -350,13 +352,19 @@ void MainWindow::buildMenus(){
         connect(languageAction,&QAction::triggered,this,[this,code]{
             languageCode_=code;
             applyLanguage();
-            if(sourceLabel_){
-                const QString source=sourceLabel_->property("orbitDynamicSource").toString();
-                if(!source.isEmpty())sourceLabel_->setText(uiText(source));
+            updatePaths();
+            // Translation pass uses the retained source text for live summaries and
+            // updates all existing table/tree cells in-place. Avoid rebuilding frame
+            // tables, rescanning the replay history, recreating charts, or decoding an
+            // SSDV JPEG as a side effect of changing the language.
+            if(positionLabel_)
+                positionLabel_->setText(currentIndex_<0?QStringLiteral("0 / %1").arg(business_.size()):
+                    QStringLiteral("%1 / %2").arg(currentIndex_+1).arg(business_.size()));
+            if(rawHex_){
+                // Raw HEX is a plain-text document rather than a table cell, so only
+                // reformat the currently selected packet; this does not walk history.
+                updateRawPacket(currentIndex_);
             }
-            updateFrameList();
-            showEvent(currentIndex_);
-            updateMetrics();
             if(tcpStatusLabel_){
                 const QString status=tcpConnected_?QStringLiteral("TCP：已连接"):
                     (tcpConnecting_?QStringLiteral("TCP：连接中"):QStringLiteral("TCP：未连接"));
@@ -369,8 +377,22 @@ void MainWindow::buildMenus(){
                 playPauseButton_->setText(uiText(playPauseButton_->isChecked()?QStringLiteral("暂停"):QStringLiteral("播放")));
             if(replayCollapseButton_)
                 replayCollapseButton_->setText(uiText(replayListCollapsed_?QStringLiteral("展开时间轴"):QStringLiteral("收起时间轴")));
-            const int imageId=selectedImageId();
-            if(imageId>=0){updateImageProgress(imageId);decodeSsdvImage(imageId,false);}
+            // Chart objects are not QWidget descendants, so update their stored
+            // source titles directly without rebuilding their data series.
+            if(engineeringChart_&&engineeringChart_->chart()){
+                auto *chart=engineeringChart_->chart();
+                const QString title=chart->property("orbitSourceTitle").toString();
+                if(!title.isEmpty())chart->setTitle(uiText(title));
+            }
+            if(attitudeChart_&&attitudeChart_->chart()){
+                auto *chart=attitudeChart_->chart();
+                const QString title=chart->property("orbitSourceTitle").toString();
+                if(!title.isEmpty())chart->setTitle(uiText(title));
+            }
+            if(imageCoverage_){
+                const QString sourceFormat=imageCoverage_->property("orbitSourceFormat").toString();
+                if(!sourceFormat.isEmpty())imageCoverage_->setFormat(uiText(sourceFormat));
+            }
             saveApplicationSettings();
         });
     }
@@ -469,34 +491,38 @@ bool MainWindow::loadLanguageFile(){
     }();
     Q_UNUSED(resourcesRegistered);
     const QString code=languageCode_.isEmpty()?QStringLiteral("zh-CN"):languageCode_;
-    QStringList paths={
-        QDir(QCoreApplication::applicationDirPath()).filePath(
-            QStringLiteral("i18n/")+code+QStringLiteral(".json")),
-        QStringLiteral(":/i18n/")+code+QStringLiteral(".json")
-    };
     QByteArray contents;
-    for(const QString &path:paths){
-        QFile file(path);
-        if(file.open(QIODevice::ReadOnly)){contents=file.readAll();break;}
-    }
+    const QString resourcePath=QStringLiteral(":/i18n/")+code+QStringLiteral(".json");
+    QFile file(resourcePath);
+    if(file.open(QIODevice::ReadOnly))contents=file.readAll();
     if(contents.isEmpty()&&code!=QStringLiteral("zh-CN")){
         languageCode_=QStringLiteral("zh-CN");
-        QStringList fallbackPaths={
-            QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("i18n/zh-CN.json")),
-            QStringLiteral(":/i18n/zh-CN.json")
-        };
-        for(const QString &path:fallbackPaths){
-            QFile file(path);
-            if(file.open(QIODevice::ReadOnly)){contents=file.readAll();break;}
-        }
+        QFile fallback(QStringLiteral(":/i18n/zh-CN.json"));
+        if(fallback.open(QIODevice::ReadOnly))contents=fallback.readAll();
     }
     if(contents.isEmpty())return false;
     const QJsonObject root=QJsonDocument::fromJson(contents).object();
     const QJsonObject map=root.value(QStringLiteral("translations")).toObject();
     if(map.isEmpty())return false;
     translations_=map;
+    webTranslations_=root.value(QStringLiteral("webTranslations")).toObject();
+    uiTextCache_.clear();
+    // Build the substring-fallback replacement order only once per language load.
+    // Previously uiText(), orbitWidgetText() and localizeItemText() each sorted
+    // the whole dictionary for every visible and hidden field, making English
+    // switching disproportionately slow on telemetry catalogs.
+    translationKeysByLength_.clear();
+    const QStringList allKeys=translations_.keys();
+    translationKeysByLength_.reserve(allKeys.size());
+    for(const QString &key:allKeys){
+        if(!key.isEmpty() && orbitContainsCjk(key) && translations_.value(key).toString()!=key)
+            translationKeysByLength_.push_back(key);
+    }
+    std::sort(translationKeysByLength_.begin(),translationKeysByLength_.end(),
+              [](const QString &a,const QString &b){return a.size()>b.size();});
     if(QCoreApplication::instance()){
         QCoreApplication::instance()->setProperty("orbitTlmTranslations",QVariant::fromValue(map));
+        QCoreApplication::instance()->setProperty("orbitTlmTranslationKeys",translationKeysByLength_);
         QCoreApplication::instance()->setProperty("orbitTlmLanguage",languageCode_);
     }
     return true;
@@ -516,30 +542,39 @@ void MainWindow::applyLanguage(){
     };
     setWindowTitle(translated(this,windowTitle(),"orbitSourceWindowTitle"));
     const auto dynamicLabel=[this](const QLabel *label){
-        return label==sourceLabel_||label==message_||label==currentTitle_||label==currentMeta_||
-            label==integrityLabel_||label==attitudeModeLabel_||label==frameMetric_||
-            label==recognizedMetric_||label==unknownMetric_||label==timeMetric_||
-            label==imageMetric_||label==transportMetric_||label==positionLabel_||
-            label==engineeringSummary_||label==fieldDetail_||label==attitudeInfo_||
-            label==imageInfo_||label==diagnosticsSummary_||label==tcpStatusLabel_;
+        return label==currentMeta_||label==integrityLabel_||label==frameMetric_||
+            label==recognizedMetric_||label==unknownMetric_||
+            label==imageMetric_||label==positionLabel_||label==tcpStatusLabel_;
     };
     for(QWidget *widget:findChildren<QWidget*>()){
         if(auto *label=qobject_cast<QLabel*>(widget)){
-            if(!dynamicLabel(label))label->setText(translated(label,label->text(),"orbitSourceText"));
+            if(!dynamicLabel(label)){
+                const QString value=translated(label,label->text(),"orbitSourceText");
+                if(label->text()!=value)label->setText(value);
+            }
         }
-        if(auto *button=qobject_cast<QAbstractButton*>(widget))
-            button->setText(translated(button,button->text(),"orbitSourceText"));
-        if(auto *group=qobject_cast<QGroupBox*>(widget))
-            group->setTitle(translated(group,group->title(),"orbitSourceText"));
-        if(auto *line=qobject_cast<QLineEdit*>(widget))
-            line->setPlaceholderText(translated(line,line->placeholderText(),"orbitSourcePlaceholder"));
-        if(auto *plain=qobject_cast<QPlainTextEdit*>(widget))
-            plain->setPlaceholderText(translated(plain,plain->placeholderText(),"orbitSourcePlaceholder"));
+        if(auto *button=qobject_cast<QAbstractButton*>(widget)){
+            const QString value=translated(button,button->text(),"orbitSourceText");
+            if(button->text()!=value)button->setText(value);
+        }
+        if(auto *group=qobject_cast<QGroupBox*>(widget)){
+            const QString value=translated(group,group->title(),"orbitSourceText");
+            if(group->title()!=value)group->setTitle(value);
+        }
+        if(auto *line=qobject_cast<QLineEdit*>(widget)){
+            const QString value=translated(line,line->placeholderText(),"orbitSourcePlaceholder");
+            if(line->placeholderText()!=value)line->setPlaceholderText(value);
+        }
+        if(auto *plain=qobject_cast<QPlainTextEdit*>(widget)){
+            const QString value=translated(plain,plain->placeholderText(),"orbitSourcePlaceholder");
+            if(plain->placeholderText()!=value)plain->setPlaceholderText(value);
+        }
         if(!widget->toolTip().isEmpty()){
             const QString tipSource=widget->property("orbitSourceToolTip").isValid()
                 ?widget->property("orbitSourceToolTip").toString():widget->toolTip();
             if(!widget->property("orbitSourceToolTip").isValid())widget->setProperty("orbitSourceToolTip",tipSource);
-            widget->setToolTip(uiText(tipSource));
+            const QString tip=uiText(tipSource);
+            if(widget->toolTip()!=tip)widget->setToolTip(tip);
         }
         if(auto *combo=qobject_cast<QComboBox*>(widget)){
             constexpr int role=Qt::UserRole+121;
@@ -548,51 +583,68 @@ void MainWindow::applyLanguage(){
                 QString source;
                 if(saved.isValid())source=saved.toString();
                 else{source=combo->itemText(i);combo->setItemData(i,source,role);}
-                combo->setItemText(i,uiText(source));
+                const QString value=uiText(source);
+                if(combo->itemText(i)!=value)combo->setItemText(i,value);
             }
         }
         if(auto *tabs=qobject_cast<QTabWidget*>(widget)){
+            // Translate only the actual Qt tab widget pages (the top-level page
+            // set and the raw-data sub-tabs). AutoWrapTabWidget keeps its own
+            // original page labels and is translated in the dedicated pass
+            // below; it must not be replaced by a nested QTabWidget wrapper.
             QStringList sources=tabs->property("orbitSourceTabTexts").toStringList();
             while(sources.size()<tabs->count())sources.push_back(tabs->tabText(sources.size()));
             if(sources.size()>tabs->count())sources=sources.mid(0,tabs->count());
             tabs->setProperty("orbitSourceTabTexts",sources);
-            for(int i=0;i<tabs->count();++i)tabs->setTabText(i,uiText(sources[i]));
+            for(int i=0;i<tabs->count();++i){
+                const QString value=uiText(sources[i]);
+                if(tabs->tabText(i)!=value)tabs->setTabText(i,value);
+            }
         }
         if(auto *menu=qobject_cast<QMenu*>(widget)){
             const QString source=translated(menu,menu->title(),"orbitSourceText");
             if(menu->menuAction())menu->menuAction()->setProperty("orbitSourceText",menu->property("orbitSourceText"));
-            menu->setTitle(source);
+            if(menu->title()!=source)menu->setTitle(source);
         }
         if(auto *toolbar=qobject_cast<QToolBar*>(widget))
             toolbar->setWindowTitle(translated(toolbar,toolbar->windowTitle(),"orbitSourceWindowTitle"));
         if(auto *table=qobject_cast<QTableWidget*>(widget)){
+            const bool hadUpdates=table->updatesEnabled();
+            table->setUpdatesEnabled(false);
             constexpr int headerRole=Qt::UserRole+122;
             constexpr int cellRole=Qt::UserRole+123;
             for(int i=0;i<table->columnCount();++i){
                 if(auto *headerItem=table->horizontalHeaderItem(i)){
                     QVariant saved=headerItem->data(headerRole);QString source;
                     if(saved.isValid())source=saved.toString();else{source=headerItem->text();headerItem->setData(headerRole,source);}
-                    headerItem->setText(uiText(source));
+                    const QString value=uiText(source);
+                    if(headerItem->text()!=value)headerItem->setText(value);
                 }
             }
             for(int row=0;row<table->rowCount();++row)for(int col=0;col<table->columnCount();++col){
                 if(auto *cell=table->item(row,col)){
                     QVariant saved=cell->data(cellRole);QString source;
                     if(saved.isValid())source=saved.toString();else{source=cell->text();cell->setData(cellRole,source);}
-                    const QString explicitEnglish=cell->data(Qt::UserRole+125).toString();
-                    cell->setText(languageCode_==QStringLiteral("en-US")&&!explicitEnglish.isEmpty()
-                                      ?explicitEnglish:uiText(source));
+                    const QString value=uiText(source);
+                    if(cell->text()!=value)cell->setText(value);
                     const QVariant tipSource=cell->data(Qt::UserRole+124);
-                    if(tipSource.isValid())cell->setToolTip(uiText(tipSource.toString()));
+                    if(tipSource.isValid()){
+                        const QString tip=uiText(tipSource.toString());
+                        if(cell->toolTip()!=tip)cell->setToolTip(tip);
+                    }
                 }
             }
+            table->setUpdatesEnabled(hadUpdates);
         }
         if(auto *tree=qobject_cast<QTreeWidget*>(widget)){
+            const bool hadUpdates=tree->updatesEnabled();
+            tree->setUpdatesEnabled(false);
             constexpr int role=Qt::UserRole+122;
             if(auto *header=tree->headerItem())for(int i=0;i<tree->columnCount();++i){
                 QVariant saved=header->data(i,role);QString source;
                 if(saved.isValid())source=saved.toString();else{source=header->text(i);header->setData(i,role,source);}
-                header->setText(i,uiText(source));
+                const QString value=uiText(source);
+                if(header->text(i)!=value)header->setText(i,value);
             }
             std::function<void(QTreeWidgetItem*)> translateNode=[&](QTreeWidgetItem *node){
                 if(!node)return;
@@ -600,47 +652,72 @@ void MainWindow::applyLanguage(){
                     QVariant saved=node->data(column,Qt::UserRole+124);QString source;
                     if(saved.isValid())source=saved.toString();
                     else{source=node->text(column);node->setData(column,Qt::UserRole+124,source);}
-                    const QString explicitEnglish=column==0?node->data(0,Qt::UserRole+125).toString():QString();
-                    node->setText(column,languageCode_==QStringLiteral("en-US")&&!explicitEnglish.isEmpty()
-                                           ?explicitEnglish:uiText(source));
+                    const QString value=uiText(source);
+                    if(node->text(column)!=value)node->setText(column,value);
                     const QVariant tooltipSource=node->data(column,Qt::UserRole+126);
-                    if(tooltipSource.isValid())node->setToolTip(column,uiText(tooltipSource.toString()));
+                    if(tooltipSource.isValid()){
+                        const QString tip=uiText(tooltipSource.toString());
+                        if(node->toolTip(column)!=tip)node->setToolTip(column,tip);
+                    }
                 }
                 for(int child=0;child<node->childCount();++child)translateNode(node->child(child));
             };
             for(int row=0;row<tree->topLevelItemCount();++row)translateNode(tree->topLevelItem(row));
+            tree->setUpdatesEnabled(hadUpdates);
         }
         if(auto *wrapped=qobject_cast<AutoWrapTabWidget*>(widget)){
+            QStringList translatedTabs;
+            translatedTabs.reserve(wrapped->count());
             for(int i=0;i<wrapped->count();++i){
                 QWidget *page=wrapped->widget(i);
-                if(!page)continue;
-                const QString source=page->property("orbitSourceTabText").toString();
-                if(!source.isEmpty())wrapped->setTabText(i,uiText(source));
-                wrapped->setTabToolTip(i,uiText(page->toolTip().isEmpty()?source:page->toolTip()));
+                QString source=page?page->property("orbitSourceTabText").toString():QString();
+                if(source.isEmpty())source=wrapped->tabText(i);
+                translatedTabs.push_back(uiText(source));
+                if(page){
+                    QString tooltipSource=page->property("orbitSourceTabTooltip").toString();
+                    if(tooltipSource.isEmpty())tooltipSource=source;
+                    wrapped->setTabToolTip(i,tooltipSource);
+                }
             }
+            wrapped->setTabTexts(translatedTabs);
         }
     }
-    for(QAction *action:findChildren<QAction*>())
-        action->setText(translated(action,action->text(),"orbitSourceText"));
+    for(QAction *action:findChildren<QAction*>()){
+        const QString value=translated(action,action->text(),"orbitSourceText");
+        if(action->text()!=value)action->setText(value);
+    }
     if(languageMenu_)for(QAction *action:languageMenu_->actions()){
         QSignalBlocker blocker(action);
         action->setCheckable(true);
         action->setChecked(action->data().toString()==languageCode_);
     }
+    updateGeometry();
+    update();
+}
+
+void MainWindow::setTranslatedLabel(QLabel *label,const QString &source){
+    if(!label)return;
+    label->setProperty("orbitSourceText",source);
+    label->setText(uiText(source));
 }
 
 QString MainWindow::uiText(const QString &source) const{
+    const auto cached=uiTextCache_.constFind(source);
+    if(cached!=uiTextCache_.constEnd())return cached.value();
     const auto exact=translations_.constFind(source);
-    if(exact!=translations_.constEnd())return exact.value().toString(source);
-    if(languageCode_!=QStringLiteral("en-US"))return source;
+    if(exact!=translations_.constEnd()){
+        const QString result=exact.value().toString(source);
+        if(source.size()<=256&&uiTextCache_.size()<20000)uiTextCache_.insert(source,result);
+        return result;
+    }
+    if(languageCode_!=QStringLiteral("en-US")||!orbitContainsCjk(source))return source;
     QString translated=source;
-    QStringList keys=translations_.keys();
-    std::sort(keys.begin(),keys.end(),[](const QString &a,const QString &b){return a.size()>b.size();});
-    for(const QString &key:keys){
-        if(key.isEmpty()||key==translations_.value(key).toString())continue;
+    for(const QString &key:translationKeysByLength_){
         if(!translated.contains(key))continue;
         translated.replace(key,translations_.value(key).toString());
+        if(!orbitContainsCjk(translated))break;
     }
+    if(source.size()<=256&&uiTextCache_.size()<20000)uiTextCache_.insert(source,translated);
     return translated;
 }
 
@@ -759,6 +836,15 @@ void MainWindow::buildWorkspace(){
     buildRaw(pages_);
     buildDiagnostics(pages_);
     workspaceSplitter_->addWidget(pages_);
+
+    const auto syncRawView=[this](){
+        if(!rawHex_||!rawPage_||!pages_)return;
+        const bool active=pages_->currentWidget()==rawPage_&&rawPage_->currentWidget()==rawHex_;
+        if(active)updateRawPacket(currentIndex_);
+        else rawHex_->clear();
+    };
+    connect(pages_,&QTabWidget::currentChanged,this,[syncRawView](int){syncRawView();});
+    if(rawPage_)connect(rawPage_,&QTabWidget::currentChanged,this,[syncRawView](int){syncRawView();});
 
     replayPanel_=new QFrame;
     replayPanel_->setObjectName("panel");
@@ -1117,13 +1203,12 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                         const QString fieldName=field.value(QStringLiteral("name")).toString();
                         const QString fullCode=field.value(QStringLiteral("code")).toString();
                         const QString englishName=field.value(QStringLiteral("english_name")).toString();
-                        const QString englishDisplay=orbitEnglishFieldLabel(fieldName.isEmpty()?fullCode:fieldName,englishName,fullCode);
                         const QString sourceDisplay=fieldName.isEmpty()?fullCode:fieldName;
-                        auto *nameItem=new QTableWidgetItem(languageCode_==QStringLiteral("en-US")?englishDisplay:sourceDisplay);
+                        const QString localizedDisplay=uiText(sourceDisplay);
+                        auto *nameItem=new QTableWidgetItem(languageCode_==QStringLiteral("en-US")?localizedDisplay:sourceDisplay);
                         nameItem->setData(Qt::UserRole,fullCode);
                         nameItem->setData(Qt::UserRole+1,englishName);
                         nameItem->setData(Qt::UserRole+123,sourceDisplay);
-                        nameItem->setData(Qt::UserRole+125,englishDisplay);
                         const QString nameTooltip=QStringLiteral("官方字段：%1\n英文名：%2").arg(fullCode,englishName);
                         nameItem->setData(Qt::UserRole+124,nameTooltip);
                         nameItem->setToolTip(uiText(nameTooltip));
@@ -1241,7 +1326,8 @@ void MainWindow::buildImages(QTabWidget *tabs){
     tabs->addTab(page,QStringLiteral("图像数据"));
 }
 void MainWindow::buildRaw(QTabWidget *tabs){
-    auto *page=new QTabWidget;
+    rawPage_=new QTabWidget;
+    auto *page=rawPage_;
     rawHex_=new QPlainTextEdit;
     rawHex_->setReadOnly(true);
     rawHex_->setLineWrapMode(QPlainTextEdit::NoWrap);

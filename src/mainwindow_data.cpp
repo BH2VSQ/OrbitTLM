@@ -81,20 +81,8 @@ QString labelStatus(const QString &s){
     return s.isEmpty()?QStringLiteral("未知"):s;
 }
 QString localizeItemText(const QString &source){
-    auto *app=QCoreApplication::instance();
-    if(!app||app->property("orbitTlmLanguage").toString()!=QStringLiteral("en-US"))return source;
-    const QJsonObject map=app->property("orbitTlmTranslations").value<QJsonObject>();
-    const auto exact=map.constFind(source);
-    if(exact!=map.constEnd())return exact.value().toString(source);
-    QString translated=source;
-    QStringList keys=map.keys();
-    std::sort(keys.begin(),keys.end(),[](const QString &a,const QString &b){return a.size()>b.size();});
-    for(const QString &key:keys){
-        const QString value=map.value(key).toString();
-        if(key.isEmpty()||key==value||!translated.contains(key))continue;
-        translated.replace(key,value);
-    }
-    return translated;
+    // Share the cached, CJK-aware translator used by other UI widgets.
+    return orbitWidgetText(source);
 }
 QTableWidgetItem *item(const QString &text,const QString &tooltip={}){
     auto *i=new QTableWidgetItem(localizeItemText(text));
@@ -219,36 +207,40 @@ QString MainWindow::utcLabel(const QDateTime &time)const{
     return time.isValid()?time.toString("yyyy-MM-dd HH:mm:ss.zzz"):
                           QStringLiteral("接收时间未知");
 }
-QString MainWindow::eventTitle(const BusinessPacket &packet)const{
+QString MainWindow::eventTitleSource(const BusinessPacket &packet)const{
     if(packet.identification=="ssdv_data_frame")
-        return uiText(QStringLiteral("SSDV 数据帧 · 图像 ID %1 · 包序号 %2"))
+        return QStringLiteral("SSDV 数据帧 · 图像 ID %1 · 包序号 %2")
             .arg(packet.ssdvImageId).arg(packet.ssdvPacketId);
     if(packet.identification=="by04_ccsds_header_only")
-        return uiText(packet.packetLabel);
+        return packet.packetLabel;
     if(packet.identification=="by04_opaque_kiss")
-        return uiText(QStringLiteral("BY04 · 未分类应用数据包"));
+        return QStringLiteral("BY04 · 未分类应用数据包");
     if(!packet.packetName.isEmpty()){
         const QString &id=packet.packetName;
-        if(id.startsWith("SAT"))return uiText(QStringLiteral("卫星平台遥测 · "))+id;
-        if(id.startsWith("ZGK"))return uiText(QStringLiteral("姿轨控遥测 · "))+id;
-        if(id.startsWith("PDB"))return uiText(QStringLiteral("配电遥测 · "))+id;
-        if(id.startsWith("TCB"))return uiText(QStringLiteral("热控遥测 · "))+id;
-        if(id.startsWith("GPS"))return uiText(QStringLiteral("GNSS 遥测 · "))+id;
+        if(id.startsWith("SAT"))return QStringLiteral("卫星平台遥测 · ")+id;
+        if(id.startsWith("ZGK"))return QStringLiteral("姿轨控遥测 · ")+id;
+        if(id.startsWith("PDB"))return QStringLiteral("配电遥测 · ")+id;
+        if(id.startsWith("TCB"))return QStringLiteral("热控遥测 · ")+id;
+        if(id.startsWith("GPS"))return QStringLiteral("GNSS 遥测 · ")+id;
         if(id.startsWith("SSY")||id.startsWith("SSZ"))
-            return uiText(QStringLiteral("星敏感器遥测 · "))+id;
+            return QStringLiteral("星敏感器遥测 · ")+id;
         if(id.startsWith("CAM")||id.startsWith("CMS"))
-            return uiText(QStringLiteral("相机遥测 · "))+id;
-        if(id.startsWith("TTC"))return uiText(QStringLiteral("测控遥测 · "))+id;
-        if(id.startsWith("BBB"))return uiText(QStringLiteral("数传遥测 · "))+id;
-        return uiText(QStringLiteral("遥测业务包 · "))+id;
+            return QStringLiteral("相机遥测 · ")+id;
+        if(id.startsWith("TTC"))return QStringLiteral("测控遥测 · ")+id;
+        if(id.startsWith("BBB"))return QStringLiteral("数传遥测 · ")+id;
+        return QStringLiteral("遥测业务包 · ")+id;
     }
     if(packet.mainType>=0&&packet.subType>=0){
-        return uiText(QStringLiteral("未识别业务包（%1 / %2）"))
+        return QStringLiteral("未识别业务包（%1 / %2）")
             .arg(packet.mainType,2,16,QChar('0'))
             .arg(packet.subType,2,16,QChar('0')).toUpper();
     }
-    return uiText(QStringLiteral("未识别 KISS 应用包"));
+    return QStringLiteral("未识别 KISS 应用包");
 }
+QString MainWindow::eventTitle(const BusinessPacket &packet)const{
+    return uiText(eventTitleSource(packet));
+}
+
 const BusinessPacket *MainWindow::latestRecognized(int index,
                                                    const QStringList &prefixes)const{
     if(index<0)return nullptr;
@@ -262,9 +254,12 @@ const BusinessPacket *MainWindow::latestRecognized(int index,
 }
 void MainWindow::updatePaths(){
     auto basename=[](const QString &p){return p.isEmpty()?QStringLiteral("未选择"):QFileInfo(p).fileName();};
-    sourceLabel_->setText(uiText(QStringLiteral("解码日志：%1     数据帧文件：%2"))
-                              .arg(basename(logPath_),basename(binPath_)));
-    sourceLabel_->setToolTip(QStringLiteral("LOG: %1\nBIN: %2").arg(logPath_,binPath_));
+    const QString sourceFormat=QStringLiteral("解码日志：%1     数据帧文件：%2");
+    sourceLabel_->setProperty("orbitSourceText",sourceFormat);
+    sourceLabel_->setText(uiText(sourceFormat).arg(basename(logPath_),basename(binPath_)));
+    const QString tooltipFormat=QStringLiteral("日志文件：%1\n数据帧文件：%2");
+    sourceLabel_->setProperty("orbitSourceToolTip",tooltipFormat);
+    sourceLabel_->setToolTip(uiText(tooltipFormat).arg(logPath_,binPath_));
 }
 void MainWindow::importSession(){
     // ORBITTLM_ROUND4_IMPORT
@@ -358,7 +353,7 @@ void MainWindow::loadHistory(){
     }
     rebuildSession();
     sourceLabel_->setProperty("orbitDynamicSource",QStringLiteral("历史会话：")+selected);
-    sourceLabel_->setText(uiText(QStringLiteral("历史会话："))+selected);
+    setTranslatedLabel(sourceLabel_,QStringLiteral("历史会话：")+selected);
     statusBar()->showMessage(uiText(QStringLiteral("历史会话已恢复："))+selected,9000);
 }
 void MainWindow::rebuildSession(bool preferLatest){
@@ -473,10 +468,11 @@ void MainWindow::updateMetrics(){
     // null QLabel pointers when those cards are absent.
     if(timeMetric_){
         if(earliest.isValid()){
-            timeMetric_->setText(earliest.date()==latest.date()?
+            const QString timeText=earliest.date()==latest.date()?
                 earliest.toString("HH:mm")+" — "+latest.toString("HH:mm"):
-                earliest.toString("MM-dd HH:mm")+"—"+latest.toString("MM-dd HH:mm"));
-        }else timeMetric_->setText(uiText(QStringLiteral("未记录")));
+                earliest.toString("MM-dd HH:mm")+"—"+latest.toString("MM-dd HH:mm");
+            setTranslatedLabel(timeMetric_,timeText);
+        }else setTranslatedLabel(timeMetric_,QStringLiteral("未记录"));
     }
     if(frameMetric_)frameMetric_->setText(QString::number(frames_.size()));
     int good=0,unknown=0;
@@ -491,31 +487,31 @@ void MainWindow::updateMetrics(){
             value->parentWidget()->findChild<QLabel*>("subtitle"):nullptr;
     };
     if(auto *caption=label(recognizedMetric_))
-        caption->setText(by04?uiText(QStringLiteral("已解析 CCSDS 包头")):
-                             uiText(QStringLiteral("已识别业务包")));
+        setTranslatedLabel(caption,by04?QStringLiteral("已解析 CCSDS 包头"):
+                                        QStringLiteral("已识别业务包"));
     if(auto *caption=label(unknownMetric_))
-        caption->setText(by04?uiText(QStringLiteral("未分类 KISS 业务包")):
-                             uiText(QStringLiteral("未识别业务包")));
+        setTranslatedLabel(caption,by04?QStringLiteral("未分类 KISS 业务包"):
+                                        QStringLiteral("未识别业务包"));
     if(recognizedMetric_)recognizedMetric_->setText(QString::number(good));
     if(unknownMetric_)unknownMetric_->setText(QString::number(unknown));
     if(imageMetric_){QSet<int> ids;for(const auto &packet:images_)ids.insert(packet.imageId);imageMetric_->setText(QString::number(ids.size()));}
-    if(transportMetric_)transportMetric_->setText(uiText(QStringLiteral("%1 包")).arg(packets_.size()));
+    if(transportMetric_)setTranslatedLabel(transportMetric_,QStringLiteral("%1 包").arg(packets_.size()));
     QSet<int> imageIds;for(const auto &packet:images_)imageIds.insert(packet.imageId);
-    message_->setText(by04?
-        uiText(QStringLiteral("BY04 · 应用包 %1 · 已匹配字段表 %2 · VC1 SSDV 图像 %3"))
+    setTranslatedLabel(message_,by04?
+        QStringLiteral("BY04 · 应用包 %1 · 已匹配字段表 %2 · VC1 SSDV 图像 %3")
             .arg(packets_.size()).arg(good).arg(imageIds.size()):
-        uiText(QStringLiteral("KISS 已重组：%1 · 应用 CRC 未校验 · 缺帧中断：%2"))
+        QStringLiteral("KISS 已重组：%1 · 应用 CRC 未校验 · 缺帧中断：%2")
             .arg(packets_.size()).arg(transportStats_.interruptedByCounterGap));
 }
 void MainWindow::updateOverview(int index){
     const bool by04=resolvedSatellite()==QStringLiteral("BY04");
     if(index<0||index>=business_.size()){
-        currentTitle_->setText(uiText(QStringLiteral("当前数据包：未解析")));
-        attitudeModeLabel_->setText(by04?uiText(QStringLiteral("UTC时间：未解析")):
-                                         uiText(QStringLiteral("UTC累计秒：未解析")));
+        setTranslatedLabel(currentTitle_,QStringLiteral("当前数据包：未解析"));
+        setTranslatedLabel(attitudeModeLabel_,by04?QStringLiteral("UTC时间：未解析"):
+                                                     QStringLiteral("UTC累计秒：未解析"));
     }else{
         const auto &packet=business_[index];
-        currentTitle_->setText(uiText(QStringLiteral("当前数据包：%1")).arg(eventTitle(packet)));
+        setTranslatedLabel(currentTitle_,QStringLiteral("当前数据包：%1").arg(eventTitleSource(packet)));
         if(by04){
             QString utc;
             for(int i=index;i>=0&&utc.isEmpty();--i){
@@ -534,8 +530,8 @@ void MainWindow::updateOverview(int index){
                     break;
                 }
             }
-            attitudeModeLabel_->setText(utc.isEmpty()?uiText(QStringLiteral("UTC时间：未解析")):
-                                            uiText(QStringLiteral("UTC时间：%1")).arg(utc));
+            setTranslatedLabel(attitudeModeLabel_,utc.isEmpty()?QStringLiteral("UTC时间：未解析"):
+                                            QStringLiteral("UTC时间：%1").arg(utc));
         }else{
             QString utc;
             bool candidateUtc=false;
@@ -552,7 +548,8 @@ void MainWindow::updateOverview(int index){
                 }
             }
             const QString suffix=candidateUtc?QStringLiteral("（候选未验证）"):QString();
-            attitudeModeLabel_->setText(uiText(QStringLiteral("UTC累计秒：%1%2")).arg(utc.isEmpty()?uiText(QStringLiteral("未解析")):utc,suffix));
+            setTranslatedLabel(attitudeModeLabel_,QStringLiteral("UTC累计秒：%1%2")
+                                   .arg(utc.isEmpty()?QStringLiteral("未解析"):utc,suffix));
         }
     }
     updateFieldCard(powerCard_,{},index);
@@ -567,14 +564,24 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     auto *table=overviewTables_.value(card,card->findChild<QTableWidget*>("statusTable"));
     if(!table)return;
     table->clearContents();
+    table->clearSpans();
+    table->horizontalHeader()->setVisible(true);
+    table->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);
     const QString activeSatellite=resolvedSatellite();
     const bool by04=activeSatellite==QStringLiteral("BY04");
-    if(card==attitudeCard_)card->setTitle(by04?uiText(QStringLiteral("姿态与轨道")):uiText(QStringLiteral("姿态与 GPS 轨道")));
+    if(card==attitudeCard_){
+        const QString cardTitle=by04?QStringLiteral("姿态与轨道"):QStringLiteral("姿态与 GPS 轨道");
+        card->setProperty("orbitSourceText",cardTitle);
+        card->setTitle(uiText(cardTitle));
+    }
     if(index<0||index>=business_.size()){
         table->setRowCount(0);
         return;
     }
-    const QString title=card->title();
+    // Branch on the untranslated source title. The visible title can be English,
+    // so using QGroupBox::title() here would silently skip all field-mapping rules.
+    const QString savedTitle=card->property("orbitSourceText").toString();
+    const QString title=savedTitle.isEmpty()?card->title():savedTitle;
     struct Row {
         QString name;
         QString packet;
@@ -730,6 +737,16 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
             rows.insert(qMax(0,current5),target);
         }
     }
+    if(rows.isEmpty()){
+        table->setRowCount(1);
+        auto *empty=item(QStringLiteral("未找到匹配的遥测字段定义；请检查当前卫星类型和字段目录。"));
+        empty->setForeground(QColor("#64748b"));
+        empty->setFlags(empty->flags()&~Qt::ItemIsSelectable);
+        table->setItem(0,0,empty);
+        table->setSpan(0,0,1,4);
+        return;
+    }
+
     const bool alignedBy04Quaternions=by04&&card==attitudeCard_;
     struct RowCell{int row=0;int column=0;};
     QVector<RowCell> rowCells(rows.size());
@@ -1032,7 +1049,7 @@ body{font:14px Segoe UI,Microsoft YaHei,sans-serif;margin:18px;color:#182940;bac
 <section class="panel"><h3>参数统计</h3><div class="scroll"><table><thead><tr><th>参数</th><th>样本</th><th>最小值</th><th>最大值</th><th>平均值</th></tr></thead><tbody id="stats"></tbody></table></div></section>
 <section class="panel"><h3>筛选后的遥测值</h3><div class="scroll"><table><thead><tr><th>时间</th><th>卫星</th><th>参数</th><th>值</th><th>单位</th><th>状态</th></tr></thead><tbody id="rows"></tbody></table></div></section>
 <script>
-const DATA=__DATA_JSON__,all=[];for(const p of DATA)for(const f of (p.fields||[]))all.push({time:p.capture_local||'',sat:p.satellite||'未知',packet:p.packet||p.packet_label||'',name:f.name_cn||f.code||'未命名',code:f.code||'',value:f.value??'',unit:f.unit||'',status:f.status||''});
+const DATA=__DATA_JSON__,all=[];for(const p of DATA)for(const f of (p.fields||[]))all.push({time:p.capture_local||'',sat:p.satellite||'未知',packet:p.packet||p.packet_label||'',name:f.name_cn||f.code||'未命名',code:f.code||'',value:(f.value==null?'':f.value),unit:f.unit||'',status:f.status||''});
 const $=id=>document.getElementById(id),numeric=x=>{if(x===null||x===undefined||String(x).trim()==='')return NaN;const n=Number(String(x).replace(/,/g,''));return Number.isFinite(n)?n:NaN},key=x=>x.code||x.name,colors=['#2675c9','#d9485f','#0f9d78','#8b5cf6','#d97706','#0891b2','#be185d','#64748b'];
 function fillSat(){const s=$('sat');for(const v of [...new Set(all.map(x=>x.sat))].sort())if(![...s.options].some(o=>o.value===v))s.add(new Option(v,v));}
 function fillFields(){const sat=$('sat').value,prev=new Set([...$('fields').selectedOptions].map(o=>o.value)),m=new Map();for(const x of all){if(sat!=='all'&&x.sat!==sat)continue;const k=key(x);if(!m.has(k))m.set(k,{k,name:x.name,code:x.code,unit:x.unit});}const e=$('fields');e.innerHTML='';for(const v of [...m.values()].sort((a,b)=>a.name.localeCompare(b.name,'zh-CN'))){const o=new Option(v.name+(v.code?' · '+v.code:'')+(v.unit?' ('+v.unit+')':''),v.k);o.selected=prev.has(v.k);e.add(o);}}
@@ -1040,8 +1057,8 @@ function filtered(){const sat=$('sat').value,q=$('q').value.trim().toLowerCase()
 function selected(){return new Set([...$('fields').selectedOptions].map(o=>o.value));}
 function render(){const rows=filtered(),keys=selected(),chosen=rows.filter(x=>keys.has(key(x))&&Number.isFinite(numeric(x.value)));$('rows').innerHTML=rows.filter(x=>!keys.size||keys.has(key(x))).slice(0,3000).map(x=>'<tr><td>'+esc(x.time)+'</td><td>'+esc(x.sat)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.value)+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.status)+'</td></tr>').join('');const groups=[...keys].map(k=>({k,items:chosen.filter(x=>key(x)===k)})).filter(g=>g.items.length);$('stats').innerHTML=groups.map(g=>{const a=g.items.map(x=>numeric(x.value)),mn=Math.min(...a),mx=Math.max(...a),avg=a.reduce((s,v)=>s+v,0)/a.length,n=(all.find(x=>key(x)===g.k)||{}).name||g.k;return '<tr><td>'+esc(n)+'</td><td>'+a.length+'</td><td>'+mn+'</td><td>'+mx+'</td><td>'+avg.toFixed(4)+'</td></tr>';}).join('');$('summary').textContent='筛选记录 '+rows.length+' 条 · 有效数值 '+chosen.length+' 个 · 已选参数 '+keys.size+' 个';draw(groups);}
 function draw(groups){const c=$('chart'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#dce5ef';ctx.fillStyle='#657a91';ctx.font='12px sans-serif';const multi=groups.length>1,allValues=groups.flatMap(g=>g.items.map(x=>numeric(x.value))),rawMin=allValues.length?Math.min(...allValues):0,rawMax=allValues.length?Math.max(...allValues):1,axisMin=multi?0:(rawMin===rawMax?rawMin-1:rawMin),axisMax=multi?100:(rawMin===rawMax?rawMax+1:rawMax);for(let i=0;i<5;i++){const y=22+i*(h-54)/4;ctx.beginPath();ctx.moveTo(48,y);ctx.lineTo(w-14,y);ctx.stroke();ctx.fillText(multi?(100-i*25)+'%':(axisMax-i*(axisMax-axisMin)/4).toPrecision(4),4,y+4);}const allTimes=groups.flatMap(g=>g.items.map(x=>new Date(x.time).getTime()).filter(Number.isFinite)),xmin=allTimes.length?Math.min(...allTimes):0,xmax=allTimes.length?Math.max(...allTimes):0;const legend=[];groups.forEach((g,i)=>{const vals=g.items.map(x=>numeric(x.value)),mn=Math.min(...vals),mx=Math.max(...vals),color=colors[i%colors.length],pts=g.items.map(x=>({t:new Date(x.time).getTime(),v:numeric(x.value)})).filter(p=>Number.isFinite(p.t));ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();pts.forEach((p,j)=>{const x=48+(xmax>xmin?(p.t-xmin)/(xmax-xmin):j/Math.max(1,pts.length-1))*(w-62),v=multi?(mx>mn?(p.v-mn)/(mx-mn)*100:50):p.v,y=22+(h-54)*(1-(multi?v/100:(v-axisMin)/(axisMax-axisMin)));if(j)ctx.lineTo(x,y);else ctx.moveTo(x,y);});ctx.stroke();const name=(all.find(x=>key(x)===g.k)||{}).name||g.k;legend.push('<span style="color:'+color+'">■ '+esc(name)+(multi?'（归一化）':'')+'</span>');});$('legend').innerHTML=legend.join('　');if(!groups.length){ctx.fillStyle='#657a91';ctx.fillText('请选择一个或多个可转为数值的参数。',60,70);}}
-function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function downloadCsv(curves){const rows=filtered(),keys=selected(),out=curves? [['时间','卫星','参数','值','单位','状态']]:[['时间','卫星','业务包','参数','字段编号','值','单位','状态']];for(const x of rows){if(keys.size&&!keys.has(key(x)))continue;if(curves&&!Number.isFinite(numeric(x.value)))continue;out.push(curves?[x.time,x.sat,x.name,x.value,x.unit,x.status]:[x.time,x.sat,x.packet,x.name,x.code,x.value,x.unit,x.status]);}const csv='\ufeff'+out.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n'),blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=curves?'OrbitTLM-curves.csv':'OrbitTLM-filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function esc(x){return String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function downloadCsv(curves){const rows=filtered(),keys=selected(),out=curves? [['时间','卫星','参数','值','单位','状态']]:[['时间','卫星','业务包','参数','字段编号','值','单位','状态']];for(const x of rows){if(keys.size&&!keys.has(key(x)))continue;if(curves&&!Number.isFinite(numeric(x.value)))continue;out.push(curves?[x.time,x.sat,x.name,x.value,x.unit,x.status]:[x.time,x.sat,x.packet,x.name,x.code,x.value,x.unit,x.status]);}const csv='\ufeff'+out.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n'),blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=curves?'OrbitTLM-curves.csv':'OrbitTLM-filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function resetFilters(){$('sat').value='all';$('q').value='';$('from').value='';$('to').value='';fillFields();render();}
 $('sat').addEventListener('change',()=>{fillFields();render();});$('fields').addEventListener('change',render);fillSat();fillFields();render();
 </script></body></html>)ORBITTLM_HTML").toUtf8();
@@ -1050,88 +1067,23 @@ $('sat').addEventListener('change',()=>{fillFields();render();});$('fields').add
     // to its visible labels before inserting telemetry JSON (which must stay intact).
     if(languageCode_==QStringLiteral("en-US")){
         QString localized=QString::fromUtf8(html);
-        QList<QPair<QString,QString>> htmlLabels={
-            {QStringLiteral("lang=\"zh-CN\""),QStringLiteral("lang=\"en-US\"")},
-            {QStringLiteral("OrbitTLM 遥测历史"),QStringLiteral("OrbitTLM Telemetry History")},
-            {QStringLiteral("OrbitTLM 遥测趋势与 CSV"),QStringLiteral("OrbitTLM Telemetry Trends & CSV")},
-            {QStringLiteral("遥测趋势与 CSV"),QStringLiteral("Telemetry Trends & CSV")},
-            {QStringLiteral("当前会话遥测 · 数据由 OrbitTLM 自动更新 · 时间为接收端记录时间，不代表已确认的星载 UTC"),QStringLiteral("Current-session telemetry · Automatically updated by OrbitTLM · Times are receiver timestamps, not confirmed onboard UTC")},
-            {QStringLiteral("当前会话数据；选择卫星、参数和时间范围后绘制趋势。多参数曲线归一化到 0–100%，CSV 保留原始工程值。"),QStringLiteral("Current-session data. Select satellites, fields and a time range to plot trends. Multi-field curves are normalized to 0–100%; CSV exports retain engineering values.")},
-            {QStringLiteral("导出当前筛选 CSV"),QStringLiteral("Export Filtered CSV")},
-            {QStringLiteral("导出曲线 CSV"),QStringLiteral("Export Curve CSV")},
-            {QStringLiteral("导出筛选 CSV"),QStringLiteral("Export Filtered CSV")},
-            {QStringLiteral("全部卫星"),QStringLiteral("All satellites")},
-            {QStringLiteral("参数（可多选，按 Ctrl/⌘ 选择多项）"),QStringLiteral("Fields (multi-select with Ctrl/⌘)")},
-            {QStringLiteral("参数（可多选）"),QStringLiteral("Fields (multi-select)")},
-            {QStringLiteral("选择一项或多项遥测参数"),QStringLiteral("Select one or more telemetry fields")},
-            {QStringLiteral("关键词"),QStringLiteral("Keyword")},
-            {QStringLiteral("参数名 / 业务包 / 字段编号"),QStringLiteral("Field name / packet / field code")},
-            {QStringLiteral("参数名 / 字段编号"),QStringLiteral("Field name / field code")},
-            {QStringLiteral("应用筛选"),QStringLiteral("Apply filters")},
-            {QStringLiteral("重置"),QStringLiteral("Reset")},
-            {QStringLiteral("筛选记录"),QStringLiteral("Filtered records")},
-            {QStringLiteral("参数种类"),QStringLiteral("Field types")},
-            {QStringLiteral("最小值"),QStringLiteral("Minimum")},
-            {QStringLiteral("最大值 / 平均值"),QStringLiteral("Maximum / Average")},
-            {QStringLiteral("参数趋势曲线"),QStringLiteral("Telemetry Trends")},
-            {QStringLiteral("遥测记录"),QStringLiteral("Telemetry Records")},
-            {QStringLiteral("参数统计"),QStringLiteral("Field Statistics")},
-            {QStringLiteral("数据说明"),QStringLiteral("Data Notes")},
-            {QStringLiteral("统计只使用可转为有限数值的工程量。选择单一参数时，纵轴显示实际数值；同时查看多个参数时，为避免不同量纲互相压缩，曲线会按各自的最小值和最大值归一化到 0–100%，原始值和单位可在统计表及 CSV 中查看。原始值、无效值和未定义字段不会被当作有效工程量绘图。"),QStringLiteral("Statistics include only engineering values convertible to finite numbers. A single field uses its actual values on the Y axis; multiple fields are normalized individually to 0–100% to avoid mixing scales. Original values and units remain available in the statistics table and CSV. Raw, invalid and undefined fields are not plotted as valid engineering quantities.")},
-            {QStringLiteral("查看 JSON 数据"),QStringLiteral("View JSON data")},
-            {QStringLiteral("下载全部 CSV"),QStringLiteral("Download full CSV")},
-            {QStringLiteral("请选择一个或多个参数，并设置时间范围查看变化趋势。"),QStringLiteral("Select one or more fields and set a time range to view trends.")},
-            {QStringLiteral("请在“参数”框中选择一个或多个参数。"),QStringLiteral("Select one or more fields in the Fields box.")},
-            {QStringLiteral("当前筛选范围内没有可绘制的数值样本。"),QStringLiteral("No numeric samples are available in the current filter range.")},
-            {QStringLiteral("请检查参数、时间范围或数据是否已解析为数值。"),QStringLiteral("Check the selected fields, time range, or whether the data was parsed as numeric values.")},
-            {QStringLiteral("曲线会使用当前卫星、时间范围和关键词筛选条件。"),QStringLiteral("The chart uses the current satellite, time range and keyword filters.")},
-            {QStringLiteral("请选择一个或多个参数。"),QStringLiteral("Select one or more fields.")},
-            {QStringLiteral("请选择一个或多个可转为数值的参数。"),QStringLiteral("Select one or more fields that can be converted to numeric values.")},
-            {QStringLiteral("请先选择至少一个参数，再导出曲线 CSV。"),QStringLiteral("Select at least one field before exporting the curve CSV.")},
-            {QStringLiteral("未知"),QStringLiteral("Unknown")},
-            {QStringLiteral("未分类"),QStringLiteral("Unclassified")},
-            {QStringLiteral("未命名"),QStringLiteral("Unnamed")},
-            {QStringLiteral("请选择参数和时间范围。"),QStringLiteral("Select fields and a time range.")},
-            {QStringLiteral("<th>时间</th>"),QStringLiteral("<th>Time</th>")},
-            {QStringLiteral("<th>卫星</th>"),QStringLiteral("<th>Satellite</th>")},
-            {QStringLiteral("<th>业务包</th>"),QStringLiteral("<th>Packet</th>")},
-            {QStringLiteral("<th>参数</th>"),QStringLiteral("<th>Field</th>")},
-            {QStringLiteral("<th>字段编号</th>"),QStringLiteral("<th>Field Code</th>")},
-            {QStringLiteral("<th>值</th>"),QStringLiteral("<th>Value</th>")},
-            {QStringLiteral("<th>单位</th>"),QStringLiteral("<th>Unit</th>")},
-            {QStringLiteral("<th>状态</th>"),QStringLiteral("<th>Status</th>")},
-            {QStringLiteral("<th>样本</th>"),QStringLiteral("<th>Samples</th>")},
-            {QStringLiteral("<th>最小</th>"),QStringLiteral("<th>Min</th>")},
-            {QStringLiteral("<th>最大</th>"),QStringLiteral("<th>Max</th>")},
-            {QStringLiteral("<th>平均</th>"),QStringLiteral("<th>Average</th>")},
-            {QStringLiteral("<h1>OrbitTLM · 遥测历史</h1>"),QStringLiteral("<h1>OrbitTLM · Telemetry History</h1>")},
-            {QStringLiteral("$('chartNote').textContent = '曲线会使用当前卫星、时间范围和关键词筛选条件。';"),QStringLiteral("$('chartNote').textContent = 'The chart uses the current satellite, time range and keyword filters.';")},
-            {QStringLiteral("legend.appendChild(swatch);legend.appendChild(document.createTextNode(`${s.name}${s.unit ? ` (${s.unit})` : ''} · ${s.points.length} 点`));"),QStringLiteral("legend.appendChild(swatch);legend.appendChild(document.createTextNode(`${s.name}${s.unit ? ` (${s.unit})` : ''} · ${s.points.length} points`));")},
-            {QStringLiteral("? `${usable.length} 个参数 · ${sampleCount} 个数值样本 · 各曲线按自身最小/最大值归一化（0–100%）`"),QStringLiteral("? `${usable.length} fields · ${sampleCount} numeric samples · each curve normalized to its own min/max (0–100%)`")},
-            {QStringLiteral(": `${usable[0].name}${usable[0].unit ? ` · 单位 ${usable[0].unit}` : ''} · ${usable[0].points.length} 个样本 · 纵轴为实际数值`;"),QStringLiteral(": `${usable[0].name}${usable[0].unit ? ` · unit ${usable[0].unit}` : ''} · ${usable[0].points.length} samples · Y axis shows actual values`;" )},
-            {QStringLiteral("if (!keys.size) { alert('请先选择至少一个参数，再导出曲线 CSV。'); return; }"),QStringLiteral("if (!keys.size) { alert('Select at least one field before exporting the curve CSV.'); return; }")},
-            {QStringLiteral(" · 单位 ${usable[0].unit}"),QStringLiteral(" · unit ${usable[0].unit}")},
-            {QStringLiteral(" 个样本 · 纵轴为实际数值"),QStringLiteral(" samples · Y axis shows actual values")},
-            {QStringLiteral("<label>卫星<select"),QStringLiteral("<label>Satellite<select")},
-            {QStringLiteral("<label>开始时间<input"),QStringLiteral("<label>Start time<input")},
-            {QStringLiteral("<label>结束时间<input"),QStringLiteral("<label>End time<input")},
-            {QStringLiteral("<label>关键词<input"),QStringLiteral("<label>Keyword<input")},
-            {QStringLiteral("<label>参数（可多选"),QStringLiteral("<label>Fields (multi-select")},
-            {QStringLiteral("$('summary').textContent='筛选记录 '+rows.length+' 条 · 有效数值 '+chosen.length+' 个 · 已选参数 '+keys.size+' 个';"),QStringLiteral("$('summary').textContent='Filtered records '+rows.length+' · Numeric values '+chosen.length+' · Selected fields '+keys.size;")},
-            {QStringLiteral("(multi?'（归一化）':'')"),QStringLiteral("(multi?' (normalized)':'')")},
-            {QStringLiteral("const DATA=__DATA_JSON__,all=[];for(const p of DATA)for(const f of (p.fields||[]))all.push({time:p.capture_local||'',sat:p.satellite||'未知',packet:p.packet||p.packet_label||'未分类',name:f.name_cn||f.code||'未命名',code:f.code||'',value:f.value??'',unit:f.unit||'',status:f.status||''});"),QStringLiteral("const DATA=__DATA_JSON__,all=[];for(const p of DATA)for(const f of (p.fields||[]))all.push({time:p.capture_local||'',sat:p.satellite||'Unknown',packet:p.packet||p.packet_label||'Unclassified',name:f.name_en||f.code||f.name_cn||'Unnamed',code:f.code||'',value:f.value??'',unit:f.unit||'',status:f.status||''});")},
-            {QStringLiteral("name: f.name_cn || f.code || '未命名',"),QStringLiteral("name: f.name_en || f.code || f.name_cn || 'Unnamed',")},
-            {QStringLiteral("localeCompare(b.name, 'zh-CN')"),QStringLiteral("localeCompare(b.name, 'en-US')")},
-            {QStringLiteral("const out=curves? [['时间','卫星','参数','值','单位','状态']]:[['时间','卫星','业务包','参数','字段编号','值','单位','状态']];"),QStringLiteral("const out=curves? [['Time','Satellite','Field','Value','Unit','Status']]:[['Time','Satellite','Packet','Field','Field Code','Value','Unit','Status']];")},
-            {QStringLiteral("alert('请先选择至少一个参数，再导出曲线 CSV。');"),QStringLiteral("alert('Select at least one field before exporting the curve CSV.');")},
-            {QStringLiteral("legend.push('<span style=\"color:'+color+'\">■ '+esc(name)+(multi?'（归一化）':'')+'</span>');"),QStringLiteral("legend.push('<span style=\"color:'+color+'\">■ '+esc(name)+(multi?' (normalized)':'')+'</span>');")},
-            {QStringLiteral("ctx.fillText('请选择一个或多个可转为数值的参数。',60,70);"),QStringLiteral("ctx.fillText('Select one or more fields that can be converted to numeric values.',60,70);")}
-        };
-        std::stable_sort(htmlLabels.begin(),htmlLabels.end(),[](const auto &left,const auto &right){
-            return left.first.size()>right.first.size();
+        QStringList webKeys=webTranslations_.keys();
+        std::stable_sort(webKeys.begin(),webKeys.end(),[](const QString &left,const QString &right){
+            return left.size()>right.size();
         });
-        for(const auto &entry:htmlLabels)localized.replace(entry.first,entry.second);
-        localized.replace(QStringLiteral("lang=\"zh-CN\""),QStringLiteral("lang=\"en\""));
+        for(const QString &key:webKeys){
+            const QString value=webTranslations_.value(key).toString(key);
+            if(!key.isEmpty()&&value!=key)localized.replace(key,value);
+        }
+        QStringList textKeys=translations_.keys();
+        std::stable_sort(textKeys.begin(),textKeys.end(),[](const QString &left,const QString &right){
+            return left.size()>right.size();
+        });
+        for(const QString &key:textKeys){
+            if(!orbitContainsCjk(key))continue;
+            const QString value=translations_.value(key).toString(key);
+            if(value!=key)localized.replace(key,value);
+        }
         html=localized.toUtf8();
     }
     html.replace("__DATA_JSON__",json);
@@ -1239,13 +1191,11 @@ void MainWindow::populateEngineering(int index){
                             const QString bitWidth=fullCode.contains(QLatin1Char('.'))
                                 ?fullCode.section(QLatin1Char('.'),1):QString();
                             const QString sourceDisplay=fieldName.isEmpty()?fullCode:fieldName;
-                            const QString englishDisplay=orbitEnglishFieldLabel(sourceDisplay,englishName,fullCode);
-                            const QString displayFieldName=languageCode_==QStringLiteral("en-US")?englishDisplay:sourceDisplay;
+                            const QString displayFieldName=uiText(sourceDisplay);
                             auto *entry=new QTreeWidgetItem(packetNode,
                                 {displayFieldName,fullCode,
                                  uiText(QStringLiteral("未解析")),uiText(QStringLiteral("官方字段定义"))});
                             entry->setData(0,Qt::UserRole+124,sourceDisplay);
-                            entry->setData(0,Qt::UserRole+125,englishDisplay);
                             entry->setData(1,Qt::UserRole+124,fullCode);
                             entry->setData(2,Qt::UserRole+124,QStringLiteral("未解析"));
                             entry->setData(3,Qt::UserRole+124,QStringLiteral("官方字段定义"));
@@ -1257,7 +1207,7 @@ void MainWindow::populateEngineering(int index){
                             entry->setData(0,Qt::UserRole+5,QStringLiteral("官方遥测树"));
                             entry->setData(0,Qt::UserRole+6,QString());
                             const QString fieldTooltip=QStringLiteral("官方字段编号：%1\n位/宽度：%2\n英文名：%3\n工程换算公式：官方目录未提供；当前不生成推测数值。")
-                                .arg(fullCode,bitWidth,englishDisplay);
+                                .arg(fullCode,bitWidth,englishName);
                             entry->setData(0,Qt::UserRole+126,fieldTooltip);
                             entry->setToolTip(0,uiText(fieldTooltip));
                             fieldTreeFieldItems_.insert(internalPacketName+QLatin1Char('|')+fullCode,entry);
@@ -1338,22 +1288,22 @@ void MainWindow::populateEngineering(int index){
             for(auto it=componentTables_.cbegin();it!=componentTables_.cend();++it)
                 if(it.value()&&it.value()->property("treeSatellite").toString()==QStringLiteral("BY04"))++packetCount;
         }else packetCount=catalog_.packetKinds();
-        engineeringSummary_->setText(by04?
-            uiText(QStringLiteral("BY70-4 官方遥测树：%1 类面板分包；本地已接入 %2 项字段定义，其余分包保留官方字段位置，未匹配样本显示“未解析”。"))
+        setTranslatedLabel(engineeringSummary_,by04?
+            QStringLiteral("BY70-4 官方遥测树：%1 类面板分包；本地已接入 %2 项字段定义，其余分包保留官方字段位置，未匹配样本显示“未解析”。")
                 .arg(packetCount).arg(fieldTreeFieldItems_.size()):
-            uiText(QStringLiteral("ASRTU-1 遥测树：%1 类分包、%2 个字段定义；数值按当前会话中最新匹配样本更新。"))
+            QStringLiteral("ASRTU-1 遥测树：%1 类分包、%2 个字段定义；数值按当前会话中最新匹配样本更新。")
                 .arg(catalog_.packetKinds()).arg(fieldTreeFieldItems_.size()));
-        fieldDetail_->setText(uiText(QStringLiteral("展开组件分组和数据包即可浏览完整字段定义。选择字段可查看位位置、公式与来源；无样本时保留定义并显示“未解析”。")));
+        setTranslatedLabel(fieldDetail_,QStringLiteral("展开组件分组和数据包即可浏览完整字段定义。选择字段可查看位位置、公式与来源；无样本时保留定义并显示“未解析”。"));
         return;
     }
     const QString treeNote=by04?
         QStringLiteral("官方面板分包 %1 类 · 本地字段定义 %2 项").arg([&]{int count=0;for(auto it=componentTables_.cbegin();it!=componentTables_.cend();++it)if(it.value()&&it.value()->property("treeSatellite").toString()==QStringLiteral("BY04"))++count;return count;}()).arg(fieldTreeFieldItems_.size()):
         QStringLiteral("完整字段树 %1 类分包 · %2 个字段").arg(catalog_.packetKinds()).arg(fieldTreeFieldItems_.size());
-    engineeringSummary_->setText(chosen->identification=="by04_ccsds_header_only"?
-        uiText(QStringLiteral("%1 · 保留 %2 项协议字段 · %3 · 未匹配业务字段保持原样"))
-            .arg(eventTitle(*chosen)).arg(chosen->fields.size()).arg(treeNote):
-        uiText(QStringLiteral("%1 · %2 项当前包字段 · %3 · 识别方式：%4 · 应用 CRC 未校验"))
-            .arg(eventTitle(*chosen)).arg(chosen->fields.size()).arg(treeNote,chosen->identification));
+    setTranslatedLabel(engineeringSummary_,chosen->identification=="by04_ccsds_header_only"?
+        QStringLiteral("%1 · 保留 %2 项协议字段 · %3 · 未匹配业务字段保持原样")
+            .arg(eventTitleSource(*chosen)).arg(chosen->fields.size()).arg(treeNote):
+        QStringLiteral("%1 · %2 项当前包字段 · %3 · 识别方式：%4 · 应用 CRC 未校验")
+            .arg(eventTitleSource(*chosen)).arg(chosen->fields.size()).arg(treeNote,chosen->identification));
     if(highlighted>=0){
         for(int row=0;row<engineeringTable_->rowCount();++row){
             auto *i=engineeringTable_->item(row,0);
@@ -1384,14 +1334,21 @@ void MainWindow::plotEngineering(const QString &packet,const QString &code,int u
                 series->append(elapsed,value);
             }
         }
+        QString chartTitle;
         if(series->count()){
             chart->addSeries(series);chart->createDefaultAxes();
-            chart->setTitle(uiText(QStringLiteral("%1 · %2（记录时间相对秒）")).arg(packet,code));
+            chartTitle=QStringLiteral("%1 · %2（记录时间相对秒）").arg(packet,code);
         }else{
             delete series;
-            chart->setTitle(uiText(QStringLiteral("所选参数暂无可用数值序列")));
+            chartTitle=QStringLiteral("所选参数暂无可用数值序列");
         }
-    }else chart->setTitle(uiText(QStringLiteral("选择业务遥测参数以查看时序曲线")));
+        chart->setProperty("orbitSourceTitle",chartTitle);
+        chart->setTitle(uiText(chartTitle));
+    }else{
+        const QString chartTitle=QStringLiteral("选择业务遥测参数以查看时序曲线");
+        chart->setProperty("orbitSourceTitle",chartTitle);
+        chart->setTitle(uiText(chartTitle));
+    }
     engineeringChart_->setChart(chart);
 }
 void MainWindow::updateAttitude(int index){
@@ -1457,14 +1414,14 @@ void MainWindow::updateAttitude(int index){
     normLabel_->setText(ready?QString::number(norm,'f',6):uiText(QStringLiteral("未解析")));
     attitudeWidget_->setQuaternion(QQuaternion(float(q[0]),float(q[1]),float(q[2]),float(q[3])),ready&&norm>1e-9);
     if(!ready){
-        attitudeInfo_->setText(uiText(QStringLiteral("未解析：当前数据包没有完整四元数")));
+        setTranslatedLabel(attitudeInfo_,QStringLiteral("未解析：当前数据包没有完整四元数"));
     }else if(candidate){
-        attitudeInfo_->setText(uiText(QStringLiteral("BY04 四元数候选值 · 未验证字段位置与坐标定义 · 接收时间：%1"))
+        setTranslatedLabel(attitudeInfo_,QStringLiteral("BY04 四元数候选值 · 未验证字段位置与坐标定义 · 接收时间：%1")
             .arg(shortTime(last->transport.captureLocal)));
     }else if(by04){
-        attitudeInfo_->setText(uiText(QStringLiteral("BY70-4 姿态四元数来自 OBC-SF 独立字段定义；参考坐标系和姿态含义仍待官方说明")));
+        setTranslatedLabel(attitudeInfo_,QStringLiteral("BY70-4 姿态四元数来自 OBC-SF 独立字段定义；参考坐标系和姿态含义仍待官方说明"));
     }else{
-        attitudeInfo_->setText(uiText(QStringLiteral("SAT-S3 四元数 · 记录时间：%1 · 数据来源：%2 · 参考系与应用 CRC 尚未核实"))
+        setTranslatedLabel(attitudeInfo_,QStringLiteral("SAT-S3 四元数 · 记录时间：%1 · 数据来源：%2 · 参考系与应用 CRC 尚未核实")
             .arg(shortTime(last->transport.captureLocal),qualityLabel(last->transport.fecEvidence)));
     }
     auto *chart=new QChart;chart->setBackgroundVisible(false);
@@ -1493,12 +1450,25 @@ void MainWindow::updateAttitude(int index){
     const bool hasSeries=series[0]->count()>0;
     for(auto *line:series){if(hasSeries)chart->addSeries(line);else delete line;}
     if(hasSeries){chart->createDefaultAxes();chart->legend()->setVisible(true);}
-    chart->setTitle(hasSeries?(candidate?uiText(QStringLiteral("候选四元数时序，未经工程字段表验证")):
-                                      uiText(QStringLiteral("解算四元数时序（相对记录时间）"))):
-                              uiText(QStringLiteral("四元数未解析")));
+    const QString chartTitle=hasSeries?(candidate?QStringLiteral("候选四元数时序，未经工程字段表验证"):
+                                                   QStringLiteral("解算四元数时序（相对记录时间）")):
+                                      QStringLiteral("四元数未解析");
+    chart->setProperty("orbitSourceTitle",chartTitle);
+    chart->setTitle(uiText(chartTitle));
     attitudeChart_->setChart(chart);
 }
 void MainWindow::updateRawPacket(int index){
+    // The raw KISS/HEX widget is only populated while both its outer page and
+    // its own nested tab are selected. This prevents raw-packet diagnostic text
+    // from leaking into (or visually obscuring) the overview on Windows.
+    if(!rawHex_)return;
+    if(!pages_||!rawPage_||
+       pages_->currentWidget()!=rawPage_||rawPage_->currentWidget()!=rawHex_){
+        rawHex_->clear();
+        return;
+    }
+    // The raw viewer is a direct QTabWidget page. Do not change its visibility
+    // manually; the parent tab stack owns visibility.
     if(index<0||index>=business_.size()){
         rawHex_->setPlainText(uiText(QStringLiteral("当前没有可检查的 KISS 应用包。")));
         return;
@@ -1556,9 +1526,9 @@ void MainWindow::updateFrameList(){
         for(int j=0;j<values.size();++j)
             packetTable_->setItem(i,j,item(values[j]));
     }
-    diagnosticsSummary_->setText(
-        uiText(QStringLiteral("传输帧 %1 条 · KISS %2 包 · 计数缺口中断 %3 次 · 非法转义 %4 次 · "
-        "超长包 %5 个 · EOF 未完成 %6 个"))
+    setTranslatedLabel(diagnosticsSummary_,
+        QStringLiteral("传输帧 %1 条 · KISS %2 包 · 计数缺口中断 %3 次 · 非法转义 %4 次 · "
+        "超长包 %5 个 · EOF 未完成 %6 个")
         .arg(frames_.size()).arg(packets_.size())
         .arg(transportStats_.interruptedByCounterGap)
         .arg(transportStats_.malformedEscapePackets)
@@ -1766,9 +1736,9 @@ void MainWindow::scanSsdv(){
     QSet<QString> groups;
     for(const auto &packet:images_)groups.insert(QStringLiteral("%1:%2:%3")
         .arg(orbit::canonicalSatelliteName(packet.satellite)).arg(packet.bytes.size()).arg(packet.imageId));
-    imageInfo_->setText(uiText(QStringLiteral("%1 · 已扫描 %2 个 SSDV 数据帧，发现 %3 个卫星/图像组合。选择图像条目即可查看恢复预览。"))
-        .arg(hasShortSsdv?uiText(QStringLiteral("VC1 218 字节 SSDV（ASRTU-1 / BY04 兼容格式）")):
-             uiText(QStringLiteral("APID %1 标准 SSDV")).arg(imageApid_->value()))
+    setTranslatedLabel(imageInfo_,QStringLiteral("%1 · 已扫描 %2 个 SSDV 数据帧，发现 %3 个卫星/图像组合。选择图像条目即可查看恢复预览。")
+        .arg(hasShortSsdv?QStringLiteral("VC1 218 字节 SSDV（ASRTU-1 / BY04 兼容格式）"):
+             QStringLiteral("APID %1 标准 SSDV").arg(imageApid_->value()))
         .arg(images_.size()).arg(groups.size()));
     decodedImage_=QPixmap();if(imagePreview_)imagePreview_->setImage(decodedImage_);
     if(!images_.isEmpty()){
@@ -1781,12 +1751,14 @@ void MainWindow::scanSsdv(){
             imageTable_->setCurrentCell(-1,-1);
         }
         imageCoverage_->setRange(0,1);imageCoverage_->setValue(0);
-        imageCoverage_->setFormat(uiText(QStringLiteral("请选择图像查看分片覆盖情况")));
-        imageCoverageNote_->setText(uiText(QStringLiteral("检测到 %1 个卫星/图像组合；选择一项后尝试安全重建预览。" )).arg(imageTable_->rowCount()));
+        imageCoverage_->setProperty("orbitSourceFormat",QStringLiteral("请选择图像查看分片覆盖情况"));
+        imageCoverage_->setFormat(uiText(imageCoverage_->property("orbitSourceFormat").toString()));
+        setTranslatedLabel(imageCoverageNote_,QStringLiteral("检测到 %1 个卫星/图像组合；选择一项后尝试安全重建预览。").arg(imageTable_->rowCount()));
     }else{
         imageCoverage_->setRange(0,1);imageCoverage_->setValue(0);
-        imageCoverage_->setFormat(uiText(QStringLiteral("尚无观测序号")));
-        imageCoverageNote_->setText(uiText(QStringLiteral("未识别到具有可靠结构或 CRC 佐证的 SSDV 分片。请检查卫星、VCID/APID 和输入数据格式。")));
+        imageCoverage_->setProperty("orbitSourceFormat",QStringLiteral("尚无观测序号"));
+        imageCoverage_->setFormat(uiText(imageCoverage_->property("orbitSourceFormat").toString()));
+        setTranslatedLabel(imageCoverageNote_,QStringLiteral("未识别到具有可靠结构或 CRC 佐证的 SSDV 分片。请检查卫星、VCID/APID 和输入数据格式。"));
     }
 }
 
@@ -1808,14 +1780,16 @@ void MainWindow::updateImageProgress(int imageId){
     for(int id:sequences)badSequences.remove(id);
     if(hi<lo){
         imageCoverage_->setRange(0,1);imageCoverage_->setValue(0);
-        imageCoverage_->setFormat(uiText(QStringLiteral("尚无观测序号")));
-        imageCoverageNote_->setText(uiText(QStringLiteral("图像 ID %1 尚无可用包序号" )).arg(imageId));return;
+        imageCoverage_->setProperty("orbitSourceFormat",QStringLiteral("尚无观测序号"));
+        imageCoverage_->setFormat(uiText(imageCoverage_->property("orbitSourceFormat").toString()));
+        setTranslatedLabel(imageCoverageNote_,QStringLiteral("图像 ID %1 尚无可用包序号").arg(imageId));return;
     }
     const int span=hi+1,missing=qMax(0,span-sequences.size());
     imageCoverage_->setRange(0,qMax(1,span));imageCoverage_->setValue(qMin(span,sequences.size()));
-    imageCoverage_->setFormat(uiText(QStringLiteral("已观测 %v / %m 个序号")));
-    QString note=uiText(QStringLiteral("%1 · 图像 ID %2 · 包序号 %3–%4 · 已观测 %5 · 缺块 %6 · CRC 坏块 %7；未观测区间外的总包数未知。"))
-        .arg(targetSatellite.isEmpty()?uiText(QStringLiteral("当前图像")):targetSatellite)
+    imageCoverage_->setProperty("orbitSourceFormat",QStringLiteral("已观测 %v / %m 个序号"));
+    imageCoverage_->setFormat(uiText(imageCoverage_->property("orbitSourceFormat").toString()));
+    QString note=QStringLiteral("%1 · 图像 ID %2 · 包序号 %3–%4 · 已观测 %5 · 缺块 %6 · CRC 坏块 %7；未观测区间外的总包数未知。")
+        .arg(targetSatellite.isEmpty()?QStringLiteral("当前图像"):targetSatellite)
         .arg(imageId).arg(lo).arg(hi).arg(sequences.size()).arg(missing).arg(badSequences.size());
     if(missing>0){
         QStringList ids;int totalMissing=0;
@@ -1823,15 +1797,15 @@ void MainWindow::updateImageProgress(int imageId){
             ++totalMissing;if(ids.size()<24)ids<<QString::number(id);
         }
         if(totalMissing>ids.size())ids<<QStringLiteral("… (+%1)").arg(totalMissing-ids.size());
-        if(!ids.isEmpty())note+=uiText(QStringLiteral(" 缺失序号：%1。" )).arg(ids.join(QStringLiteral(", ")));
+        if(!ids.isEmpty())note+=QStringLiteral(" 缺失序号：%1。").arg(ids.join(QStringLiteral(", ")));
     }
     if(!badSequences.isEmpty()){
         QStringList ids;QList<int> sortedBad=badSequences.values();std::sort(sortedBad.begin(),sortedBad.end());
         for(int id:sortedBad){if(ids.size()<24)ids<<QString::number(id);}
         if(sortedBad.size()>ids.size())ids<<QStringLiteral("… (+%1)").arg(sortedBad.size()-ids.size());
-        note+=uiText(QStringLiteral(" CRC 坏块序号：%1。" )).arg(ids.join(QStringLiteral(", ")));
+        note+=QStringLiteral(" CRC 坏块序号：%1。").arg(ids.join(QStringLiteral(", ")));
     }
-    imageCoverageNote_->setText(note);
+    setTranslatedLabel(imageCoverageNote_,note);
 }
 
 void MainWindow::exportSsdv(){
@@ -1866,13 +1840,14 @@ bool MainWindow::decodeSsdvImage(int imageId,bool showErrors){
     if(selected.isEmpty())return false;
     const bool shortPacket=selected.first().bytes.size()==218;
     const auto rebuilt=orbit::ImageTools::decodeImage(selected,imageId,shortPacket);
-    const QString diagnostic=uiText(QStringLiteral("缺块 %1 · CRC 坏块 %2 · 有效分片 %3"))
+    const QString diagnosticSource=QStringLiteral("缺块 %1 · CRC 坏块 %2 · 有效分片 %3")
         .arg(rebuilt.missingPacketIds.size()).arg(rebuilt.badPacketIds.size()).arg(rebuilt.receivedPackets);
+    const QString diagnostic=uiText(diagnosticSource);
     auto clearPreview=[this]{decodedImage_=QPixmap();if(imagePreview_)imagePreview_->setImage(decodedImage_);};
     if(rebuilt.jpeg.isEmpty()){
         clearPreview();
-        if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("%1 · 图像 ID %2 暂无安全可解码预览。%3 %4"))
-            .arg(targetSatellite).arg(imageId).arg(diagnostic).arg(uiText(rebuilt.error)));
+        if(imageInfo_)setTranslatedLabel(imageInfo_,QStringLiteral("%1 · 图像 ID %2 暂无安全可解码预览。%3 %4")
+            .arg(targetSatellite).arg(imageId).arg(diagnosticSource).arg(rebuilt.error));
         if(showErrors)QMessageBox::warning(this,uiText(QStringLiteral("SSDV 图片重建失败")),
             (rebuilt.error.isEmpty()?uiText(QStringLiteral("当前分片无法安全重建 JPEG。")):uiText(rebuilt.error))+
             QStringLiteral("\n\n")+diagnostic);
@@ -1887,37 +1862,37 @@ bool MainWindow::decodeSsdvImage(int imageId,bool showErrors){
     if(!reported.isValid()||reported.width()>4080||reported.height()>4080||
        quint64(reported.width())*quint64(reported.height())>16646400ULL){
         clearPreview();
-        if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("图像 ID %1 的 JPEG 尺寸异常，已安全拒绝预览。%2"))
-            .arg(imageId).arg(diagnostic));
+        if(imageInfo_)setTranslatedLabel(imageInfo_,QStringLiteral("图像 ID %1 的 JPEG 尺寸异常，已安全拒绝预览。%2")
+            .arg(imageId).arg(diagnosticSource));
         return false;
     }
     QImageReader::setAllocationLimit(64);
     const QImage image=reader.read();
     if(image.isNull()){
         clearPreview();
-        if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("图像 ID %1 的 JPEG 不完整，无法显示。%2"))
-            .arg(imageId).arg(diagnostic));
+        if(imageInfo_)setTranslatedLabel(imageInfo_,QStringLiteral("图像 ID %1 的 JPEG 不完整，无法显示。%2")
+            .arg(imageId).arg(diagnosticSource));
         if(showErrors)QMessageBox::warning(this,uiText(QStringLiteral("SSDV 图片重建失败")),
             uiText(QStringLiteral("解码器输出尚不能转换为预览图像。缺块和坏块统计已保留。"))+
             QStringLiteral("\n\n")+diagnostic);
         return false;
     }
     decodedImage_=QPixmap::fromImage(image);if(imagePreview_)imagePreview_->setImage(decodedImage_);
-    QString details=uiText(QStringLiteral("%1 · 图像 ID %2 · %3 × %4 · 已使用 %5 个有效分片 · %6 · %7"))
+    QString details=QStringLiteral("%1 · 图像 ID %2 · %3 × %4 · 已使用 %5 个有效分片 · %6 · %7")
         .arg(targetSatellite).arg(imageId).arg(image.width()).arg(image.height()).arg(rebuilt.receivedPackets)
-        .arg(rebuilt.complete?uiText(QStringLiteral("检测到图像结束标志")):uiText(QStringLiteral("部分恢复预览")))
-        .arg(diagnostic);
+        .arg(rebuilt.complete?QStringLiteral("检测到图像结束标志"):QStringLiteral("部分恢复预览"))
+        .arg(diagnosticSource);
     if(!rebuilt.missingPacketIds.isEmpty()){
         QStringList ids;for(int i=0;i<rebuilt.missingPacketIds.size()&&i<24;++i)ids<<QString::number(rebuilt.missingPacketIds[i]);
         if(rebuilt.missingPacketIds.size()>ids.size())ids<<QStringLiteral("… (+%1)").arg(rebuilt.missingPacketIds.size()-ids.size());
-        details+=uiText(QStringLiteral(" · 缺失序号：%1")).arg(ids.join(QStringLiteral(", ")));
+        details+=QStringLiteral(" · 缺失序号：%1").arg(ids.join(QStringLiteral(", ")));
     }
     if(!rebuilt.badPacketIds.isEmpty()){
         QStringList ids;for(int i=0;i<rebuilt.badPacketIds.size()&&i<24;++i)ids<<QString::number(rebuilt.badPacketIds[i]);
         if(rebuilt.badPacketIds.size()>ids.size())ids<<QStringLiteral("… (+%1)").arg(rebuilt.badPacketIds.size()-ids.size());
-        details+=uiText(QStringLiteral(" · CRC 坏块序号：%1")).arg(ids.join(QStringLiteral(", ")));
+        details+=QStringLiteral(" · CRC 坏块序号：%1").arg(ids.join(QStringLiteral(", ")));
     }
-    if(imageInfo_)imageInfo_->setText(details);
+    if(imageInfo_)setTranslatedLabel(imageInfo_,details);
     if(showErrors&&!rebuilt.complete)statusBar()->showMessage(uiText(QStringLiteral("已生成部分恢复预览；缺块和 CRC 坏块仍已标记。")),8000);
     return true;
 }
@@ -2065,7 +2040,7 @@ void MainWindow::importImageBin(){
         for(const auto &packet:images_)imageIds.insert(QStringLiteral("%1:%2:%3")
             .arg(orbit::canonicalSatelliteName(packet.satellite)).arg(packet.bytes.size()).arg(packet.imageId));
         const int imageCount=imageIds.size();
-        imageInfo_->setText(uiText(QStringLiteral("已导入 %1 · %2 个 SSDV 分片，合并为 %3 个卫星/图像组合。选择图像条目可查看恢复预览。"))
+        setTranslatedLabel(imageInfo_,QStringLiteral("已导入 %1 · %2 个 SSDV 分片，合并为 %3 个卫星/图像组合。选择图像条目可查看恢复预览。")
             .arg(QFileInfo(path).fileName()).arg(images_.size()).arg(imageCount));
     }
     // Reflect imported packet events on the same replay axis without resetting

@@ -8,6 +8,7 @@
 #include <QMainWindow>
 #include <QPixmap>
 #include <QHash>
+#include <QStringList>
 #include <QJsonObject>
 class QCheckBox;
 class QComboBox;
@@ -46,6 +47,7 @@ private:
     void applyLanguage();
     bool loadLanguageFile();
     QString uiText(const QString &source) const;
+    void setTranslatedLabel(QLabel *label,const QString &source);
     void buildToolbar();
     void buildWorkspace();
     void buildOverview(QTabWidget *tabs);
@@ -95,6 +97,7 @@ private:
     QString satellite() const;
     QString resolvedSatellite() const;
     QString eventTitle(const orbit::BusinessPacket &packet) const;
+    QString eventTitleSource(const orbit::BusinessPacket &packet) const;
     QString qualityLabel(const QString &status) const;
     QString sourceLabel(const QStringList &sources) const;
     QString utcLabel(const QDateTime &dt) const;
@@ -132,6 +135,9 @@ private:
     int tcpPort_=9985;
     QString languageCode_=QStringLiteral("zh-CN");
     QJsonObject translations_;
+    QJsonObject webTranslations_;
+    QStringList translationKeysByLength_;
+    mutable QHash<QString,QString> uiTextCache_;
     QString exportDirectoryOverride_;
     QLabel *sourceLabel_=nullptr,*message_=nullptr,*currentTitle_=nullptr,
            *currentMeta_=nullptr,*integrityLabel_=nullptr,*attitudeModeLabel_=nullptr,*frameMetric_=nullptr,
@@ -152,7 +158,7 @@ private:
     QPlainTextEdit *rawHex_=nullptr,*debugText_=nullptr,*rawFrameHex_=nullptr;
     ReplayTimelineWidget *timeline_=nullptr;
     QTimer *timer_=nullptr;
-    QTabWidget *pages_=nullptr;
+    QTabWidget *pages_=nullptr,*rawPage_=nullptr;
     int diagnosticTab_=-1;
     QGroupBox *powerCard_=nullptr,*attitudeCard_=nullptr,*thermalCard_=nullptr,*payloadCard_=nullptr;
     QHash<QGroupBox*,QTableWidget*> overviewTables_;
