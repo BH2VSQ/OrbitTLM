@@ -72,15 +72,6 @@ inline QString orbitWidgetText(const QString &source){
     if(source.size()<=256&&cache.size()<20000)cache.insert(source,translated);
     return translated;
 }
-inline QString orbitEnglishFieldLabel(const QString &source,const QString &catalogEnglish,const QString &code){
-    if(!catalogEnglish.isEmpty()&&!orbitContainsCjk(catalogEnglish))return catalogEnglish;
-    const QString translated=orbitWidgetText(source);
-    if(!orbitContainsCjk(translated))return translated;
-    // Some mission catalogs contain no English metadata for a field. Keep the
-    // English UI free of untranslated CJK; the stable official field code lets
-    // operators locate and cross-reference the exact catalog entry.
-    return code.isEmpty()?QStringLiteral("Telemetry field"):QStringLiteral("Field %1").arg(code);
-}
 // ORBITTLM_ROUND4_PACKET_ARROWS
 class FlowLayout final : public QLayout {
 public:

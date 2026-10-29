@@ -10,6 +10,9 @@
 #include <QPushButton>
 #include <QGroupBox>
 #include <QStandardPaths>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 class UiSmoke:public QObject {
     Q_OBJECT
@@ -17,6 +20,28 @@ private slots:
     void startupShowsChineseOverviewAndHidesDebug() {
         QStandardPaths::setTestModeEnabled(true);
         MainWindow window;
+        QFile embeddedZh(QStringLiteral(":/i18n/zh-CN.json"));
+        QVERIFY2(embeddedZh.open(QIODevice::ReadOnly),"Chinese i18n must be embedded in the application binary");
+        const QJsonObject zhRoot=QJsonDocument::fromJson(embeddedZh.readAll()).object();
+        QVERIFY(zhRoot.value(QStringLiteral("translations")).toObject().size()>=4000);
+        QFile embeddedEn(QStringLiteral(":/i18n/en-US.json"));
+        QVERIFY2(embeddedEn.open(QIODevice::ReadOnly),"English i18n must be embedded in the application binary");
+        const QJsonObject enRoot=QJsonDocument::fromJson(embeddedEn.readAll()).object();
+        QCOMPARE(zhRoot.value(QStringLiteral("translations")).toObject().size(),
+                 enRoot.value(QStringLiteral("translations")).toObject().size());
+        QVERIFY(enRoot.value(QStringLiteral("webTranslations")).toObject().size()>=70);
+        const QJsonObject zhTranslations=zhRoot.value(QStringLiteral("translations")).toObject();
+        const QJsonObject enTranslations=enRoot.value(QStringLiteral("translations")).toObject();
+        QCOMPARE(zhTranslations.value(QStringLiteral("遥测轮询计数")).toString(),QStringLiteral("遥测轮询计数"));
+        QCOMPARE(enTranslations.value(QStringLiteral("遥测轮询计数")).toString(),QStringLiteral("Telemetry Poll Count"));
+        QCOMPARE(enTranslations.value(QStringLiteral("升交点赤经")).toString(),QStringLiteral("Right Ascension of the Ascending Node"));
+        QCOMPARE(enTranslations.value(QStringLiteral("近地点角距")).toString(),QStringLiteral("Argument of Perigee"));
+        QCOMPARE(zhTranslations.value(QStringLiteral("日志文件：%1\n数据帧文件：%2")).toString(),
+                 QStringLiteral("日志文件：%1\n数据帧文件：%2"));
+        QCOMPARE(enTranslations.value(QStringLiteral("日志文件：%1\n数据帧文件：%2")).toString(),
+                 QStringLiteral("Log file: %1\nFrame file: %2"));
+        QCOMPARE(enTranslations.value(QStringLiteral("日志与数据帧文件路径")).toString(),
+                 QStringLiteral("LOG/BIN session input paths"));
         window.show();
         QApplication::processEvents();
         // Best-effort offscreen render snapshot, not a prerequisite for tests.
@@ -44,6 +69,7 @@ private slots:
         QApplication::processEvents();
         QVERIFY(enAction->isChecked());
         QVERIFY(!zhAction->isChecked());
+        QVERIFY(window.windowTitle().contains(QStringLiteral("Satellite Telemetry Replay Workbench")));
         zhAction->trigger();
         QApplication::processEvents();
         QVERIFY(zhAction->isChecked());

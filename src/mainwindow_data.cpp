@@ -254,9 +254,12 @@ const BusinessPacket *MainWindow::latestRecognized(int index,
 }
 void MainWindow::updatePaths(){
     auto basename=[](const QString &p){return p.isEmpty()?QStringLiteral("未选择"):QFileInfo(p).fileName();};
-    setTranslatedLabel(sourceLabel_,QStringLiteral("解码日志：%1     数据帧文件：%2")
-                              .arg(basename(logPath_),basename(binPath_));
-    sourceLabel_->setToolTip(QStringLiteral("LOG: %1\nBIN: %2").arg(logPath_,binPath_));
+    const QString sourceFormat=QStringLiteral("解码日志：%1     数据帧文件：%2");
+    sourceLabel_->setProperty("orbitSourceText",sourceFormat);
+    sourceLabel_->setText(uiText(sourceFormat).arg(basename(logPath_),basename(binPath_)));
+    const QString tooltipFormat=QStringLiteral("日志文件：%1\n数据帧文件：%2");
+    sourceLabel_->setProperty("orbitSourceToolTip",tooltipFormat);
+    sourceLabel_->setToolTip(uiText(tooltipFormat).arg(logPath_,binPath_));
 }
 void MainWindow::importSession(){
     // ORBITTLM_ROUND4_IMPORT
@@ -1030,7 +1033,7 @@ body{font:14px Segoe UI,Microsoft YaHei,sans-serif;margin:18px;color:#182940;bac
 <section class="panel"><h3>参数统计</h3><div class="scroll"><table><thead><tr><th>参数</th><th>样本</th><th>最小值</th><th>最大值</th><th>平均值</th></tr></thead><tbody id="stats"></tbody></table></div></section>
 <section class="panel"><h3>筛选后的遥测值</h3><div class="scroll"><table><thead><tr><th>时间</th><th>卫星</th><th>参数</th><th>值</th><th>单位</th><th>状态</th></tr></thead><tbody id="rows"></tbody></table></div></section>
 <script>
-const DATA=__DATA_JSON__,all=[];for(const p of DATA)for(const f of (p.fields||[]))all.push({time:p.capture_local||'',sat:p.satellite||'未知',packet:p.packet||p.packet_label||'',name:f.name_cn||f.code||'未命名',code:f.code||'',value:f.value??'',unit:f.unit||'',status:f.status||''});
+const DATA=__DATA_JSON__,all=[];for(const p of DATA)for(const f of (p.fields||[]))all.push({time:p.capture_local||'',sat:p.satellite||'未知',packet:p.packet||p.packet_label||'',name:f.name_cn||f.code||'未命名',code:f.code||'',value:(f.value==null?'':f.value),unit:f.unit||'',status:f.status||''});
 const $=id=>document.getElementById(id),numeric=x=>{if(x===null||x===undefined||String(x).trim()==='')return NaN;const n=Number(String(x).replace(/,/g,''));return Number.isFinite(n)?n:NaN},key=x=>x.code||x.name,colors=['#2675c9','#d9485f','#0f9d78','#8b5cf6','#d97706','#0891b2','#be185d','#64748b'];
 function fillSat(){const s=$('sat');for(const v of [...new Set(all.map(x=>x.sat))].sort())if(![...s.options].some(o=>o.value===v))s.add(new Option(v,v));}
 function fillFields(){const sat=$('sat').value,prev=new Set([...$('fields').selectedOptions].map(o=>o.value)),m=new Map();for(const x of all){if(sat!=='all'&&x.sat!==sat)continue;const k=key(x);if(!m.has(k))m.set(k,{k,name:x.name,code:x.code,unit:x.unit});}const e=$('fields');e.innerHTML='';for(const v of [...m.values()].sort((a,b)=>a.name.localeCompare(b.name,'zh-CN'))){const o=new Option(v.name+(v.code?' · '+v.code:'')+(v.unit?' ('+v.unit+')':''),v.k);o.selected=prev.has(v.k);e.add(o);}}
@@ -1038,8 +1041,8 @@ function filtered(){const sat=$('sat').value,q=$('q').value.trim().toLowerCase()
 function selected(){return new Set([...$('fields').selectedOptions].map(o=>o.value));}
 function render(){const rows=filtered(),keys=selected(),chosen=rows.filter(x=>keys.has(key(x))&&Number.isFinite(numeric(x.value)));$('rows').innerHTML=rows.filter(x=>!keys.size||keys.has(key(x))).slice(0,3000).map(x=>'<tr><td>'+esc(x.time)+'</td><td>'+esc(x.sat)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.value)+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.status)+'</td></tr>').join('');const groups=[...keys].map(k=>({k,items:chosen.filter(x=>key(x)===k)})).filter(g=>g.items.length);$('stats').innerHTML=groups.map(g=>{const a=g.items.map(x=>numeric(x.value)),mn=Math.min(...a),mx=Math.max(...a),avg=a.reduce((s,v)=>s+v,0)/a.length,n=(all.find(x=>key(x)===g.k)||{}).name||g.k;return '<tr><td>'+esc(n)+'</td><td>'+a.length+'</td><td>'+mn+'</td><td>'+mx+'</td><td>'+avg.toFixed(4)+'</td></tr>';}).join('');$('summary').textContent='筛选记录 '+rows.length+' 条 · 有效数值 '+chosen.length+' 个 · 已选参数 '+keys.size+' 个';draw(groups);}
 function draw(groups){const c=$('chart'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#dce5ef';ctx.fillStyle='#657a91';ctx.font='12px sans-serif';const multi=groups.length>1,allValues=groups.flatMap(g=>g.items.map(x=>numeric(x.value))),rawMin=allValues.length?Math.min(...allValues):0,rawMax=allValues.length?Math.max(...allValues):1,axisMin=multi?0:(rawMin===rawMax?rawMin-1:rawMin),axisMax=multi?100:(rawMin===rawMax?rawMax+1:rawMax);for(let i=0;i<5;i++){const y=22+i*(h-54)/4;ctx.beginPath();ctx.moveTo(48,y);ctx.lineTo(w-14,y);ctx.stroke();ctx.fillText(multi?(100-i*25)+'%':(axisMax-i*(axisMax-axisMin)/4).toPrecision(4),4,y+4);}const allTimes=groups.flatMap(g=>g.items.map(x=>new Date(x.time).getTime()).filter(Number.isFinite)),xmin=allTimes.length?Math.min(...allTimes):0,xmax=allTimes.length?Math.max(...allTimes):0;const legend=[];groups.forEach((g,i)=>{const vals=g.items.map(x=>numeric(x.value)),mn=Math.min(...vals),mx=Math.max(...vals),color=colors[i%colors.length],pts=g.items.map(x=>({t:new Date(x.time).getTime(),v:numeric(x.value)})).filter(p=>Number.isFinite(p.t));ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();pts.forEach((p,j)=>{const x=48+(xmax>xmin?(p.t-xmin)/(xmax-xmin):j/Math.max(1,pts.length-1))*(w-62),v=multi?(mx>mn?(p.v-mn)/(mx-mn)*100:50):p.v,y=22+(h-54)*(1-(multi?v/100:(v-axisMin)/(axisMax-axisMin)));if(j)ctx.lineTo(x,y);else ctx.moveTo(x,y);});ctx.stroke();const name=(all.find(x=>key(x)===g.k)||{}).name||g.k;legend.push('<span style="color:'+color+'">■ '+esc(name)+(multi?'（归一化）':'')+'</span>');});$('legend').innerHTML=legend.join('　');if(!groups.length){ctx.fillStyle='#657a91';ctx.fillText('请选择一个或多个可转为数值的参数。',60,70);}}
-function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function downloadCsv(curves){const rows=filtered(),keys=selected(),out=curves? [['时间','卫星','参数','值','单位','状态']]:[['时间','卫星','业务包','参数','字段编号','值','单位','状态']];for(const x of rows){if(keys.size&&!keys.has(key(x)))continue;if(curves&&!Number.isFinite(numeric(x.value)))continue;out.push(curves?[x.time,x.sat,x.name,x.value,x.unit,x.status]:[x.time,x.sat,x.packet,x.name,x.code,x.value,x.unit,x.status]);}const csv='\ufeff'+out.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n'),blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=curves?'OrbitTLM-curves.csv':'OrbitTLM-filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function esc(x){return String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function downloadCsv(curves){const rows=filtered(),keys=selected(),out=curves? [['时间','卫星','参数','值','单位','状态']]:[['时间','卫星','业务包','参数','字段编号','值','单位','状态']];for(const x of rows){if(keys.size&&!keys.has(key(x)))continue;if(curves&&!Number.isFinite(numeric(x.value)))continue;out.push(curves?[x.time,x.sat,x.name,x.value,x.unit,x.status]:[x.time,x.sat,x.packet,x.name,x.code,x.value,x.unit,x.status]);}const csv='\ufeff'+out.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n'),blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=curves?'OrbitTLM-curves.csv':'OrbitTLM-filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function resetFilters(){$('sat').value='all';$('q').value='';$('from').value='';$('to').value='';fillFields();render();}
 $('sat').addEventListener('change',()=>{fillFields();render();});$('fields').addEventListener('change',render);fillSat();fillFields();render();
 </script></body></html>)ORBITTLM_HTML").toUtf8();
@@ -1048,88 +1051,23 @@ $('sat').addEventListener('change',()=>{fillFields();render();});$('fields').add
     // to its visible labels before inserting telemetry JSON (which must stay intact).
     if(languageCode_==QStringLiteral("en-US")){
         QString localized=QString::fromUtf8(html);
-        QList<QPair<QString,QString>> htmlLabels={
-            {QStringLiteral("lang=\"zh-CN\""),QStringLiteral("lang=\"en-US\"")},
-            {QStringLiteral("OrbitTLM 遥测历史"),QStringLiteral("OrbitTLM Telemetry History")},
-            {QStringLiteral("OrbitTLM 遥测趋势与 CSV"),QStringLiteral("OrbitTLM Telemetry Trends & CSV")},
-            {QStringLiteral("遥测趋势与 CSV"),QStringLiteral("Telemetry Trends & CSV")},
-            {QStringLiteral("当前会话遥测 · 数据由 OrbitTLM 自动更新 · 时间为接收端记录时间，不代表已确认的星载 UTC"),QStringLiteral("Current-session telemetry · Automatically updated by OrbitTLM · Times are receiver timestamps, not confirmed onboard UTC")},
-            {QStringLiteral("当前会话数据；选择卫星、参数和时间范围后绘制趋势。多参数曲线归一化到 0–100%，CSV 保留原始工程值。"),QStringLiteral("Current-session data. Select satellites, fields and a time range to plot trends. Multi-field curves are normalized to 0–100%; CSV exports retain engineering values.")},
-            {QStringLiteral("导出当前筛选 CSV"),QStringLiteral("Export Filtered CSV")},
-            {QStringLiteral("导出曲线 CSV"),QStringLiteral("Export Curve CSV")},
-            {QStringLiteral("导出筛选 CSV"),QStringLiteral("Export Filtered CSV")},
-            {QStringLiteral("全部卫星"),QStringLiteral("All satellites")},
-            {QStringLiteral("参数（可多选，按 Ctrl/⌘ 选择多项）"),QStringLiteral("Fields (multi-select with Ctrl/⌘)")},
-            {QStringLiteral("参数（可多选）"),QStringLiteral("Fields (multi-select)")},
-            {QStringLiteral("选择一项或多项遥测参数"),QStringLiteral("Select one or more telemetry fields")},
-            {QStringLiteral("关键词"),QStringLiteral("Keyword")},
-            {QStringLiteral("参数名 / 业务包 / 字段编号"),QStringLiteral("Field name / packet / field code")},
-            {QStringLiteral("参数名 / 字段编号"),QStringLiteral("Field name / field code")},
-            {QStringLiteral("应用筛选"),QStringLiteral("Apply filters")},
-            {QStringLiteral("重置"),QStringLiteral("Reset")},
-            {QStringLiteral("筛选记录"),QStringLiteral("Filtered records")},
-            {QStringLiteral("参数种类"),QStringLiteral("Field types")},
-            {QStringLiteral("最小值"),QStringLiteral("Minimum")},
-            {QStringLiteral("最大值 / 平均值"),QStringLiteral("Maximum / Average")},
-            {QStringLiteral("参数趋势曲线"),QStringLiteral("Telemetry Trends")},
-            {QStringLiteral("遥测记录"),QStringLiteral("Telemetry Records")},
-            {QStringLiteral("参数统计"),QStringLiteral("Field Statistics")},
-            {QStringLiteral("数据说明"),QStringLiteral("Data Notes")},
-            {QStringLiteral("统计只使用可转为有限数值的工程量。选择单一参数时，纵轴显示实际数值；同时查看多个参数时，为避免不同量纲互相压缩，曲线会按各自的最小值和最大值归一化到 0–100%，原始值和单位可在统计表及 CSV 中查看。原始值、无效值和未定义字段不会被当作有效工程量绘图。"),QStringLiteral("Statistics include only engineering values convertible to finite numbers. A single field uses its actual values on the Y axis; multiple fields are normalized individually to 0–100% to avoid mixing scales. Original values and units remain available in the statistics table and CSV. Raw, invalid and undefined fields are not plotted as valid engineering quantities.")},
-            {QStringLiteral("查看 JSON 数据"),QStringLiteral("View JSON data")},
-            {QStringLiteral("下载全部 CSV"),QStringLiteral("Download full CSV")},
-            {QStringLiteral("请选择一个或多个参数，并设置时间范围查看变化趋势。"),QStringLiteral("Select one or more fields and set a time range to view trends.")},
-            {QStringLiteral("请在“参数”框中选择一个或多个参数。"),QStringLiteral("Select one or more fields in the Fields box.")},
-            {QStringLiteral("当前筛选范围内没有可绘制的数值样本。"),QStringLiteral("No numeric samples are available in the current filter range.")},
-            {QStringLiteral("请检查参数、时间范围或数据是否已解析为数值。"),QStringLiteral("Check the selected fields, time range, or whether the data was parsed as numeric values.")},
-            {QStringLiteral("曲线会使用当前卫星、时间范围和关键词筛选条件。"),QStringLiteral("The chart uses the current satellite, time range and keyword filters.")},
-            {QStringLiteral("请选择一个或多个参数。"),QStringLiteral("Select one or more fields.")},
-            {QStringLiteral("请选择一个或多个可转为数值的参数。"),QStringLiteral("Select one or more fields that can be converted to numeric values.")},
-            {QStringLiteral("请先选择至少一个参数，再导出曲线 CSV。"),QStringLiteral("Select at least one field before exporting the curve CSV.")},
-            {QStringLiteral("未知"),QStringLiteral("Unknown")},
-            {QStringLiteral("未分类"),QStringLiteral("Unclassified")},
-            {QStringLiteral("未命名"),QStringLiteral("Unnamed")},
-            {QStringLiteral("请选择参数和时间范围。"),QStringLiteral("Select fields and a time range.")},
-            {QStringLiteral("<th>时间</th>"),QStringLiteral("<th>Time</th>")},
-            {QStringLiteral("<th>卫星</th>"),QStringLiteral("<th>Satellite</th>")},
-            {QStringLiteral("<th>业务包</th>"),QStringLiteral("<th>Packet</th>")},
-            {QStringLiteral("<th>参数</th>"),QStringLiteral("<th>Field</th>")},
-            {QStringLiteral("<th>字段编号</th>"),QStringLiteral("<th>Field Code</th>")},
-            {QStringLiteral("<th>值</th>"),QStringLiteral("<th>Value</th>")},
-            {QStringLiteral("<th>单位</th>"),QStringLiteral("<th>Unit</th>")},
-            {QStringLiteral("<th>状态</th>"),QStringLiteral("<th>Status</th>")},
-            {QStringLiteral("<th>样本</th>"),QStringLiteral("<th>Samples</th>")},
-            {QStringLiteral("<th>最小</th>"),QStringLiteral("<th>Min</th>")},
-            {QStringLiteral("<th>最大</th>"),QStringLiteral("<th>Max</th>")},
-            {QStringLiteral("<th>平均</th>"),QStringLiteral("<th>Average</th>")},
-            {QStringLiteral("<h1>OrbitTLM · 遥测历史</h1>"),QStringLiteral("<h1>OrbitTLM · Telemetry History</h1>")},
-            {QStringLiteral("$('chartNote').textContent = '曲线会使用当前卫星、时间范围和关键词筛选条件。';"),QStringLiteral("$('chartNote').textContent = 'The chart uses the current satellite, time range and keyword filters.';")},
-            {QStringLiteral("legend.appendChild(swatch);legend.appendChild(document.createTextNode(`${s.name}${s.unit ? ` (${s.unit})` : ''} · ${s.points.length} 点`));"),QStringLiteral("legend.appendChild(swatch);legend.appendChild(document.createTextNode(`${s.name}${s.unit ? ` (${s.unit})` : ''} · ${s.points.length} points`));")},
-            {QStringLiteral("? `${usable.length} 个参数 · ${sampleCount} 个数值样本 · 各曲线按自身最小/最大值归一化（0–100%）`"),QStringLiteral("? `${usable.length} fields · ${sampleCount} numeric samples · each curve normalized to its own min/max (0–100%)`")},
-            {QStringLiteral(": `${usable[0].name}${usable[0].unit ? ` · 单位 ${usable[0].unit}` : ''} · ${usable[0].points.length} 个样本 · 纵轴为实际数值`;"),QStringLiteral(": `${usable[0].name}${usable[0].unit ? ` · unit ${usable[0].unit}` : ''} · ${usable[0].points.length} samples · Y axis shows actual values`;" )},
-            {QStringLiteral("if (!keys.size) { alert('请先选择至少一个参数，再导出曲线 CSV。'); return; }"),QStringLiteral("if (!keys.size) { alert('Select at least one field before exporting the curve CSV.'); return; }")},
-            {QStringLiteral(" · 单位 ${usable[0].unit}"),QStringLiteral(" · unit ${usable[0].unit}")},
-            {QStringLiteral(" 个样本 · 纵轴为实际数值"),QStringLiteral(" samples · Y axis shows actual values")},
-            {QStringLiteral("<label>卫星<select"),QStringLiteral("<label>Satellite<select")},
-            {QStringLiteral("<label>开始时间<input"),QStringLiteral("<label>Start time<input")},
-            {QStringLiteral("<label>结束时间<input"),QStringLiteral("<label>End time<input")},
-            {QStringLiteral("<label>关键词<input"),QStringLiteral("<label>Keyword<input")},
-            {QStringLiteral("<label>参数（可多选"),QStringLiteral("<label>Fields (multi-select")},
-            {QStringLiteral("$('summary').textContent='筛选记录 '+rows.length+' 条 · 有效数值 '+chosen.length+' 个 · 已选参数 '+keys.size+' 个';"),QStringLiteral("$('summary').textContent='Filtered records '+rows.length+' · Numeric values '+chosen.length+' · Selected fields '+keys.size;")},
-            {QStringLiteral("(multi?'（归一化）':'')"),QStringLiteral("(multi?' (normalized)':'')")},
-            {QStringLiteral("const DATA=__DATA_JSON__,all=[];for(const p of DATA)for(const f of (p.fields||[]))all.push({time:p.capture_local||'',sat:p.satellite||'未知',packet:p.packet||p.packet_label||'未分类',name:f.name_cn||f.code||'未命名',code:f.code||'',value:f.value??'',unit:f.unit||'',status:f.status||''});"),QStringLiteral("const DATA=__DATA_JSON__,all=[];for(const p of DATA)for(const f of (p.fields||[]))all.push({time:p.capture_local||'',sat:p.satellite||'Unknown',packet:p.packet||p.packet_label||'Unclassified',name:f.name_en||f.code||f.name_cn||'Unnamed',code:f.code||'',value:f.value??'',unit:f.unit||'',status:f.status||''});")},
-            {QStringLiteral("name: f.name_cn || f.code || '未命名',"),QStringLiteral("name: f.name_en || f.code || f.name_cn || 'Unnamed',")},
-            {QStringLiteral("localeCompare(b.name, 'zh-CN')"),QStringLiteral("localeCompare(b.name, 'en-US')")},
-            {QStringLiteral("const out=curves? [['时间','卫星','参数','值','单位','状态']]:[['时间','卫星','业务包','参数','字段编号','值','单位','状态']];"),QStringLiteral("const out=curves? [['Time','Satellite','Field','Value','Unit','Status']]:[['Time','Satellite','Packet','Field','Field Code','Value','Unit','Status']];")},
-            {QStringLiteral("alert('请先选择至少一个参数，再导出曲线 CSV。');"),QStringLiteral("alert('Select at least one field before exporting the curve CSV.');")},
-            {QStringLiteral("legend.push('<span style=\"color:'+color+'\">■ '+esc(name)+(multi?'（归一化）':'')+'</span>');"),QStringLiteral("legend.push('<span style=\"color:'+color+'\">■ '+esc(name)+(multi?' (normalized)':'')+'</span>');")},
-            {QStringLiteral("ctx.fillText('请选择一个或多个可转为数值的参数。',60,70);"),QStringLiteral("ctx.fillText('Select one or more fields that can be converted to numeric values.',60,70);")}
-        };
-        std::stable_sort(htmlLabels.begin(),htmlLabels.end(),[](const auto &left,const auto &right){
-            return left.first.size()>right.first.size();
+        QStringList webKeys=webTranslations_.keys();
+        std::stable_sort(webKeys.begin(),webKeys.end(),[](const QString &left,const QString &right){
+            return left.size()>right.size();
         });
-        for(const auto &entry:htmlLabels)localized.replace(entry.first,entry.second);
-        localized.replace(QStringLiteral("lang=\"zh-CN\""),QStringLiteral("lang=\"en\""));
+        for(const QString &key:webKeys){
+            const QString value=webTranslations_.value(key).toString(key);
+            if(!key.isEmpty()&&value!=key)localized.replace(key,value);
+        }
+        QStringList textKeys=translations_.keys();
+        std::stable_sort(textKeys.begin(),textKeys.end(),[](const QString &left,const QString &right){
+            return left.size()>right.size();
+        });
+        for(const QString &key:textKeys){
+            if(!orbitContainsCjk(key))continue;
+            const QString value=translations_.value(key).toString(key);
+            if(value!=key)localized.replace(key,value);
+        }
         html=localized.toUtf8();
     }
     html.replace("__DATA_JSON__",json);
@@ -1237,13 +1175,11 @@ void MainWindow::populateEngineering(int index){
                             const QString bitWidth=fullCode.contains(QLatin1Char('.'))
                                 ?fullCode.section(QLatin1Char('.'),1):QString();
                             const QString sourceDisplay=fieldName.isEmpty()?fullCode:fieldName;
-                            const QString englishDisplay=orbitEnglishFieldLabel(sourceDisplay,englishName,fullCode);
-                            const QString displayFieldName=languageCode_==QStringLiteral("en-US")?englishDisplay:sourceDisplay;
+                            const QString displayFieldName=uiText(sourceDisplay);
                             auto *entry=new QTreeWidgetItem(packetNode,
                                 {displayFieldName,fullCode,
                                  uiText(QStringLiteral("未解析")),uiText(QStringLiteral("官方字段定义"))});
                             entry->setData(0,Qt::UserRole+124,sourceDisplay);
-                            entry->setData(0,Qt::UserRole+125,englishDisplay);
                             entry->setData(1,Qt::UserRole+124,fullCode);
                             entry->setData(2,Qt::UserRole+124,QStringLiteral("未解析"));
                             entry->setData(3,Qt::UserRole+124,QStringLiteral("官方字段定义"));
@@ -1255,7 +1191,7 @@ void MainWindow::populateEngineering(int index){
                             entry->setData(0,Qt::UserRole+5,QStringLiteral("官方遥测树"));
                             entry->setData(0,Qt::UserRole+6,QString());
                             const QString fieldTooltip=QStringLiteral("官方字段编号：%1\n位/宽度：%2\n英文名：%3\n工程换算公式：官方目录未提供；当前不生成推测数值。")
-                                .arg(fullCode,bitWidth,englishDisplay);
+                                .arg(fullCode,bitWidth,englishName);
                             entry->setData(0,Qt::UserRole+126,fieldTooltip);
                             entry->setToolTip(0,uiText(fieldTooltip));
                             fieldTreeFieldItems_.insert(internalPacketName+QLatin1Char('|')+fullCode,entry);

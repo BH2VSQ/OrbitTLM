@@ -150,7 +150,9 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
         }
     });
     connect(live_,&orbit::LiveTcp::status,this,[this](const QString &message){
-        statusBar()->showMessage(uiText(QStringLiteral("TCP 状态："))+uiText(message),7500);
+        const QString visibleStatus=message==QStringLiteral("Connected")?QStringLiteral("已连接"):
+            (message==QStringLiteral("Disconnected")?QStringLiteral("已断开连接"):message);
+        statusBar()->showMessage(uiText(QStringLiteral("TCP 状态："))+uiText(visibleStatus),7500);
         if(message==QStringLiteral("Connected")){
             tcpConnected_=true;tcpConnecting_=false;
             if(tcpToggleButton_)tcpToggleButton_->setText(uiText(QStringLiteral("断开 TCP")));
@@ -343,15 +345,17 @@ void MainWindow::buildMenus(){
     tools->addAction(QStringLiteral("TCP 服务器设置…"),[this]{configureTcpServer();});
     languageMenu_=tools->addMenu(QStringLiteral("界面语言"));
     languageMenu_->setObjectName(QStringLiteral("languageMenu"));
-    // Always expose supported languages even when the executable is launched
-    // from a folder that does not contain the external i18n directory.
-    const QList<QPair<QString,QString>> supportedLanguages={
-        {QStringLiteral("zh-CN"),QStringLiteral("简体中文")},
-        {QStringLiteral("en-US"),QStringLiteral("English")}
-    };
-    for(const auto &language:supportedLanguages){
-        const QString code=language.first;
-        auto *languageAction=languageMenu_->addAction(language.second);
+    // Locale names are metadata in the embedded dictionaries; language codes
+    // remain stable identifiers in source code and settings.
+    const QStringList supportedLanguages={QStringLiteral("zh-CN"),QStringLiteral("en-US")};
+    for(const QString &code:supportedLanguages){
+        QString displayName=code;
+        QFile localeFile(QStringLiteral(":/i18n/")+code+QStringLiteral(".json"));
+        if(localeFile.open(QIODevice::ReadOnly)){
+            const QJsonObject localeRoot=QJsonDocument::fromJson(localeFile.readAll()).object();
+            displayName=localeRoot.value(QStringLiteral("displayName")).toString(code);
+        }
+        auto *languageAction=languageMenu_->addAction(displayName);
         languageAction->setObjectName(QStringLiteral("languageAction_")+code);
         languageAction->setCheckable(true);
         languageAction->setData(code);
@@ -359,6 +363,7 @@ void MainWindow::buildMenus(){
         connect(languageAction,&QAction::triggered,this,[this,code]{
             languageCode_=code;
             applyLanguage();
+            updatePaths();
             // Translation pass uses the retained source text for live summaries and
             // updates all existing table/tree cells in-place. Avoid rebuilding frame
             // tables, rescanning the replay history, recreating charts, or decoding an
@@ -497,32 +502,21 @@ bool MainWindow::loadLanguageFile(){
     }();
     Q_UNUSED(resourcesRegistered);
     const QString code=languageCode_.isEmpty()?QStringLiteral("zh-CN"):languageCode_;
-    QStringList paths={
-        QDir(QCoreApplication::applicationDirPath()).filePath(
-            QStringLiteral("i18n/")+code+QStringLiteral(".json")),
-        QStringLiteral(":/i18n/")+code+QStringLiteral(".json")
-    };
     QByteArray contents;
-    for(const QString &path:paths){
-        QFile file(path);
-        if(file.open(QIODevice::ReadOnly)){contents=file.readAll();break;}
-    }
+    const QString resourcePath=QStringLiteral(":/i18n/")+code+QStringLiteral(".json");
+    QFile file(resourcePath);
+    if(file.open(QIODevice::ReadOnly))contents=file.readAll();
     if(contents.isEmpty()&&code!=QStringLiteral("zh-CN")){
         languageCode_=QStringLiteral("zh-CN");
-        QStringList fallbackPaths={
-            QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("i18n/zh-CN.json")),
-            QStringLiteral(":/i18n/zh-CN.json")
-        };
-        for(const QString &path:fallbackPaths){
-            QFile file(path);
-            if(file.open(QIODevice::ReadOnly)){contents=file.readAll();break;}
-        }
+        QFile fallback(QStringLiteral(":/i18n/zh-CN.json"));
+        if(fallback.open(QIODevice::ReadOnly))contents=fallback.readAll();
     }
     if(contents.isEmpty())return false;
     const QJsonObject root=QJsonDocument::fromJson(contents).object();
     const QJsonObject map=root.value(QStringLiteral("translations")).toObject();
     if(map.isEmpty())return false;
     translations_=map;
+    webTranslations_=root.value(QStringLiteral("webTranslations")).toObject();
     uiTextCache_.clear();
     // Build the substring-fallback replacement order only once per language load.
     // Previously uiText(), orbitWidgetText() and localizeItemText() each sorted
@@ -641,9 +635,7 @@ void MainWindow::applyLanguage(){
                 if(auto *cell=table->item(row,col)){
                     QVariant saved=cell->data(cellRole);QString source;
                     if(saved.isValid())source=saved.toString();else{source=cell->text();cell->setData(cellRole,source);}
-                    const QString explicitEnglish=cell->data(Qt::UserRole+125).toString();
-                    const QString value=languageCode_==QStringLiteral("en-US")&&!explicitEnglish.isEmpty()
-                                      ?explicitEnglish:uiText(source);
+                    const QString value=uiText(source);
                     if(cell->text()!=value)cell->setText(value);
                     const QVariant tipSource=cell->data(Qt::UserRole+124);
                     if(tipSource.isValid()){
@@ -670,9 +662,7 @@ void MainWindow::applyLanguage(){
                     QVariant saved=node->data(column,Qt::UserRole+124);QString source;
                     if(saved.isValid())source=saved.toString();
                     else{source=node->text(column);node->setData(column,Qt::UserRole+124,source);}
-                    const QString explicitEnglish=column==0?node->data(0,Qt::UserRole+125).toString():QString();
-                    const QString value=languageCode_==QStringLiteral("en-US")&&!explicitEnglish.isEmpty()
-                                           ?explicitEnglish:uiText(source);
+                    const QString value=uiText(source);
                     if(node->text(column)!=value)node->setText(column,value);
                     const QVariant tooltipSource=node->data(column,Qt::UserRole+126);
                     if(tooltipSource.isValid()){
@@ -835,7 +825,7 @@ void MainWindow::buildWorkspace(){
     fileLayout->setContentsMargins(8,4,8,4);
     sourceLabel_=new QLabel;
     sourceLabel_->setWordWrap(false);
-    sourceLabel_->setToolTip(QStringLiteral("LOG/BIN session input paths"));
+    sourceLabel_->setToolTip(QStringLiteral("日志与数据帧文件路径"));
     fileLayout->addWidget(sourceLabel_,1);
     message_=new QLabel(QStringLiteral("离线会话 · 应用层 CRC 未校验"));
     message_->setObjectName("note");
@@ -1218,13 +1208,11 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                         const QString fieldName=field.value(QStringLiteral("name")).toString();
                         const QString fullCode=field.value(QStringLiteral("code")).toString();
                         const QString englishName=field.value(QStringLiteral("english_name")).toString();
-                        const QString englishDisplay=orbitEnglishFieldLabel(fieldName.isEmpty()?fullCode:fieldName,englishName,fullCode);
                         const QString sourceDisplay=fieldName.isEmpty()?fullCode:fieldName;
-                        auto *nameItem=new QTableWidgetItem(languageCode_==QStringLiteral("en-US")?englishDisplay:sourceDisplay);
+                        auto *nameItem=new QTableWidgetItem(uiText(sourceDisplay));
                         nameItem->setData(Qt::UserRole,fullCode);
                         nameItem->setData(Qt::UserRole+1,englishName);
                         nameItem->setData(Qt::UserRole+123,sourceDisplay);
-                        nameItem->setData(Qt::UserRole+125,englishDisplay);
                         const QString nameTooltip=QStringLiteral("官方字段：%1\n英文名：%2").arg(fullCode,englishName);
                         nameItem->setData(Qt::UserRole+124,nameTooltip);
                         nameItem->setToolTip(uiText(nameTooltip));

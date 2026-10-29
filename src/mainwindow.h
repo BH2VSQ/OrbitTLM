@@ -135,6 +135,7 @@ private:
     int tcpPort_=9985;
     QString languageCode_=QStringLiteral("zh-CN");
     QJsonObject translations_;
+    QJsonObject webTranslations_;
     QStringList translationKeysByLength_;
     mutable QHash<QString,QString> uiTextCache_;
     QString exportDirectoryOverride_;
