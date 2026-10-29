@@ -37,7 +37,7 @@ inline QString orbitWidgetText(const QString &source){
     if(!app||app->property("orbitTlmLanguage").toString()!=QStringLiteral("en-US"))return source;
     const QJsonObject map=app->property("orbitTlmTranslations").value<QJsonObject>();
     const auto exact=map.constFind(source);
-    if(exact!=map.cend())return exact.value().toString(source);
+    if(exact!=map.constEnd())return exact.value().toString(source);
     QString translated=source;
     QStringList keys=map.keys();
     std::sort(keys.begin(),keys.end(),[](const QString &a,const QString &b){return a.size()>b.size();});

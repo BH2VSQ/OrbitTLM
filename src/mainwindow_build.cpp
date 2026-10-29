@@ -629,7 +629,7 @@ void MainWindow::applyLanguage(){
 
 QString MainWindow::uiText(const QString &source) const{
     const auto exact=translations_.constFind(source);
-    if(exact!=translations_.cend())return exact.value().toString(source);
+    if(exact!=translations_.constEnd())return exact.value().toString(source);
     if(languageCode_!=QStringLiteral("en-US"))return source;
     QString translated=source;
     QStringList keys=translations_.keys();

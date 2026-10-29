@@ -83,7 +83,7 @@ QString localizeItemText(const QString &source){
     if(!app||app->property("orbitTlmLanguage").toString()!=QStringLiteral("en-US"))return source;
     const QJsonObject map=app->property("orbitTlmTranslations").value<QJsonObject>();
     const auto exact=map.constFind(source);
-    if(exact!=map.cend())return exact.value().toString(source);
+    if(exact!=map.constEnd())return exact.value().toString(source);
     QString translated=source;
     QStringList keys=map.keys();
     std::sort(keys.begin(),keys.end(),[](const QString &a,const QString &b){return a.size()>b.size();});
@@ -1802,7 +1802,7 @@ bool MainWindow::decodeSsdvImage(int imageId,bool showErrors){
         .arg(rebuilt.missingPacketIds.size()).arg(rebuilt.badPacketIds.size()).arg(rebuilt.receivedPackets);
     if(rebuilt.jpeg.isEmpty()){
         if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("图像 ID %1 暂无可解码预览。%2 当前数据仍会保留，可继续接收或导入其他分片。"))
-            .arg(imageId,diagnostic));
+            .arg(imageId).arg(diagnostic));
         if(showErrors)QMessageBox::warning(this,uiText(QStringLiteral("SSDV 图片重建失败")),
             (rebuilt.error.isEmpty()?uiText(QStringLiteral("当前分片无法重建 JPEG。")):uiText(rebuilt.error))+
             QStringLiteral("\n\n")+diagnostic);
@@ -1815,7 +1815,7 @@ bool MainWindow::decodeSsdvImage(int imageId,bool showErrors){
     QImage image=QImage::fromData(jpeg,"JPEG");
     if(image.isNull()){
         if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("图像 ID %1 已识别分片，但 JPEG 仍不完整。%2"))
-            .arg(imageId,diagnostic));
+            .arg(imageId).arg(diagnostic));
         if(showErrors)QMessageBox::warning(this,uiText(QStringLiteral("SSDV 图片重建失败")),
             uiText(QStringLiteral("解码器输出尚不能转换为预览图像。缺块和坏块统计已保留。"))+
             QStringLiteral("\n\n")+diagnostic);
