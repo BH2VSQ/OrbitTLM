@@ -21,7 +21,7 @@ QVector<ImagePacket> ImageTools::candidatesFromKiss(
     for(const auto &packet:packets){
         // Never stitch arbitrary 223-byte TM regions. The application KISS
         // stream must be reconstructed before image data is consumed.
-        if(packet.apid!=apid || packet.fecEvidence!="log_fec_reported" ||
+        if(packet.apid!=apid ||
            packet.classification!="ccsds_space_packet_candidate")continue;
         if(lastSequence>=0 && (lastSequence+1)%16384!=packet.sequence)stream.clear();
         lastSequence=packet.sequence;
@@ -31,16 +31,26 @@ QVector<ImagePacket> ImageTools::candidatesFromKiss(
             if(pos<0){stream.clear();break;}
             if(pos>0)stream.remove(0,pos);
             if(stream.size()<256)break;
-            const int type=quint8(stream[1]);
-            const int width=quint8(stream[9])*16;
-            const int height=quint8(stream[10])*16;
-            if((type==0x66||type==0x67)&&width>0&&height>0&&
-               width<=4080&&height<=4080){
+            // Try the reference SSDV validator before extracting metadata. Keep a
+            // structurally valid but CRC-failing candidate visible for diagnosis;
+            // decodeImage will reject it before JPEG reconstruction.
+            QByteArray rawCandidate=stream.left(256);
+            QByteArray checkedCandidate=rawCandidate;
+            int correctedSymbols=0;
+            const int packetStatus=ssdv_dec_is_packet(
+                reinterpret_cast<std::uint8_t*>(checkedCandidate.data()),&correctedSymbols,ssdv_normal_mode);
+            const QByteArray &headerBytes=packetStatus==SSDV_OK?checkedCandidate:rawCandidate;
+            const int type=quint8(headerBytes[1]);
+            const int width=quint8(headerBytes[9])*16;
+            const int height=quint8(headerBytes[10])*16;
+            if((type==0x66||type==0x67)&&width>0&&height>0&&width<=4080&&height<=4080){
                 ImagePacket p;
-                p.bytes=stream.left(256);p.apid=apid;
-                p.imageId=quint8(stream[6]);
-                p.packetId=(quint8(stream[7])<<8)|quint8(stream[8]);
+                p.bytes=packetStatus==SSDV_OK?checkedCandidate:rawCandidate;p.apid=apid;
+                p.imageId=quint8(headerBytes[6]);
+                p.packetId=(quint8(headerBytes[7])<<8)|quint8(headerBytes[8]);
                 p.width=width;p.height=height;
+                if(packetStatus==SSDV_OK)p.status=QStringLiteral("ssdv_crc_pass");
+                else if(packet.fecEvidence!="log_fec_reported")p.status=QStringLiteral("bin_only_unverified");
                 out.push_back(p);
                 stream.remove(0,256);
             }else stream.remove(0,1);
@@ -63,15 +73,27 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
     DecodedImage decoded;
     decoded.imageId=imageId;
     const int expectedSize=dslwp?SSDV_PKT_SIZE_DSLWP:SSDV_PKT_SIZE;
+    const ssdv_mode_t mode=dslwp?ssdv_dslwp_mode:ssdv_normal_mode;
     std::map<int,ImagePacket> ordered;
     for(const auto &packet:packets){
         if(packet.imageId!=imageId||packet.bytes.size()!=expectedSize)continue;
-        auto found=ordered.find(packet.packetId);
+        // Mirror the reference receiver: validate/correct each packet before
+        // handing it to the JPEG state machine. Normal SSDV mode performs RS
+        // correction; DSLWP mode validates its 218-byte packet CRC.
+        QByteArray correctedBytes=packet.bytes;
+        int correctedSymbols=0;
+        if(ssdv_dec_is_packet(reinterpret_cast<std::uint8_t*>(correctedBytes.data()),
+                              &correctedSymbols,mode)!=SSDV_OK)continue;
+        ImagePacket validated=packet;
+        validated.bytes=correctedBytes;
+        if(dslwp)validated.status=QStringLiteral("dslwp_crc32_pass");
+        else validated.status=QStringLiteral("ssdv_crc_pass");
+        auto found=ordered.find(validated.packetId);
         if(found==ordered.end()){
-            ordered.emplace(packet.packetId,packet);
+            ordered.emplace(validated.packetId,validated);
         }else if(found->second.status!="dslwp_crc32_pass"&&
-                 packet.status=="dslwp_crc32_pass"){
-            found->second=packet;
+                 validated.status=="dslwp_crc32_pass"){
+            found->second=validated;
         }
     }
     if(ordered.empty()){
@@ -90,7 +112,6 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
         if(packet.status=="dslwp_crc32_pass")++decoded.crcPassedPackets;
     }
 
-    const ssdv_mode_t mode=dslwp?ssdv_dslwp_mode:ssdv_normal_mode;
     std::vector<std::uint8_t> jpegBuffer(32U*1024U*1024U);
     // Match the receiver's recovery strategy: if one damaged packet prevents
     // reconstruction, discard that packet and restart with the remaining

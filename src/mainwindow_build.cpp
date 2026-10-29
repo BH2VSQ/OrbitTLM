@@ -183,10 +183,6 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
         statusBar()->showMessage(QStringLiteral("缺少 ASRTU-1 遥测字段库：")+error,18000);
     }
     updatePaths();
-    QString startupStoreError;
-    frames_=satelliteStore_.loadAll(&startupStoreError);
-    if(!startupStoreError.isEmpty())statusBar()->showMessage(QStringLiteral("读取 SQLite 遥测库失败：%1").arg(startupStoreError),10000);
-    if(!frames_.isEmpty())rebuildSession();
     updateMetrics();
     updateWebHistory();
     showEvent(-1);
@@ -303,7 +299,6 @@ void MainWindow::buildToolbar(){
 }
 void MainWindow::buildMenus(){
     auto *file=menuBar()->addMenu(QStringLiteral("文件(&F)"));
-    file->addAction(QStringLiteral("打开 SQLite 历史会话"),[this]{loadHistory();});
     file->addAction(QStringLiteral("打开 HTML 遥测历史"),[this]{
         updateWebHistory();
         const QString path=QDir(satelliteStore_.rootDirectory()).filePath(QStringLiteral("index.html"));
@@ -782,15 +777,34 @@ void MainWindow::buildRaw(QTabWidget *tabs){
     rawHex_=new QPlainTextEdit;
     rawHex_->setReadOnly(true);
     rawHex_->setLineWrapMode(QPlainTextEdit::NoWrap);
-    rawHex_->setPlainText(QStringLiteral("选择回放数据包后显示原始传输字节。"));
+    rawHex_->setPlainText(QStringLiteral("选择业务包后显示 KISS / HEX 数据。"));
     page->addTab(rawHex_,QStringLiteral("KISS / HEX"));
+
     packetTable_=new QTableWidget(0,6);
     packetTable_->setHorizontalHeaderLabels({QStringLiteral("VCID"),
         QStringLiteral("帧号范围"),QStringLiteral("字节数"),QStringLiteral("候选 APID"),
-        QStringLiteral("FEC 证据"),QStringLiteral("完整性")});
+        QStringLiteral("FEC 证据"),QStringLiteral("校验状态")});
     setupTable(packetTable_);
-    packetTable_->horizontalHeader()->setStretchLastSection(true);
-    page->addTab(packetTable_,QStringLiteral("分包明细"));
+    page->addTab(packetTable_,QStringLiteral("KISS 应用包"));
+
+    auto *framePage=new QWidget;
+    auto *frameLayout=new QVBoxLayout(framePage);
+    auto *note=subtitle(QStringLiteral("选择下方传输帧可查看完整原始帧。BY04 / ASRTU-1 信息帧为 223 字节时将逐字节显示；不会将 KISS 内容误当作原始帧。"));
+    frameLayout->addWidget(note);
+    rawFrameTable_=new QTableWidget(0,6);
+    rawFrameTable_->setHorizontalHeaderLabels({QStringLiteral("接收时间"),QStringLiteral("卫星"),
+        QStringLiteral("主帧计数"),QStringLiteral("VCID"),QStringLiteral("帧长度"),QStringLiteral("结构状态")});
+    setupTable(rawFrameTable_);
+    rawFrameTable_->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
+    frameLayout->addWidget(rawFrameTable_,2);
+    rawFrameHex_=new QPlainTextEdit;
+    rawFrameHex_->setReadOnly(true);
+    rawFrameHex_->setLineWrapMode(QPlainTextEdit::NoWrap);
+    rawFrameHex_->setPlaceholderText(QStringLiteral("选择一条原始帧以显示十六进制内容。"));
+    frameLayout->addWidget(rawFrameHex_,3);
+    connect(rawFrameTable_,&QTableWidget::currentCellChanged,this,
+            [this](int row,int,int,int){inspectRawFrame(row);});
+    page->addTab(framePage,QStringLiteral("223 字节原始帧"));
     tabs->addTab(page,QStringLiteral("原始数据"));
 }
 void MainWindow::buildDiagnostics(QTabWidget *tabs){

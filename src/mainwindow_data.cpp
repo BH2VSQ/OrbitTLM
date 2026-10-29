@@ -606,8 +606,8 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     }else if(title==QStringLiteral("姿态与 GPS 轨道")){
         const QStringList fixed={QStringLiteral("解算四元数q0"),QStringLiteral("解算四元数q1"),
             QStringLiteral("解算四元数q2"),QStringLiteral("解算四元数q3"),
-            QStringLiteral("升交点赤经"),QStringLiteral("近地点角距"),
-            QStringLiteral("GPS速度X"),QStringLiteral("GPS速度Y"),QStringLiteral("GPS速度Z"),
+            QStringLiteral("GPS速度X"),QStringLiteral("GPS速度Y"),
+            QStringLiteral("升交点赤经"),QStringLiteral("近地点角距"),QStringLiteral("GPS速度Z"),
             QStringLiteral("半长轴"),QStringLiteral("偏心率"),QStringLiteral("轨道倾角")};
         for(const QString &name:fixed){
             bool added=false;
@@ -932,9 +932,27 @@ bool MainWindow::updateWebHistory(QString *error){
     if(html.isEmpty()||!html.contains("__DATA_JSON__")){
         html=QString::fromUtf8(R"ORBITTLM_HTML(<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OrbitTLM 遥测历史</title><style>body{font:14px system-ui,sans-serif;margin:24px;color:#1e293b;background:#f8fafc}h1{font-size:22px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;border:1px solid #cbd5e1;border-radius:8px;padding:16px}</style></head>
-<body><h1>OrbitTLM 遥测历史索引</h1><p>自动生成的离线索引；完整记录保存在各卫星 SQLite 数据库中。</p><pre id="records">正在加载…</pre>
-<script>const records=__DATA_JSON__;document.getElementById('records').textContent=JSON.stringify(records,null,2);</script></body></html>)ORBITTLM_HTML").toUtf8();
+<title>OrbitTLM 遥测趋势与 CSV</title><style>
+body{font:14px Segoe UI,Microsoft YaHei,sans-serif;margin:18px;color:#182940;background:#f3f6fb}h1{font-size:21px}.panel{background:#fff;border:1px solid #dce5f0;border-radius:9px;padding:12px;margin:10px 0}.row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}label{display:flex;flex-direction:column;gap:4px;font-size:12px}input,select,button{padding:7px;border:1px solid #cbd8e8;border-radius:6px;background:#fff;font:inherit}button{cursor:pointer;background:#eaf3ff}select[multiple]{min-width:270px;min-height:100px}canvas{width:100%;height:330px;display:block}table{border-collapse:collapse;width:100%;font-size:12px}td,th{text-align:left;border-bottom:1px solid #e4ebf3;padding:6px}th{background:#f5f8fc;position:sticky;top:0}.scroll{max-height:300px;overflow:auto}.muted{color:#687d94;font-size:12px}
+</style></head><body><h1>OrbitTLM · 遥测趋势与 CSV</h1><p class="muted">当前会话数据；选择卫星、参数和时间范围后绘制趋势。多参数曲线归一化到 0–100%，CSV 保留原始工程值。</p>
+<section class="panel row"><label>卫星<select id="sat"><option value="all">全部卫星</option></select></label><label>参数（可多选）<select id="fields" multiple></select></label><label>开始时间<input id="from" type="datetime-local"></label><label>结束时间<input id="to" type="datetime-local"></label><label>关键词<input id="q" placeholder="参数名 / 字段编号"></label><button onclick="render()">应用筛选</button><button onclick="resetFilters()">重置</button><button onclick="downloadCsv(false)">导出筛选 CSV</button><button onclick="downloadCsv(true)">导出曲线 CSV</button></section>
+<section class="panel"><b id="summary">请选择参数和时间范围。</b><canvas id="chart" width="1200" height="360"></canvas><div id="legend"></div></section>
+<section class="panel"><h3>参数统计</h3><div class="scroll"><table><thead><tr><th>参数</th><th>样本</th><th>最小值</th><th>最大值</th><th>平均值</th></tr></thead><tbody id="stats"></tbody></table></div></section>
+<section class="panel"><h3>筛选后的遥测值</h3><div class="scroll"><table><thead><tr><th>时间</th><th>卫星</th><th>参数</th><th>值</th><th>单位</th><th>状态</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+<script>
+const DATA=__DATA_JSON__,all=[];for(const p of DATA)for(const f of (p.fields||[]))all.push({time:p.capture_local||'',sat:p.satellite||'未知',packet:p.packet||p.packet_label||'',name:f.name_cn||f.code||'未命名',code:f.code||'',value:f.value??'',unit:f.unit||'',status:f.status||''});
+const $=id=>document.getElementById(id),numeric=x=>{if(x===null||x===undefined||String(x).trim()==='')return NaN;const n=Number(String(x).replace(/,/g,''));return Number.isFinite(n)?n:NaN},key=x=>x.code||x.name,colors=['#2675c9','#d9485f','#0f9d78','#8b5cf6','#d97706','#0891b2','#be185d','#64748b'];
+function fillSat(){const s=$('sat');for(const v of [...new Set(all.map(x=>x.sat))].sort())if(![...s.options].some(o=>o.value===v))s.add(new Option(v,v));}
+function fillFields(){const sat=$('sat').value,prev=new Set([...$('fields').selectedOptions].map(o=>o.value)),m=new Map();for(const x of all){if(sat!=='all'&&x.sat!==sat)continue;const k=key(x);if(!m.has(k))m.set(k,{k,name:x.name,code:x.code,unit:x.unit});}const e=$('fields');e.innerHTML='';for(const v of [...m.values()].sort((a,b)=>a.name.localeCompare(b.name,'zh-CN'))){const o=new Option(v.name+(v.code?' · '+v.code:'')+(v.unit?' ('+v.unit+')':''),v.k);o.selected=prev.has(v.k);e.add(o);}}
+function filtered(){const sat=$('sat').value,q=$('q').value.trim().toLowerCase(),from=$('from').value?new Date($('from').value).getTime():-Infinity,to=$('to').value?new Date($('to').value).getTime():Infinity;return all.filter(x=>{const t=new Date(x.time).getTime();return(sat==='all'||x.sat===sat)&&(!q||(x.name+' '+x.code+' '+x.packet).toLowerCase().includes(q))&&(!Number.isFinite(t)||(t>=from&&t<=to));});}
+function selected(){return new Set([...$('fields').selectedOptions].map(o=>o.value));}
+function render(){const rows=filtered(),keys=selected(),chosen=rows.filter(x=>keys.has(key(x))&&Number.isFinite(numeric(x.value)));$('rows').innerHTML=rows.filter(x=>!keys.size||keys.has(key(x))).slice(0,3000).map(x=>'<tr><td>'+esc(x.time)+'</td><td>'+esc(x.sat)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.value)+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.status)+'</td></tr>').join('');const groups=[...keys].map(k=>({k,items:chosen.filter(x=>key(x)===k)})).filter(g=>g.items.length);$('stats').innerHTML=groups.map(g=>{const a=g.items.map(x=>numeric(x.value)),mn=Math.min(...a),mx=Math.max(...a),avg=a.reduce((s,v)=>s+v,0)/a.length,n=(all.find(x=>key(x)===g.k)||{}).name||g.k;return '<tr><td>'+esc(n)+'</td><td>'+a.length+'</td><td>'+mn+'</td><td>'+mx+'</td><td>'+avg.toFixed(4)+'</td></tr>';}).join('');$('summary').textContent='筛选记录 '+rows.length+' 条 · 有效数值 '+chosen.length+' 个 · 已选参数 '+keys.size+' 个';draw(groups);}
+function draw(groups){const c=$('chart'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#dce5ef';ctx.fillStyle='#657a91';ctx.font='12px sans-serif';const multi=groups.length>1,allValues=groups.flatMap(g=>g.items.map(x=>numeric(x.value))),rawMin=allValues.length?Math.min(...allValues):0,rawMax=allValues.length?Math.max(...allValues):1,axisMin=multi?0:(rawMin===rawMax?rawMin-1:rawMin),axisMax=multi?100:(rawMin===rawMax?rawMax+1:rawMax);for(let i=0;i<5;i++){const y=22+i*(h-54)/4;ctx.beginPath();ctx.moveTo(48,y);ctx.lineTo(w-14,y);ctx.stroke();ctx.fillText(multi?(100-i*25)+'%':(axisMax-i*(axisMax-axisMin)/4).toPrecision(4),4,y+4);}const allTimes=groups.flatMap(g=>g.items.map(x=>new Date(x.time).getTime()).filter(Number.isFinite)),xmin=allTimes.length?Math.min(...allTimes):0,xmax=allTimes.length?Math.max(...allTimes):0;const legend=[];groups.forEach((g,i)=>{const vals=g.items.map(x=>numeric(x.value)),mn=Math.min(...vals),mx=Math.max(...vals),color=colors[i%colors.length],pts=g.items.map(x=>({t:new Date(x.time).getTime(),v:numeric(x.value)})).filter(p=>Number.isFinite(p.t));ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();pts.forEach((p,j)=>{const x=48+(xmax>xmin?(p.t-xmin)/(xmax-xmin):j/Math.max(1,pts.length-1))*(w-62),v=multi?(mx>mn?(p.v-mn)/(mx-mn)*100:50):p.v,y=22+(h-54)*(1-(multi?v/100:(v-axisMin)/(axisMax-axisMin)));if(j)ctx.lineTo(x,y);else ctx.moveTo(x,y);});ctx.stroke();const name=(all.find(x=>key(x)===g.k)||{}).name||g.k;legend.push('<span style="color:'+color+'">■ '+esc(name)+(multi?'（归一化）':'')+'</span>');});$('legend').innerHTML=legend.join('　');if(!groups.length){ctx.fillStyle='#657a91';ctx.fillText('请选择一个或多个可转为数值的参数。',60,70);}}
+function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function downloadCsv(curves){const rows=filtered(),keys=selected(),out=curves? [['时间','卫星','参数','值','单位','状态']]:[['时间','卫星','业务包','参数','字段编号','值','单位','状态']];for(const x of rows){if(keys.size&&!keys.has(key(x)))continue;if(curves&&!Number.isFinite(numeric(x.value)))continue;out.push(curves?[x.time,x.sat,x.name,x.value,x.unit,x.status]:[x.time,x.sat,x.packet,x.name,x.code,x.value,x.unit,x.status]);}const csv='\ufeff'+out.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n'),blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=curves?'OrbitTLM-curves.csv':'OrbitTLM-filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function resetFilters(){$('sat').value='all';$('q').value='';$('from').value='';$('to').value='';fillFields();render();}
+$('sat').addEventListener('change',()=>{fillFields();render();});$('fields').addEventListener('change',render);fillSat();fillFields();render();
+</script></body></html>)ORBITTLM_HTML").toUtf8();
     }
     html.replace("__DATA_JSON__",json);
     const QString outputPath=QDir(dataDir).filePath(QStringLiteral("index.html"));
@@ -1307,6 +1325,19 @@ void MainWindow::updateFrameList(){
         for(int j=0;j<cells.size();++j)
             frameTable_->setItem(i,j,item(cells[j]));
     }
+    if(rawFrameTable_){
+        QSignalBlocker rawFrameBlocked(rawFrameTable_);
+        rawFrameTable_->setRowCount(frames_.size());
+        for(int i=0;i<frames_.size();++i){
+            const auto &f=frames_[i];
+            const QStringList cells={shortTime(f.captureLocal),f.satellite,
+                f.master<0?QStringLiteral("—"):QString::number(f.master),
+                f.vcid<0?QStringLiteral("—"):QString::number(f.vcid),
+                QString::number(f.bytes.size()),
+                f.complete?QStringLiteral("结构可读"):QStringLiteral("结构异常")};
+            for(int j=0;j<cells.size();++j)rawFrameTable_->setItem(i,j,item(cells[j]));
+        }
+    }
     QSignalBlocker packetBlocked(packetTable_);
     packetTable_->setRowCount(packets_.size());
     for(int i=0;i<packets_.size();++i){
@@ -1451,6 +1482,21 @@ void MainWindow::decodeSsdv(){
     }
     imagePath_=outputPath;
     statusBar()->showMessage(QStringLiteral("JPEG 重建完成并已保存：")+outputPath,9000);
+}
+void MainWindow::inspectRawFrame(int index){
+    if(!rawFrameHex_)return;
+    if(index<0||index>=frames_.size()){rawFrameHex_->clear();return;}
+    const auto &f=frames_[index];
+    QString result=QStringLiteral("接收时间：%1\n卫星：%2\n主帧计数：%3\nVCID：%4\n帧长度：%5 字节\n结构：%6\nSHA-256：%7")
+        .arg(utcLabel(f.captureLocal),f.satellite)
+        .arg(f.master).arg(f.vcid).arg(f.bytes.size())
+        .arg(f.complete?QStringLiteral("可读"):QStringLiteral("异常"),f.hash);
+    result+=QStringLiteral("\n\n完整原始帧 HEX（每行 16 字节，左侧为十六进制偏移）：\n");
+    for(int offset=0;offset<f.bytes.size();offset+=16){
+        result+=QStringLiteral("%1  %2\n")
+            .arg(offset,4,16,QChar('0')).arg(QString::fromLatin1(f.bytes.mid(offset,16).toHex(' ').toUpper()));
+    }
+    rawFrameHex_->setPlainText(result);
 }
 void MainWindow::exportFrames(bool csv){
     if(frames_.isEmpty())return;

@@ -62,6 +62,7 @@ private:
     void updateRawPacket(int index);
     void updateFrameList();
     void inspectFrame(int index);
+    void inspectRawFrame(int index);
     void exportFrames(bool csv);
     void exportEngineering(bool csv);
     void exportQuaternions(bool experimental=false);
@@ -107,12 +108,12 @@ private:
     QLineEdit *eventSearch_=nullptr,*engineeringSearch_=nullptr;
     QCheckBox *recognizedOnly_=nullptr;
     QTableWidget *eventTable_=nullptr,*engineeringTable_=nullptr,
-                 *frameTable_=nullptr,*packetTable_=nullptr,*imageTable_=nullptr;
+                 *frameTable_=nullptr,*packetTable_=nullptr,*imageTable_=nullptr,*rawFrameTable_=nullptr;
     QTreeWidget *fieldTree_=nullptr;
     QChartView *engineeringChart_=nullptr,*attitudeChart_=nullptr;
     AttitudeWidget *attitudeWidget_=nullptr;
     ImagePreview *imagePreview_=nullptr;
-    QPlainTextEdit *rawHex_=nullptr,*debugText_=nullptr;
+    QPlainTextEdit *rawHex_=nullptr,*debugText_=nullptr,*rawFrameHex_=nullptr;
     QSlider *timeline_=nullptr;
     QTimer *timer_=nullptr;
     QTabWidget *pages_=nullptr;
