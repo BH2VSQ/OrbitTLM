@@ -332,9 +332,24 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
         decoded.error=QStringLiteral("所选图像没有可安全解码的 CRC 通过分片。");
         return decoded;
     }
+    // The upstream C decoder assumes entropy data is safe once a CRC passes.
+    // A lone later fragment (packet ID > 0) has no image-start context and may
+    // trigger unsafe gap-fill / entropy parsing when preceded by a synthetic
+    // header packet. Refuse this underdetermined case before entering C code.
+    // Preserve gap diagnostics even when the stream is too underdetermined to
+    // send into the C decoder.
     int lastObserved=-1;
     for(int id:observedIds)lastObserved=qMax(lastObserved,id);
     for(int id=0;id<=lastObserved;++id)if(!observedIds.contains(id))decoded.missingPacketIds.push_back(id);
+    // Two or more verified fragments can still reconstruct a partial image.
+    if(ordered.size()==1 && ordered.begin()->first!=0){
+        decoded.receivedPackets=1;
+        decoded.crcPassedPackets=1;
+        decoded.width=ordered.begin()->second.width;
+        decoded.height=ordered.begin()->second.height;
+        decoded.error=QStringLiteral("仅有一个非首包的 CRC 通过分片，缺少可靠图像起始上下文；已跳过 JPEG 解码以确保稳定性。");
+        return decoded;
+    }
 
     const ImagePacket *metadataSource=&ordered.begin()->second;
     decoded.width=metadataSource->width;
@@ -348,32 +363,41 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
         }
     }
 
-    auto makeHeaderOnlyPacket=[&](const ImagePacket &source)->ImagePacket{
+    auto makeBootstrapPacket=[&](const ImagePacket &source)->ImagePacket{
         ImagePacket bootstrap=source;
         QByteArray bytes=source.bytes;
+        int payloadStart=0,payloadLength=0;
         if(shortPacketFormat){
             if(bytes.size()!=SSDV_PKT_SIZE_DSLWP||bytes.size()<9)return ImagePacket{};
             bytes[1]=char(0);bytes[2]=char(0);
-            bytes[5]=char(quint8(bytes[5])&~0x04); // bootstrap must never inherit EOI
+            bytes[5]=char(quint8(bytes[5])&~0x04); // never inherit EOI
             bytes[6]=char(0);
-            bytes[7]=char(0xff);bytes[8]=char(0xff);
+            bytes[7]=char(0);bytes[8]=char(0);       // start at MCU zero
+            payloadStart=9;payloadLength=205;
         }else{
             if(bytes.size()!=SSDV_PKT_SIZE||bytes.size()<15)return ImagePacket{};
             bytes[0]=char(0x55);
             bytes[7]=char(0);bytes[8]=char(0);
-            bytes[11]=char(quint8(bytes[11])&~0x04); // bootstrap must never inherit EOI
+            bytes[11]=char(quint8(bytes[11])&~0x04); // never inherit EOI
             bytes[12]=char(0);
-            bytes[13]=char(0xff);bytes[14]=char(0xff);
+            bytes[13]=char(0);bytes[14]=char(0);    // start at MCU zero
+            payloadStart=15;payloadLength=(quint8(bytes[1])==0x67?237:205);
         }
+        // The upstream decoder must consume packet zero normally so it advances
+        // its packet state. A 0xFFFF MCU sentinel causes an early return without
+        // advancing packet_id. Zero-valued entropy bytes form a blank bootstrap
+        // run; all real bytes after this packet come only from CRC-verified input.
+        if(payloadStart+payloadLength>bytes.size())return ImagePacket{};
+        std::fill(bytes.begin()+payloadStart,bytes.begin()+payloadStart+payloadLength,char(0));
         bootstrap.bytes=bytes;bootstrap.packetId=0;
-        bootstrap.status=QStringLiteral("synthetic_header_only");
+        bootstrap.status=QStringLiteral("synthetic_bootstrap");
         return bootstrap;
     };
 
     std::map<int,ImagePacket> feedOrdered=ordered;
     bool syntheticBootstrap=false;
     if(feedOrdered.find(0)==feedOrdered.end()){
-        ImagePacket bootstrap=makeHeaderOnlyPacket(*metadataSource);
+        ImagePacket bootstrap=makeBootstrapPacket(*metadataSource);
         if(bootstrap.bytes.isEmpty()){
             decoded.error=QStringLiteral("无法从候选分片读取 SSDV 图像头，不能生成部分预览。");
             return decoded;
@@ -403,7 +427,7 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
         for(const auto &entry:feedOrdered){
             if(entry.second.bytes.size()!=expectedSize){rejectedId=entry.first;break;}
             ssdv_packet_info_t check{};QByteArray corrected;bool good=false;
-            const bool synthetic=entry.second.status==QStringLiteral("synthetic_header_only");
+            const bool synthetic=entry.second.status==QStringLiteral("synthetic_bootstrap");
             if(!inspectPacket(entry.second.bytes,shortPacketFormat,check,corrected,good,synthetic)||
                (!good&&!synthetic)){
                 rejectedId=entry.first;break;
@@ -427,7 +451,7 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
             if(rejectedId==0&&!syntheticBootstrap&&!replacedPacketZero){
                 const auto zero=feedOrdered.find(0);
                 const ImagePacket *source=zero==feedOrdered.end()?metadataSource:&zero->second;
-                ImagePacket bootstrap=makeHeaderOnlyPacket(*source);
+                ImagePacket bootstrap=makeBootstrapPacket(*source);
                 if(!bootstrap.bytes.isEmpty()){
                     if(!decoded.badPacketIds.contains(0))decoded.badPacketIds.push_back(0);
                     feedOrdered[0]=std::move(bootstrap);ordered.erase(0);

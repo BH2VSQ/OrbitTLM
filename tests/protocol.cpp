@@ -653,13 +653,15 @@ private slots:
         QCOMPARE(imported[0].imageId,0x33);
         QCOMPARE(imported[0].packetId,0x0011);
         QCOMPARE(imported[0].status,QString("ssdv_crc32_pass"));
-        // A valid later fragment must still produce a partial JPEG when packet
-        // zero is missing; the internal header-only bootstrap must not inherit
-        // EOI from the source fragment or feed unchecked data to the decoder.
+        // A single later packet has no verified image-start context. Refuse to
+        // enter the upstream C JPEG decoder with this underdetermined stream.
         const auto partial=ImageTools::decodeImage(imported,0x33,true);
-        QVERIFY2(!partial.jpeg.isEmpty(),qPrintable(partial.error));
+        QVERIFY(partial.jpeg.isEmpty());
+        QVERIFY(partial.error.contains(QStringLiteral("仅有一个非首包")));
+        QCOMPARE(partial.receivedPackets,1);
         QCOMPARE(partial.width,480);
         QCOMPARE(partial.height,352);
+        QVERIFY(partial.missingPacketIds.contains(0));
     }
     void by04DslwpNativeVcidOneImageWithSourceVerifiedCrc(){
         QByteArray frame(223,char(0));

@@ -801,7 +801,8 @@
     "请选择图像查看分片覆盖情况": "Select an image to view fragment coverage",
     "检测到 %1 个卫星/图像组合；选择一项后尝试安全重建预览。": "Detected %1 satellite/image groups. Select one to attempt safe preview reconstruction.",
     "未识别到具有可靠结构或 CRC 佐证的 SSDV 分片。请检查卫星、VCID/APID 和输入数据格式。": "No SSDV fragments with a reliable structure or CRC corroboration were detected. Check the satellite, VCID/APID, and input data format.",
-    "系统内存不足，无法分配 SSDV JPEG 缓冲区。": "There is not enough system memory to allocate the SSDV JPEG buffer."
+    "系统内存不足，无法分配 SSDV JPEG 缓冲区。": "There is not enough system memory to allocate the SSDV JPEG buffer.",
+    "仅有一个非首包的 CRC 通过分片，缺少可靠图像起始上下文；已跳过 JPEG 解码以确保稳定性。": "Only one CRC-passing fragment is available and it is not packet zero; JPEG decoding was skipped because reliable image-start context is missing."
   },
   "无法从候选分片读取 SSDV 图像头，不能生成部分预览。": "Could not read an SSDV image header from the candidate fragments; a partial preview cannot be generated.",
   "已接收 %1 个有效分片，正在使用缺块填充策略，但当前数据仍不足以生成 JPEG。": "Received %1 valid fragments. Missing-block padding was attempted, but the current data is still insufficient to generate a JPEG.",
