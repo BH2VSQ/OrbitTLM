@@ -1,5 +1,11 @@
 #pragma once
 #include <QPainter>
+#include <QVBoxLayout>
+#include <QToolButton>
+#include <QSizePolicy>
+#include <QStackedWidget>
+#include <QPushButton>
+#include <QLayout>
 #include <QFontMetrics>
 #include <QResizeEvent>
 #include <QTabBar>
@@ -11,94 +17,147 @@
 #include <QWidget>
 #include <algorithm>
 #include <cmath>
-class AutoWrapTabBar final : public QTabBar {
+class FlowLayout final : public QLayout {
 public:
-    using QTabBar::QTabBar;
-
-    void refreshWrapping(){applyWrapping();}
-    void setOriginalText(int index,const QString &text){
-        if(index<0||index>=count())return;
-        while(originalTexts_.size()<count())originalTexts_.push_back(QTabBar::tabText(originalTexts_.size()));
-        originalTexts_[index]=text;
-        updating_=true;
-        QTabBar::setTabText(index,text);
-        updating_=false;
-        applyWrapping();
+    explicit FlowLayout(QWidget *parent=nullptr,int spacing=4):QLayout(parent){
+        setContentsMargins(0,0,0,0);
+        setSpacing(spacing);
     }
-
-protected:
-    void tabInserted(int index) override {
-        QTabBar::tabInserted(index);
-        originalTexts_.insert(qBound(0,index,originalTexts_.size()),QTabBar::tabText(index));
-        applyWrapping();
+    ~FlowLayout() override { while(QLayoutItem *item=takeAt(0))delete item; }
+    void addItem(QLayoutItem *item) override { items_.push_back(item); }
+    int count() const override { return int(items_.size()); }
+    QLayoutItem *itemAt(int index) const override {
+        return index>=0&&index<count()?items_.at(index):nullptr;
     }
-    void tabRemoved(int index) override {
-        QTabBar::tabRemoved(index);
-        if(index>=0&&index<originalTexts_.size())originalTexts_.removeAt(index);
-        applyWrapping();
+    QLayoutItem *takeAt(int index) override {
+        if(index<0||index>=count())return nullptr;
+        return items_.takeAt(index);
     }
-    void resizeEvent(QResizeEvent *event) override {
-        QTabBar::resizeEvent(event);
-        applyWrapping();
+    Qt::Orientations expandingDirections() const override { return {}; }
+    bool hasHeightForWidth() const override { return true; }
+    int heightForWidth(int width) const override { return doLayout(QRect(0,0,width,0),true); }
+    QSize sizeHint() const override { return minimumSize(); }
+    QSize minimumSize() const override {
+        QSize size;
+        for(QLayoutItem *item:items_)if(!item->isEmpty())size=size.expandedTo(item->minimumSize());
+        const QMargins margins=contentsMargins();
+        size+=QSize(margins.left()+margins.right(),margins.top()+margins.bottom());
+        return size;
     }
-
+    void setGeometry(const QRect &rect) override {
+        QLayout::setGeometry(rect);
+        doLayout(rect,false);
+    }
 private:
-    QVector<QString> originalTexts_;
-    bool updating_=false;
-
-    static QString wrapText(const QString &text){
-        // Keep each tab caption on one line. The subsystem tab row and the nested
-        // official-packet tab row provide navigation levels without breaking labels.
-        return text;
-    }
-    void applyWrapping(){
-        if(updating_||count()==0||width()<80)return;
-        while(originalTexts_.size()<count())originalTexts_.push_back(QTabBar::tabText(originalTexts_.size()));
-        while(originalTexts_.size()>count())originalTexts_.removeLast();
-        const QFontMetrics metrics(font());
-        auto tabWidth=[&](const QString &text){
-            int widest=0;
-            for(const QString &line:text.split(QLatin1Char('\n')))
-                widest=qMax(widest,metrics.horizontalAdvance(line));
-            return widest+22;
-        };
-        QVector<QString> display=originalTexts_;
-        int total=0;
-        for(const auto &text:display)total+=tabWidth(text);
-        if(total>width()){
-            QVector<int> candidates;
-            for(int i=0;i<display.size();++i)
-                if(display[i].size()>=5)candidates.push_back(i);
-            std::sort(candidates.begin(),candidates.end(),[&](int a,int b){
-                return metrics.horizontalAdvance(display[a])>metrics.horizontalAdvance(display[b]);
-            });
-            for(int i:candidates){
-                if(total<=width())break;
-                display[i]=wrapText(originalTexts_[i]);
-                total=0;
-                for(const auto &text:display)total+=tabWidth(text);
+    int doLayout(const QRect &rect,bool testOnly) const {
+        const QMargins margins=contentsMargins();
+        const QRect effective=rect.adjusted(margins.left(),margins.top(),-margins.right(),-margins.bottom());
+        int x=effective.x(),y=effective.y(),lineHeight=0;
+        const int gap=qMax(0,spacing());
+        for(QLayoutItem *item:items_){
+            if(item->isEmpty())continue;
+            const QSize size=item->sizeHint();
+            int nextX=x+size.width()+gap;
+            if(nextX-gap>effective.right()+1&&lineHeight>0){
+                x=effective.x();
+                y+=lineHeight+gap;
+                nextX=x+size.width()+gap;
+                lineHeight=0;
             }
+            if(!testOnly)item->setGeometry(QRect(QPoint(x,y),size));
+            x=nextX;
+            lineHeight=qMax(lineHeight,size.height());
         }
-        updating_=true;
-        for(int i=0;i<count();++i)
-            if(QTabBar::tabText(i)!=display[i])QTabBar::setTabText(i,display[i]);
-        updating_=false;
+        return y+lineHeight-rect.y()+margins.bottom();
     }
+    QVector<QLayoutItem*> items_;
 };
 
-class AutoWrapTabWidget final : public QTabWidget {
+class AutoWrapTabWidget final : public QWidget {
+    Q_OBJECT
 public:
-    explicit AutoWrapTabWidget(QWidget *parent=nullptr):QTabWidget(parent){
-        wrappingBar_=new AutoWrapTabBar(this);
-        wrappingBar_->setElideMode(Qt::ElideNone);
-        wrappingBar_->setUsesScrollButtons(true);
-        wrappingBar_->setExpanding(false);
-        setTabBar(wrappingBar_);
+    explicit AutoWrapTabWidget(QWidget *parent=nullptr):QWidget(parent){
+        auto *root=new QVBoxLayout(this);
+        root->setContentsMargins(0,0,0,0);
+        root->setSpacing(3);
+        auto *tabArea=new QWidget(this);
+        tabArea->setObjectName(QStringLiteral("flowTabButtonArea"));
+        tabArea->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);
+        tabLayout_=new FlowLayout(tabArea,4);
+        tabLayout_->setAlignment(Qt::AlignLeft|Qt::AlignTop);
+        stack_=new QStackedWidget(this);
+        root->addWidget(tabArea,0);
+        root->addWidget(stack_,1);
     }
-    void refreshTabWrapping(){wrappingBar_->refreshWrapping();}
-    void setWrappedTabText(int index,const QString &text){wrappingBar_->setOriginalText(index,text);}
+    int addTab(QWidget *page,const QString &text){
+        if(!page)return -1;
+        const int index=int(buttons_.size());
+        pages_.push_back(page);
+        labels_.push_back(text);
+        visible_.push_back(true);
+        stack_->addWidget(page);
+        auto *button=new QToolButton;
+        button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        button->setText(text);
+        button->setToolTip(text);
+        button->setCheckable(true);
+        button->setAutoRaise(false);
+        button->setMinimumHeight(28);
+        button->setSizePolicy(QSizePolicy::Preferred,QSizePolicy::Fixed);
+        buttons_.push_back(button);
+        tabLayout_->addWidget(button);
+        QObject::connect(button,&QToolButton::clicked,this,[this,index]{setCurrentIndex(index);});
+        if(currentIndex_<0)setCurrentIndex(index);
+        refreshTabWrapping();
+        return index;
+    }
+    void setDocumentMode(bool) {}
+    int count() const { return int(pages_.size()); }
+    QWidget *widget(int index) const {
+        return index>=0&&index<count()?pages_.at(index):nullptr;
+    }
+    int currentIndex() const { return currentIndex_; }
+    void setCurrentIndex(int index){
+        if(index<0||index>=count()||!visible_.at(index))return;
+        currentIndex_=index;
+        stack_->setCurrentIndex(index);
+        for(int i=0;i<buttons_.size();++i)buttons_[i]->setChecked(i==index);
+    }
+    void setTabVisible(int index,bool visible){
+        if(index<0||index>=count())return;
+        visible_[index]=visible;
+        buttons_[index]->setVisible(visible);
+        if(!visible&&currentIndex_==index){
+            currentIndex_=-1;
+            for(int i=0;i<count();++i)if(visible_[i]){setCurrentIndex(i);break;}
+        }
+        refreshTabWrapping();
+    }
+    void setTabText(int index,const QString &text){
+        if(index<0||index>=count())return;
+        labels_[index]=text;
+        buttons_[index]->setText(text);
+        refreshTabWrapping();
+    }
+    QString tabText(int index) const {
+        return index>=0&&index<count()?labels_.at(index):QString();
+    }
+    void setTabToolTip(int index,const QString &tip){
+        if(index>=0&&index<count())buttons_[index]->setToolTip(tip);
+    }
+    void setWrappedTabText(int index,const QString &text){setTabText(index,text);}
+    void refreshTabWrapping(){
+        if(tabLayout_){tabLayout_->invalidate();tabLayout_->activate();}
+        updateGeometry();
+    }
 private:
-    AutoWrapTabBar *wrappingBar_=nullptr;
+    FlowLayout *tabLayout_=nullptr;
+    QStackedWidget *stack_=nullptr;
+    QVector<QWidget*> pages_;
+    QVector<QToolButton*> buttons_;
+    QVector<QString> labels_;
+    QVector<bool> visible_;
+    int currentIndex_=-1;
 };
 
 class AttitudeWidget final : public QWidget {

@@ -572,20 +572,34 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                                   .filePath(QStringLiteral("telemetry-trees"));
     for(const QString &treeSatellite : {QStringLiteral("ASRTU-1"),QStringLiteral("BY04")}){
         const QString catalogName=treeSatellite+QStringLiteral(".json");
-        QFile file(QStringLiteral(":/telemetry-trees/")+catalogName);
+        QFile file(QDir(catalogRoot).filePath(catalogName));
         if(!file.open(QIODevice::ReadOnly)){
-            file.setFileName(QDir(catalogRoot).filePath(catalogName));
+            file.setFileName(QStringLiteral(":/telemetry-trees/")+catalogName);
             if(!file.open(QIODevice::ReadOnly)){
                 auto *errorPage=new QWidget;
+                errorPage->setProperty("treeSatellite",treeSatellite);
                 auto *errorLayout=new QVBoxLayout(errorPage);
-                errorLayout->addWidget(new QLabel(QStringLiteral("官方遥测字段目录未加载：%1").arg(catalogName)));
-                systems->addTab(errorPage,treeSatellite+QStringLiteral(" · 目录错误"));
+                errorLayout->addWidget(new QLabel(QStringLiteral("官方遥测字段目录无法读取：%1").arg(catalogName)));
+                const int errorTab=systems->addTab(errorPage,QStringLiteral("目录错误"));
+                systems->setTabToolTip(errorTab,treeSatellite+QStringLiteral(" · 目录错误"));
                 continue;
             }
         }
-        const QJsonDocument document=QJsonDocument::fromJson(file.readAll());
-        if(!document.isObject())continue;
+        QJsonParseError parseError;
+        const QByteArray catalogBytes=file.readAll();
+        file.close();
+        const QJsonDocument document=QJsonDocument::fromJson(catalogBytes,&parseError);
         const QJsonArray packetArray=document.object().value(QStringLiteral("packets")).toArray();
+        if(!document.isObject()||packetArray.isEmpty()){
+            auto *errorPage=new QWidget;
+            errorPage->setProperty("treeSatellite",treeSatellite);
+            auto *errorLayout=new QVBoxLayout(errorPage);
+            errorLayout->addWidget(new QLabel(QStringLiteral("遥测目录格式错误：%1（%2）")
+                .arg(catalogName,parseError.errorString())));
+            const int errorTab=systems->addTab(errorPage,QStringLiteral("目录错误"));
+            systems->setTabToolTip(errorTab,treeSatellite+QStringLiteral(" · 目录错误"));
+            continue;
+        }
 
         QStringList groupOrder;
         QHash<QString,int> groupIndices;
@@ -667,7 +681,8 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                 componentTables_.insert(treeSatellite+QLatin1Char('|')+packetCode,table);
             }
             groupLayout->addWidget(packetTabs,1);
-            systems->addTab(groupPage,treeSatellite+QStringLiteral(" · ")+groupName);
+            const int systemTab=systems->addTab(groupPage,groupName);
+            systems->setTabToolTip(systemTab,treeSatellite+QStringLiteral(" · ")+groupName);
         }
     }
 

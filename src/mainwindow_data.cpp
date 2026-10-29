@@ -504,15 +504,18 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     const auto definitions=catalog_.definitionPackets();
     if(by04){
         if(card==powerCard_){
-            for(int i=0;i<=index&&i<business_.size();++i){
-                const auto &packet=business_[i];
-                if(packet.transport.satellite!="BY04")continue;
-                for(const auto &field:packet.fields){
-                    const QString &name=field.nameCn;
-                    if((name.contains(QStringLiteral("电压"))||name.contains(QStringLiteral("电流")))&&
-                       !excludedLimitField(name))add(name,packet.packetName,field);
-                }
-            }
+            addBy04(QStringLiteral("母线电压"),{QStringLiteral("母线电压"),QStringLiteral("A12-母线电压遥测")});
+            addBy04(QStringLiteral("12V电压"),{QStringLiteral("12V电压"),QStringLiteral("A15-12V电压遥测")});
+            addBy04(QStringLiteral("12V电流"),{QStringLiteral("12V电流"),QStringLiteral("A20-12V电流遥测")});
+            addBy04(QStringLiteral("5V电压"),{QStringLiteral("5V电压"),QStringLiteral("A14-5V电压遥测")});
+            addBy04(QStringLiteral("5V电流"),{QStringLiteral("5V电流"),QStringLiteral("A19-5V电流遥测")});
+            addBy04(QStringLiteral("射频3.3V电压"),{QStringLiteral("射频 3.3V电压")});
+            addBy04(QStringLiteral("射频3.3V电流"),{QStringLiteral("射频 3.3V电流")});
+            addBy04(QStringLiteral("射频1.8V电压"),{QStringLiteral("射频 1.8V电压")});
+            addBy04(QStringLiteral("射频1.8V电流"),{QStringLiteral("射频 1.8V电流")});
+            addBy04(QStringLiteral("电池电压"),{QStringLiteral("电池电压"),QStringLiteral("A17-蓄电池电压")});
+            addBy04(QStringLiteral("充电电流"),{QStringLiteral("充电电流"),QStringLiteral("A26-充电电流")});
+            addBy04(QStringLiteral("放电电流"),{QStringLiteral("放电电流"),QStringLiteral("A24-放电电流")});
         }else if(card==attitudeCard_){
             addBy04(QStringLiteral("姿态模式"),{QStringLiteral("姿态模式")});
             addBy04(QStringLiteral("姿态四元数 q0"),{QStringLiteral("姿态四元数q0")});
@@ -543,6 +546,10 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
             addBy04(QStringLiteral("基带UV"),{QStringLiteral("基带UV")});
             addBy04(QStringLiteral("星敏A"),{QStringLiteral("星敏X_5V")});
             addBy04(QStringLiteral("星敏B"),{QStringLiteral("星敏Y_5V")});
+            addBy04(QStringLiteral("GNSS"),{QStringLiteral("GNSS_5V"),QStringLiteral("GNSS_5V-回读")});
+            addBy04(QStringLiteral("X发射机开关状态"),{QStringLiteral("X发射机开关状态"),QStringLiteral("B0：发射机开关状态")});
+            addBy04(QStringLiteral("X频段数传状态"),{QStringLiteral("X频段数传状态"),QStringLiteral("数传锁定状态"),QStringLiteral("B4： 数传锁定状态"),QStringLiteral("B4：数传锁定状态")});
+            addBy04(QStringLiteral("X测控数传"),{QStringLiteral("X测控数传继电器"),QStringLiteral("X测控数传开-回读"),QStringLiteral("X测控数传关-回读")});
         }
     }else if(title==QStringLiteral("总线电压与电流")){
         for(const auto &packet:definitions)for(const auto &field:packet.fields){
@@ -611,17 +618,22 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
         int extraSlot=0;
         for(int r=0;r<rows.size();++r){
             const QString &name=rows[r].name;
-            const bool pose=name.startsWith(QStringLiteral("姿态四元数 q"));
-            const bool deviation=name.startsWith(QStringLiteral("偏差四元数 q"));
-            if(pose||deviation){
-                const int marker=name.lastIndexOf(QLatin1Char('q'));
-                bool ok=false;
-                const int qIndex=name.mid(marker+1).toInt(&ok);
-                if(ok&&qIndex>=0&&qIndex<4){
-                    rowCells[r]={qIndex,deviation?2:0};
-                    continue;
+            // Place matching q0..q3 pairs on the same table row explicitly.
+            // Left pair: attitude quaternion; right pair: deviation quaternion.
+            bool quaternionMapped=false;
+            for(int qIndex=0;qIndex<4;++qIndex){
+                if(name==QStringLiteral("姿态四元数 q%1").arg(qIndex)){
+                    rowCells[r]={qIndex,0};
+                    quaternionMapped=true;
+                    break;
+                }
+                if(name==QStringLiteral("偏差四元数 q%1").arg(qIndex)){
+                    rowCells[r]={qIndex,2};
+                    quaternionMapped=true;
+                    break;
                 }
             }
+            if(quaternionMapped)continue;
             int slot=-1;
             if(name==QStringLiteral("姿态模式"))slot=0;
             else if(name==QStringLiteral("GPS轨道有效计数"))slot=1;
@@ -748,7 +760,7 @@ void MainWindow::updateComponentTabs(int index){
     const QString activeSatellite=by04?QStringLiteral("BY04"):QStringLiteral("ASRTU-1");
 
     // Hide the other satellite's subsystem tabs while keeping both official trees loaded.
-    auto *systems=pages_?pages_->findChild<QTabWidget*>(QStringLiteral("officialSystemTabs")):nullptr;
+    auto *systems=pages_?pages_->findChild<AutoWrapTabWidget*>(QStringLiteral("officialSystemTabs")):nullptr;
     if(systems){
         int firstVisible=-1;
         bool currentIsVisible=false;
@@ -934,10 +946,10 @@ void MainWindow::populateEngineering(int index){
         const QString treeSatellite=by04?QStringLiteral("BY04"):QStringLiteral("ASRTU-1");
         const QString treePath=QDir(QCoreApplication::applicationDirPath())
                               .filePath(QStringLiteral("telemetry-trees/")+treeSatellite+QStringLiteral(".json"));
-        QFile officialFile(QStringLiteral(":/telemetry-trees/")+treeSatellite+QStringLiteral(".json"));
+        QFile officialFile(treePath);
         bool officialOpen=officialFile.open(QIODevice::ReadOnly);
         if(!officialOpen){
-            officialFile.setFileName(treePath);
+            officialFile.setFileName(QStringLiteral(":/telemetry-trees/")+treeSatellite+QStringLiteral(".json"));
             officialOpen=officialFile.open(QIODevice::ReadOnly);
         }
         bool loadedOfficial=false;
@@ -1014,8 +1026,20 @@ void MainWindow::populateEngineering(int index){
         for(int i=0;i<=index&&i<business_.size();++i){
             const auto &packet=business_[i];
             if(by04!=(packet.transport.satellite==QStringLiteral("BY04")))continue;
-            for(const auto &field:packet.fields)
-                if(!field.code.isEmpty())latestFields.insert(packet.packetName+QLatin1Char('|')+field.code,field);
+            for(const auto &field:packet.fields){
+                if(field.code.isEmpty())continue;
+                QString fullCode=field.code;
+                if(!field.bits.isEmpty()&&!fullCode.endsWith(QLatin1Char('.')+field.bits))
+                    fullCode+=QLatin1Char('.')+field.bits;
+                QStringList packetKeys{packet.packetName};
+                if(packet.transport.satellite==QStringLiteral("BY04")&&
+                   !packet.packetName.startsWith(QStringLiteral("BY04-")))
+                    packetKeys.push_back(QStringLiteral("BY04-")+packet.packetName);
+                for(const QString &packetKey:packetKeys){
+                    latestFields.insert(packetKey+QLatin1Char('|')+field.code,field);
+                    latestFields.insert(packetKey+QLatin1Char('|')+fullCode,field);
+                }
+            }
         }
     }
     {
@@ -1048,9 +1072,13 @@ void MainWindow::populateEngineering(int index){
     const auto *chosen=index>=0?latestRecognized(index,{""}):nullptr;
     if(!chosen){
         int packetCount=0;
-        if(by04)packetCount=54; else packetCount=catalog_.packetKinds();
+        if(by04){
+            packetCount=0;
+            for(auto it=componentTables_.cbegin();it!=componentTables_.cend();++it)
+                if(it.value()&&it.value()->property("treeSatellite").toString()==QStringLiteral("BY04"))++packetCount;
+        }else packetCount=catalog_.packetKinds();
         engineeringSummary_->setText(by04?
-            QStringLiteral("BY70-4 官方遥测树：%1 类面板分包；本地已接入 %2 项字段定义，其余分包保留官方名称，字段映射待验证。")
+            QStringLiteral("BY70-4 官方遥测树：%1 类面板分包；本地已接入 %2 项字段定义，其余分包保留官方字段位置，未匹配样本显示“未解析”。")
                 .arg(packetCount).arg(fieldTreeFieldItems_.size()):
             QStringLiteral("ASRTU-1 遥测树：%1 类分包、%2 个字段定义；数值按当前会话中最新匹配样本更新。")
                 .arg(catalog_.packetKinds()).arg(fieldTreeFieldItems_.size()));
@@ -1058,7 +1086,7 @@ void MainWindow::populateEngineering(int index){
         return;
     }
     const QString treeNote=by04?
-        QStringLiteral("官方面板分包 54 类 · 本地字段定义 %1 项").arg(fieldTreeFieldItems_.size()):
+        QStringLiteral("官方面板分包 %1 类 · 本地字段定义 %2 项").arg([&]{int count=0;for(auto it=componentTables_.cbegin();it!=componentTables_.cend();++it)if(it.value()&&it.value()->property("treeSatellite").toString()==QStringLiteral("BY04"))++count;return count;}()).arg(fieldTreeFieldItems_.size()):
         QStringLiteral("完整字段树 %1 类分包 · %2 个字段").arg(catalog_.packetKinds()).arg(fieldTreeFieldItems_.size());
     engineeringSummary_->setText(chosen->identification=="by04_ccsds_header_only"?
         QStringLiteral("%1 · 保留 %2 项协议字段 · %3 · 未匹配业务字段保持原样")

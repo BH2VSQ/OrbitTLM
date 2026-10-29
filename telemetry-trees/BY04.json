@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "satellite": "BY04",
   "source_satellite_name": "BY-04",
   "packets": [
@@ -7,7 +7,293 @@
       "official_name": "测控板-测控-00包",
       "packet_code": "TTC-S0",
       "group": "测控板",
-      "fields": []
+      "fields": [
+        {
+          "name": "遥测轮询计数",
+          "code": "TTC-C00000.7.8",
+          "english_name": "遥测轮询计数"
+        },
+        {
+          "name": "A总线正确帧计数",
+          "code": "TTC-C00001.7.8",
+          "english_name": "A总线正确帧计数"
+        },
+        {
+          "name": "A总线错误帧计数",
+          "code": "TTC-C00002.7.8",
+          "english_name": "A总线错误帧计数"
+        },
+        {
+          "name": "B总线正确帧计数",
+          "code": "TTC-C00003.7.8",
+          "english_name": "B总线正确帧计数"
+        },
+        {
+          "name": "B总线错误帧计数",
+          "code": "TTC-C00004.7.8",
+          "english_name": "B总线错误帧计数"
+        },
+        {
+          "name": "A总线接收错误计数",
+          "code": "TTC-C00005.7.8",
+          "english_name": "A总线接收错误计数"
+        },
+        {
+          "name": "B总线接收错误计数",
+          "code": "TTC-C00006.7.8",
+          "english_name": "B总线接收错误计数"
+        },
+        {
+          "name": "A总线发送错误计数",
+          "code": "TTC-C00007.7.8",
+          "english_name": "A总线发送错误计数"
+        },
+        {
+          "name": "B总线发送错误计数",
+          "code": "TTC-C00008.7.8",
+          "english_name": "B总线发送错误计数"
+        },
+        {
+          "name": "A总线复位计数",
+          "code": "TTC-C00009.7.8",
+          "english_name": "A总线复位计数"
+        },
+        {
+          "name": "B总线复位计数",
+          "code": "TTC-C00010.7.8",
+          "english_name": "B总线复位计数"
+        },
+        {
+          "name": "总线复位类型",
+          "code": "TTC-C00011.7.8",
+          "english_name": "总线复位类型"
+        },
+        {
+          "name": "最近一次指令码",
+          "code": "TTC-C00012.7.8",
+          "english_name": "最近一次指令码"
+        },
+        {
+          "name": "工作电流",
+          "code": "TTC-C00013.7.8",
+          "english_name": "工作电流"
+        },
+        {
+          "name": "工作电压",
+          "code": "TTC-C00014.7.8",
+          "english_name": "工作电压"
+        },
+        {
+          "name": "接收功率",
+          "code": "TTC-C00015.7.8",
+          "english_name": "接收功率"
+        },
+        {
+          "name": "工作温度",
+          "code": "TTC-C00016.7.8",
+          "english_name": "工作温度"
+        },
+        {
+          "name": "B7：遥控帧同步锁定状态",
+          "code": "TTC-C00017.7.1",
+          "english_name": "B7：遥控帧同步锁定状态"
+        },
+        {
+          "name": "B6：遥控码同步锁定状态",
+          "code": "TTC-C00017.6.1",
+          "english_name": "B6：遥控码同步锁定状态"
+        },
+        {
+          "name": "B5：遥控载波锁定状态",
+          "code": "TTC-C00017.5.1",
+          "english_name": "B5：遥控载波锁定状态"
+        },
+        {
+          "name": "B4：上注帧同步锁定状态",
+          "code": "TTC-C00017.4.1",
+          "english_name": "B4：上注帧同步锁定状态"
+        },
+        {
+          "name": "B3：上注码同步锁定状态",
+          "code": "TTC-C00017.3.1",
+          "english_name": "B3：上注码同步锁定状态"
+        },
+        {
+          "name": "B2：上注载波锁定状态",
+          "code": "TTC-C00017.2.1",
+          "english_name": "B2：上注载波锁定状态"
+        },
+        {
+          "name": "B1：上行工作模式",
+          "code": "TTC-C00017.1.1",
+          "english_name": "B1：上行工作模式"
+        },
+        {
+          "name": "B0：发射机开关状态",
+          "code": "TTC-C00017.0.1",
+          "english_name": "B0：发射机开关状态"
+        },
+        {
+          "name": "B7：监控状态",
+          "code": "TTC-C00018.7.1",
+          "english_name": "B7：监控状态"
+        },
+        {
+          "name": "B6：FPGA运行FLASH",
+          "code": "TTC-C00018.6.1",
+          "english_name": "B6：FPGA运行FLASH"
+        },
+        {
+          "name": "B5：码组",
+          "code": "TTC-C00018.5.1",
+          "english_name": "B5：码组"
+        },
+        {
+          "name": "B4：载波模式",
+          "code": "TTC-C00018.4.1",
+          "english_name": "B4：载波模式"
+        },
+        {
+          "name": "B3：活动总线标记",
+          "code": "TTC-C00018.3.1",
+          "english_name": "B3：活动总线标记"
+        },
+        {
+          "name": "B2：星地遥控数据缓存状态",
+          "code": "TTC-C00018.2.1",
+          "english_name": "B2：星地遥控数据缓存状态"
+        },
+        {
+          "name": "B1：单机就绪状态",
+          "code": "TTC-C00018.1.1",
+          "english_name": "B1：单机就绪状态"
+        },
+        {
+          "name": "多普勒",
+          "code": "TTC-C00019.7.16",
+          "english_name": "多普勒"
+        },
+        {
+          "name": "直接（OC）指令正确计数",
+          "code": "TTC-C00021.7.8",
+          "english_name": "直接（OC）指令正确计数"
+        },
+        {
+          "name": "直接（OC）指令错误计数",
+          "code": "TTC-C00022.7.8",
+          "english_name": "直接（OC）指令错误计数"
+        },
+        {
+          "name": "遥控指令正确计数",
+          "code": "TTC-C00023.7.8",
+          "english_name": "遥控指令正确计数"
+        },
+        {
+          "name": "遥控指令错误计数",
+          "code": "TTC-C00024.7.8",
+          "english_name": "遥控指令错误计数"
+        },
+        {
+          "name": "上注数据错误计数",
+          "code": "TTC-C00026.7.8",
+          "english_name": "上注数据错误计数"
+        },
+        {
+          "name": "下行遥测正确计数",
+          "code": "TTC-C00027.7.8",
+          "english_name": "下行遥测正确计数"
+        },
+        {
+          "name": "下行遥测错误计数",
+          "code": "TTC-C00028.7.8",
+          "english_name": "下行遥测错误计数"
+        },
+        {
+          "name": "B7：网口状态",
+          "code": "TTC-C00029.7.1",
+          "english_name": "B7：网口状态"
+        },
+        {
+          "name": "B6：发射机工作模式",
+          "code": "TTC-C00029.6.1",
+          "english_name": "B6：发射机工作模式"
+        },
+        {
+          "name": "B5：射频锁定状态",
+          "code": "TTC-C00029.5.1",
+          "english_name": "B5：射频锁定状态"
+        },
+        {
+          "name": "B4： 数传锁定状态",
+          "code": "TTC-C00029.4.1",
+          "english_name": "B4： 数传锁定状态"
+        },
+        {
+          "name": "B1：数传速率",
+          "code": "TTC-C00029.1.1",
+          "english_name": "B1：数传速率"
+        },
+        {
+          "name": "B0：数据门状态",
+          "code": "TTC-C00029.0.1",
+          "english_name": "B0：数据门状态"
+        },
+        {
+          "name": "Bit[3:2]：数传接收使能通道",
+          "code": "TTC-C00030.3.2",
+          "english_name": "Bit[3:2]：数传接收使能通道"
+        },
+        {
+          "name": "Bit[1:0]：上注设备选择",
+          "code": "TTC-C00030.1.2",
+          "english_name": "Bit[1:0]：上注设备选择"
+        },
+        {
+          "name": "上注数据正确计数",
+          "code": "TTC-C00032.7.16",
+          "english_name": "上注数据正确计数"
+        },
+        {
+          "name": "间接OC指令参数1",
+          "code": "TTC-C00036.7.8",
+          "english_name": "间接OC指令参数1"
+        },
+        {
+          "name": "间接OC指令参数2",
+          "code": "TTC-C00037.7.8",
+          "english_name": "间接OC指令参数2"
+        },
+        {
+          "name": "B7~4：内部指令发送计数",
+          "code": "TTC-C00046.7.4",
+          "english_name": "B7~4：内部指令发送计数"
+        },
+        {
+          "name": "B3~0：内部指令接收计数",
+          "code": "TTC-C00046.3.4",
+          "english_name": "B3~0：内部指令接收计数"
+        },
+        {
+          "name": "B7~4：发射机过流计数",
+          "code": "TTC-C00047.7.4",
+          "english_name": "B7~4：发射机过流计数"
+        },
+        {
+          "name": "B3~0：过温计数",
+          "code": "TTC-C00047.3.4",
+          "english_name": "B3~0：过温计数"
+        },
+        {
+          "name": "FPGA版本号",
+          "code": "TTC-C00048.7.8",
+          "english_name": "FPGA版本号"
+        },
+        {
+          "name": "ARM版本号",
+          "code": "TTC-C00049.7.8",
+          "english_name": "ARM版本号"
+        }
+      ]
     },
     {
       "official_name": "DBW-00包",
@@ -13219,7 +13505,1109 @@
       "official_name": "计算机-关键遥测-0F包",
       "packet_code": "OBC-SF",
       "group": "计算机",
-      "fields": []
+      "fields": [
+        {
+          "name": "UTC时间",
+          "code": "OBC-CF0000.7.32",
+          "english_name": "UTC时间"
+        },
+        {
+          "name": "启动时间",
+          "code": "OBC-CF0004.7.32",
+          "english_name": "启动时间"
+        },
+        {
+          "name": "指令接收计数",
+          "code": "OBC-CF0008.7.16",
+          "english_name": "指令接收计数"
+        },
+        {
+          "name": "最近接收指令",
+          "code": "OBC-CF0010.7.32",
+          "english_name": "最近接收指令"
+        },
+        {
+          "name": "最近接收指令时间",
+          "code": "OBC-CF0014.7.32",
+          "english_name": "最近接收指令时间"
+        },
+        {
+          "name": "错误指令计数",
+          "code": "OBC-CF0018.7.16",
+          "english_name": "错误指令计数"
+        },
+        {
+          "name": "错误指令原因",
+          "code": "OBC-CF0020.7.8",
+          "english_name": "错误指令原因"
+        },
+        {
+          "name": "执行指令计数",
+          "code": "OBC-CF0021.7.16",
+          "english_name": "执行指令计数"
+        },
+        {
+          "name": "最近执行指令",
+          "code": "OBC-CF0023.7.32",
+          "english_name": "最近执行指令"
+        },
+        {
+          "name": "最近延时遥控指令",
+          "code": "OBC-CF0027.7.32",
+          "english_name": "最近延时遥控指令"
+        },
+        {
+          "name": "最近延时指令时间",
+          "code": "OBC-CF0031.7.32",
+          "english_name": "最近延时指令时间"
+        },
+        {
+          "name": "延时指令计数",
+          "code": "OBC-CF0035.7.16",
+          "english_name": "延时指令计数"
+        },
+        {
+          "name": "当班机",
+          "code": "OBC-CF0037.7.8",
+          "english_name": "当班机"
+        },
+        {
+          "name": "当前FLASH",
+          "code": "OBC-CF0038.7.8",
+          "english_name": "当前FLASH"
+        },
+        {
+          "name": "复位计数",
+          "code": "OBC-CF0039.7.32",
+          "english_name": "复位计数"
+        },
+        {
+          "name": "电源阶段",
+          "code": "OBC-CF0043.7.8",
+          "english_name": "电源阶段"
+        },
+        {
+          "name": "12V电压",
+          "code": "OBC-CF0044.7.16",
+          "english_name": "12V电压"
+        },
+        {
+          "name": "12V电流",
+          "code": "OBC-CF0046.7.16",
+          "english_name": "12V电流"
+        },
+        {
+          "name": "5V电压",
+          "code": "OBC-CF0048.7.16",
+          "english_name": "5V电压"
+        },
+        {
+          "name": "5V电流",
+          "code": "OBC-CF0050.7.16",
+          "english_name": "5V电流"
+        },
+        {
+          "name": "充电电流",
+          "code": "OBC-CF0052.7.16",
+          "english_name": "充电电流"
+        },
+        {
+          "name": "放电电流",
+          "code": "OBC-CF0054.7.16",
+          "english_name": "放电电流"
+        },
+        {
+          "name": "母线电压",
+          "code": "OBC-CF0056.7.16",
+          "english_name": "母线电压"
+        },
+        {
+          "name": "电池电压",
+          "code": "OBC-CF0058.7.16",
+          "english_name": "电池电压"
+        },
+        {
+          "name": "放电开关状态",
+          "code": "OBC-CF0060.7.16",
+          "english_name": "放电开关状态"
+        },
+        {
+          "name": "帆板电流",
+          "code": "OBC-CF0062.7.16",
+          "english_name": "帆板电流"
+        },
+        {
+          "name": "电池温度1",
+          "code": "OBC-CF0066.7.16",
+          "english_name": "电池温度1"
+        },
+        {
+          "name": "电池温度2",
+          "code": "OBC-CF0068.7.16",
+          "english_name": "电池温度2"
+        },
+        {
+          "name": "蓄电池加热带_2_12V",
+          "code": "OBC-CF0070.7.1",
+          "english_name": "蓄电池加热带_2_12V"
+        },
+        {
+          "name": "蓄电池加热带_2_12V-回读",
+          "code": "OBC-CF0078.7.1",
+          "english_name": "蓄电池加热带_2_12V-回读"
+        },
+        {
+          "name": "帆板解锁2",
+          "code": "OBC-CF0070.6.1",
+          "english_name": "帆板解锁2"
+        },
+        {
+          "name": "帆板解锁2-回读",
+          "code": "OBC-CF0078.6.1",
+          "english_name": "帆板解锁2-回读"
+        },
+        {
+          "name": "S/C通道板",
+          "code": "OBC-CF0070.5.1",
+          "english_name": "S/C通道板"
+        },
+        {
+          "name": "S/C通道板-回读",
+          "code": "OBC-CF0078.5.1",
+          "english_name": "S/C通道板-回读"
+        },
+        {
+          "name": "基带板关",
+          "code": "OBC-CF0070.4.1",
+          "english_name": "基带板关"
+        },
+        {
+          "name": "基带板关-回读",
+          "code": "OBC-CF0078.4.1",
+          "english_name": "基带板关-回读"
+        },
+        {
+          "name": "保留",
+          "code": "OBC-CF0078.3.1",
+          "english_name": "保留"
+        },
+        {
+          "name": "帆板解锁1",
+          "code": "OBC-CF0070.2.1",
+          "english_name": "帆板解锁1"
+        },
+        {
+          "name": "帆板解锁1-回读",
+          "code": "OBC-CF0078.2.1",
+          "english_name": "帆板解锁1-回读"
+        },
+        {
+          "name": "蓄电池加热带1_12V",
+          "code": "OBC-CF0070.1.1",
+          "english_name": "蓄电池加热带1_12V"
+        },
+        {
+          "name": "蓄电池加热带1_12V-回读",
+          "code": "OBC-CF0078.1.1",
+          "english_name": "蓄电池加热带1_12V-回读"
+        },
+        {
+          "name": "微型相机_5V",
+          "code": "OBC-CF0070.0.1",
+          "english_name": "微型相机_5V"
+        },
+        {
+          "name": "微型相机_5V-回读",
+          "code": "OBC-CF0078.0.1",
+          "english_name": "微型相机_5V-回读"
+        },
+        {
+          "name": "过放保护使能",
+          "code": "OBC-CF0071.7.1",
+          "english_name": "过放保护使能"
+        },
+        {
+          "name": "过放保护使能-回读",
+          "code": "OBC-CF0079.7.1",
+          "english_name": "过放保护使能-回读"
+        },
+        {
+          "name": "Ka通道板",
+          "code": "OBC-CF0071.6.1",
+          "english_name": "Ka通道板"
+        },
+        {
+          "name": "Ka通道板-回读",
+          "code": "OBC-CF0079.6.1",
+          "english_name": "Ka通道板-回读"
+        },
+        {
+          "name": "短报文",
+          "code": "OBC-CF0071.5.1",
+          "english_name": "短报文"
+        },
+        {
+          "name": "短报文-回读",
+          "code": "OBC-CF0079.5.1",
+          "english_name": "短报文-回读"
+        },
+        {
+          "name": "加热带_4_12V",
+          "code": "OBC-CF0071.4.1",
+          "english_name": "加热带_4_12V"
+        },
+        {
+          "name": "加热带_4_12V-回读",
+          "code": "OBC-CF0079.4.1",
+          "english_name": "加热带_4_12V-回读"
+        },
+        {
+          "name": "飞轮3关",
+          "code": "OBC-CF0071.3.1",
+          "english_name": "飞轮3关"
+        },
+        {
+          "name": "飞轮3关-回读",
+          "code": "OBC-CF0079.3.1",
+          "english_name": "飞轮3关-回读"
+        },
+        {
+          "name": "冷推加热_12V",
+          "code": "OBC-CF0071.2.1",
+          "english_name": "冷推加热_12V"
+        },
+        {
+          "name": "冷推加热_12V-回读",
+          "code": "OBC-CF0079.2.1",
+          "english_name": "冷推加热_12V-回读"
+        },
+        {
+          "name": "太敏_5V",
+          "code": "OBC-CF0071.1.1",
+          "english_name": "太敏_5V"
+        },
+        {
+          "name": "太敏_5V-回读",
+          "code": "OBC-CF0079.1.1",
+          "english_name": "太敏_5V-回读"
+        },
+        {
+          "name": "基带板开",
+          "code": "OBC-CF0071.0.1",
+          "english_name": "基带板开"
+        },
+        {
+          "name": "基带板开-回读",
+          "code": "OBC-CF0079.0.1",
+          "english_name": "基带板开-回读"
+        },
+        {
+          "name": "冷推电磁阀_12V",
+          "code": "OBC-CF0072.7.1",
+          "english_name": "冷推电磁阀_12V"
+        },
+        {
+          "name": "冷推电磁阀_12V-回读",
+          "code": "OBC-CF0080.7.1",
+          "english_name": "冷推电磁阀_12V-回读"
+        },
+        {
+          "name": "星敏Y_5V",
+          "code": "OBC-CF0072.6.1",
+          "english_name": "星敏Y_5V"
+        },
+        {
+          "name": "星敏Y_5V-回读",
+          "code": "OBC-CF0080.6.1",
+          "english_name": "星敏Y_5V-回读"
+        },
+        {
+          "name": "屏幕5V_1",
+          "code": "OBC-CF0072.5.1",
+          "english_name": "屏幕5V_1"
+        },
+        {
+          "name": "屏幕5V_1-回读",
+          "code": "OBC-CF0080.5.1",
+          "english_name": "屏幕5V_1-回读"
+        },
+        {
+          "name": "放电开关接通",
+          "code": "OBC-CF0072.4.1",
+          "english_name": "放电开关接通"
+        },
+        {
+          "name": "放电开关接通-回读",
+          "code": "OBC-CF0080.4.1",
+          "english_name": "放电开关接通-回读"
+        },
+        {
+          "name": "MEMS_B_5V",
+          "code": "OBC-CF0072.3.1",
+          "english_name": "MEMS_B_5V"
+        },
+        {
+          "name": "MEMS_B_5V-回读",
+          "code": "OBC-CF0080.3.1",
+          "english_name": "MEMS_B_5V-回读"
+        },
+        {
+          "name": "加热带_3_12V",
+          "code": "OBC-CF0072.2.1",
+          "english_name": "加热带_3_12V"
+        },
+        {
+          "name": "加热带_3_12V-回读",
+          "code": "OBC-CF0080.2.1",
+          "english_name": "加热带_3_12V-回读"
+        },
+        {
+          "name": "自主加电开关断",
+          "code": "OBC-CF0072.1.1",
+          "english_name": "自主加电开关断"
+        },
+        {
+          "name": "自主加电开关断-回读",
+          "code": "OBC-CF0080.1.1",
+          "english_name": "自主加电开关断-回读"
+        },
+        {
+          "name": "X测控数传开",
+          "code": "OBC-CF0072.0.1",
+          "english_name": "X测控数传开"
+        },
+        {
+          "name": "X测控数传开-回读",
+          "code": "OBC-CF0080.0.1",
+          "english_name": "X测控数传开-回读"
+        },
+        {
+          "name": "MEMS_A_5V",
+          "code": "OBC-CF0073.7.1",
+          "english_name": "MEMS_A_5V"
+        },
+        {
+          "name": "MEMS_A_5V-回读",
+          "code": "OBC-CF0081.7.1",
+          "english_name": "MEMS_A_5V-回读"
+        },
+        {
+          "name": "飞轮4关",
+          "code": "OBC-CF0073.6.1",
+          "english_name": "飞轮4关"
+        },
+        {
+          "name": "飞轮4关-回读",
+          "code": "OBC-CF0081.6.1",
+          "english_name": "飞轮4关-回读"
+        },
+        {
+          "name": "加热带_6_12V",
+          "code": "OBC-CF0073.5.1",
+          "english_name": "加热带_6_12V"
+        },
+        {
+          "name": "加热带_6_12V-回读",
+          "code": "OBC-CF0081.5.1",
+          "english_name": "加热带_6_12V-回读"
+        },
+        {
+          "name": "磁强计1_12V",
+          "code": "OBC-CF0073.4.1",
+          "english_name": "磁强计1_12V"
+        },
+        {
+          "name": "磁强计1_12V-回读",
+          "code": "OBC-CF0081.4.1",
+          "english_name": "磁强计1_12V-回读"
+        },
+        {
+          "name": "飞轮1开",
+          "code": "OBC-CF0073.3.1",
+          "english_name": "飞轮1开"
+        },
+        {
+          "name": "飞轮1开-回读",
+          "code": "OBC-CF0081.3.1",
+          "english_name": "飞轮1开-回读"
+        },
+        {
+          "name": "飞轮4开",
+          "code": "OBC-CF0073.2.1",
+          "english_name": "飞轮4开"
+        },
+        {
+          "name": "飞轮4开-回读",
+          "code": "OBC-CF0081.2.1",
+          "english_name": "飞轮4开-回读"
+        },
+        {
+          "name": "X测控数传关",
+          "code": "OBC-CF0073.1.1",
+          "english_name": "X测控数传关"
+        },
+        {
+          "name": "X测控数传关-回读",
+          "code": "OBC-CF0081.1.1",
+          "english_name": "X测控数传关-回读"
+        },
+        {
+          "name": "飞轮1关",
+          "code": "OBC-CF0073.0.1",
+          "english_name": "飞轮1关"
+        },
+        {
+          "name": "飞轮1关-回读",
+          "code": "OBC-CF0081.0.1",
+          "english_name": "飞轮1关-回读"
+        },
+        {
+          "name": "过放保护禁止",
+          "code": "OBC-CF0074.7.1",
+          "english_name": "过放保护禁止"
+        },
+        {
+          "name": "过放保护禁止-回读",
+          "code": "OBC-CF0082.7.1",
+          "english_name": "过放保护禁止-回读"
+        },
+        {
+          "name": "飞轮3开",
+          "code": "OBC-CF0074.6.1",
+          "english_name": "飞轮3开"
+        },
+        {
+          "name": "飞轮3开-回读",
+          "code": "OBC-CF0082.6.1",
+          "english_name": "飞轮3开-回读"
+        },
+        {
+          "name": "帆板解锁母线接通",
+          "code": "OBC-CF0074.5.1",
+          "english_name": "帆板解锁母线接通"
+        },
+        {
+          "name": "帆板解锁母线接通-回读",
+          "code": "OBC-CF0082.5.1",
+          "english_name": "帆板解锁母线接通-回读"
+        },
+        {
+          "name": "磁强计2_12V",
+          "code": "OBC-CF0074.4.1",
+          "english_name": "磁强计2_12V"
+        },
+        {
+          "name": "磁强计2_12V-回读",
+          "code": "OBC-CF0082.4.1",
+          "english_name": "磁强计2_12V-回读"
+        },
+        {
+          "name": "自主加电开关通",
+          "code": "OBC-CF0074.3.1",
+          "english_name": "自主加电开关通"
+        },
+        {
+          "name": "自主加电开关通-回读",
+          "code": "OBC-CF0082.3.1",
+          "english_name": "自主加电开关通-回读"
+        },
+        {
+          "name": "星敏X_5V",
+          "code": "OBC-CF0074.2.1",
+          "english_name": "星敏X_5V"
+        },
+        {
+          "name": "星敏X_5V-回读",
+          "code": "OBC-CF0082.2.1",
+          "english_name": "星敏X_5V-回读"
+        },
+        {
+          "name": "飞轮2开",
+          "code": "OBC-CF0074.1.1",
+          "english_name": "飞轮2开"
+        },
+        {
+          "name": "飞轮2开-回读",
+          "code": "OBC-CF0082.1.1",
+          "english_name": "飞轮2开-回读"
+        },
+        {
+          "name": "飞轮2关",
+          "code": "OBC-CF0074.0.1",
+          "english_name": "飞轮2关"
+        },
+        {
+          "name": "飞轮2关-回读",
+          "code": "OBC-CF0082.0.1",
+          "english_name": "飞轮2关-回读"
+        },
+        {
+          "name": "放电开关断开",
+          "code": "OBC-CF0075.7.1",
+          "english_name": "放电开关断开"
+        },
+        {
+          "name": "放电开关断开-回读",
+          "code": "OBC-CF0083.7.1",
+          "english_name": "放电开关断开-回读"
+        },
+        {
+          "name": "屏幕5V_2",
+          "code": "OBC-CF0075.6.1",
+          "english_name": "屏幕5V_2"
+        },
+        {
+          "name": "屏幕5V_2-回读",
+          "code": "OBC-CF0083.6.1",
+          "english_name": "屏幕5V_2-回读"
+        },
+        {
+          "name": "偏振相机_12V",
+          "code": "OBC-CF0075.5.1",
+          "english_name": "偏振相机_12V"
+        },
+        {
+          "name": "偏振相机_12V-回读",
+          "code": "OBC-CF0083.5.1",
+          "english_name": "偏振相机_12V-回读"
+        },
+        {
+          "name": "加热带_1_12V",
+          "code": "OBC-CF0075.4.1",
+          "english_name": "加热带_1_12V"
+        },
+        {
+          "name": "加热带_1_12V-回读",
+          "code": "OBC-CF0083.4.1",
+          "english_name": "加热带_1_12V-回读"
+        },
+        {
+          "name": "GNSS_5V",
+          "code": "OBC-CF0075.3.1",
+          "english_name": "GNSS_5V"
+        },
+        {
+          "name": "GNSS_5V-回读",
+          "code": "OBC-CF0083.3.1",
+          "english_name": "GNSS_5V-回读"
+        },
+        {
+          "name": "加热带_2_12V",
+          "code": "OBC-CF0075.2.1",
+          "english_name": "加热带_2_12V"
+        },
+        {
+          "name": "加热带_2_12V-回读",
+          "code": "OBC-CF0083.2.1",
+          "english_name": "加热带_2_12V-回读"
+        },
+        {
+          "name": "加热带_5_12V",
+          "code": "OBC-CF0075.1.1",
+          "english_name": "加热带_5_12V"
+        },
+        {
+          "name": "加热带_5_12V-回读",
+          "code": "OBC-CF0083.1.1",
+          "english_name": "加热带_5_12V-回读"
+        },
+        {
+          "name": "高清相机_12V",
+          "code": "OBC-CF0075.0.1",
+          "english_name": "高清相机_12V"
+        },
+        {
+          "name": "高清相机_12V-回读",
+          "code": "OBC-CF0083.0.1",
+          "english_name": "高清相机_12V-回读"
+        },
+        {
+          "name": "自主加电继电器",
+          "code": "OBC-CF0076.7.1",
+          "english_name": "自主加电继电器"
+        },
+        {
+          "name": "基带板继电器",
+          "code": "OBC-CF0076.6.1",
+          "english_name": "基带板继电器"
+        },
+        {
+          "name": "放电继电器",
+          "code": "OBC-CF0076.5.1",
+          "english_name": "放电继电器"
+        },
+        {
+          "name": "飞轮4继电器",
+          "code": "OBC-CF0076.4.1",
+          "english_name": "飞轮4继电器"
+        },
+        {
+          "name": "飞轮3继电器",
+          "code": "OBC-CF0076.3.1",
+          "english_name": "飞轮3继电器"
+        },
+        {
+          "name": "X测控数传继电器",
+          "code": "OBC-CF0076.2.1",
+          "english_name": "X测控数传继电器"
+        },
+        {
+          "name": "飞轮1继电器",
+          "code": "OBC-CF0076.1.1",
+          "english_name": "飞轮1继电器"
+        },
+        {
+          "name": "飞轮2继电器",
+          "code": "OBC-CF0076.0.1",
+          "english_name": "飞轮2继电器"
+        },
+        {
+          "name": "过放保护继电器",
+          "code": "OBC-CF0077.7.1",
+          "english_name": "过放保护继电器"
+        },
+        {
+          "name": "AIBoard电源",
+          "code": "OBC-CF0077.6.1",
+          "english_name": "AIBoard电源"
+        },
+        {
+          "name": "基带板卡",
+          "code": "OBC-CF0077.5.1",
+          "english_name": "基带板卡"
+        },
+        {
+          "name": "基带HW",
+          "code": "OBC-CF0077.4.1",
+          "english_name": "基带HW"
+        },
+        {
+          "name": "基带UV",
+          "code": "OBC-CF0077.3.1",
+          "english_name": "基带UV"
+        },
+        {
+          "name": "X测控遥测计数",
+          "code": "OBC-CF0084.7.8",
+          "english_name": "X测控遥测计数"
+        },
+        {
+          "name": "GNSS遥测计数",
+          "code": "OBC-CF0085.7.8",
+          "english_name": "GNSS遥测计数"
+        },
+        {
+          "name": "星敏A遥测计数",
+          "code": "OBC-CF0086.7.8",
+          "english_name": "星敏A遥测计数"
+        },
+        {
+          "name": "星敏B遥测计数",
+          "code": "OBC-CF0087.7.8",
+          "english_name": "星敏B遥测计数"
+        },
+        {
+          "name": "太敏遥测计数",
+          "code": "OBC-CF0088.7.8",
+          "english_name": "太敏遥测计数"
+        },
+        {
+          "name": "飞轮X遥测计数",
+          "code": "OBC-CF0089.7.8",
+          "english_name": "飞轮X遥测计数"
+        },
+        {
+          "name": "飞轮Y遥测计数",
+          "code": "OBC-CF0090.7.8",
+          "english_name": "飞轮Y遥测计数"
+        },
+        {
+          "name": "飞轮Z遥测计数",
+          "code": "OBC-CF0091.7.8",
+          "english_name": "飞轮Z遥测计数"
+        },
+        {
+          "name": "飞轮S遥测计数",
+          "code": "OBC-CF0092.7.8",
+          "english_name": "飞轮S遥测计数"
+        },
+        {
+          "name": "磁强计A遥测计数",
+          "code": "OBC-CF0093.7.8",
+          "english_name": "磁强计A遥测计数"
+        },
+        {
+          "name": "磁强计B遥测计数",
+          "code": "OBC-CF0094.7.8",
+          "english_name": "磁强计B遥测计数"
+        },
+        {
+          "name": "陀螺A遥测计数",
+          "code": "OBC-CF0095.7.8",
+          "english_name": "陀螺A遥测计数"
+        },
+        {
+          "name": "陀螺B遥测计数",
+          "code": "OBC-CF0096.7.8",
+          "english_name": "陀螺B遥测计数"
+        },
+        {
+          "name": "基带板遥测计数",
+          "code": "OBC-CF0097.7.8",
+          "english_name": "基带板遥测计数"
+        },
+        {
+          "name": "基带板UV遥测计数",
+          "code": "OBC-CF0098.7.8",
+          "english_name": "基带板UV遥测计数"
+        },
+        {
+          "name": "短报文遥测计数",
+          "code": "OBC-CF0099.7.8",
+          "english_name": "短报文遥测计数"
+        },
+        {
+          "name": "微型相机遥测计数",
+          "code": "OBC-CF0100.7.8",
+          "english_name": "微型相机遥测计数"
+        },
+        {
+          "name": "高清相机遥测计数",
+          "code": "OBC-CF0101.7.8",
+          "english_name": "高清相机遥测计数"
+        },
+        {
+          "name": "故障标志星敏B",
+          "code": "OBC-CF0102.7.1",
+          "english_name": "故障标志星敏B"
+        },
+        {
+          "name": "故障标志星敏A",
+          "code": "OBC-CF0102.6.1",
+          "english_name": "故障标志星敏A"
+        },
+        {
+          "name": "故障标志陀螺B-z",
+          "code": "OBC-CF0102.5.1",
+          "english_name": "故障标志陀螺B-z"
+        },
+        {
+          "name": "故障标志陀螺B-y",
+          "code": "OBC-CF0102.4.1",
+          "english_name": "故障标志陀螺B-y"
+        },
+        {
+          "name": "故障标志陀螺B-x",
+          "code": "OBC-CF0102.3.1",
+          "english_name": "故障标志陀螺B-x"
+        },
+        {
+          "name": "故障标志陀螺A-z",
+          "code": "OBC-CF0102.2.1",
+          "english_name": "故障标志陀螺A-z"
+        },
+        {
+          "name": "故障标志陀螺A-y",
+          "code": "OBC-CF0102.1.1",
+          "english_name": "故障标志陀螺A-y"
+        },
+        {
+          "name": "故障标志陀螺A-x",
+          "code": "OBC-CF0102.0.1",
+          "english_name": "故障标志陀螺A-x"
+        },
+        {
+          "name": "故障标志磁强计B-z",
+          "code": "OBC-CF0103.7.1",
+          "english_name": "故障标志磁强计B-z"
+        },
+        {
+          "name": "故障标志磁强计B-y",
+          "code": "OBC-CF0103.6.1",
+          "english_name": "故障标志磁强计B-y"
+        },
+        {
+          "name": "故障标志磁强计B-x",
+          "code": "OBC-CF0103.5.1",
+          "english_name": "故障标志磁强计B-x"
+        },
+        {
+          "name": "故障标志磁强计A-z",
+          "code": "OBC-CF0103.4.1",
+          "english_name": "故障标志磁强计A-z"
+        },
+        {
+          "name": "故障标志磁强计A-y",
+          "code": "OBC-CF0103.3.1",
+          "english_name": "故障标志磁强计A-y"
+        },
+        {
+          "name": "故障标志磁强计A-x",
+          "code": "OBC-CF0103.2.1",
+          "english_name": "故障标志磁强计A-x"
+        },
+        {
+          "name": "故障标志GPS六根数",
+          "code": "OBC-CF0103.1.1",
+          "english_name": "故障标志GPS六根数"
+        },
+        {
+          "name": "故障标志GPS位置速度",
+          "code": "OBC-CF0103.0.1",
+          "english_name": "故障标志GPS位置速度"
+        },
+        {
+          "name": "故障标志飞轮S",
+          "code": "OBC-CF0104.5.1",
+          "english_name": "故障标志飞轮S"
+        },
+        {
+          "name": "故障标志飞轮Z",
+          "code": "OBC-CF0104.4.1",
+          "english_name": "故障标志飞轮Z"
+        },
+        {
+          "name": "故障标志飞轮Y",
+          "code": "OBC-CF0104.3.1",
+          "english_name": "故障标志飞轮Y"
+        },
+        {
+          "name": "故障标志飞轮X",
+          "code": "OBC-CF0104.2.1",
+          "english_name": "故障标志飞轮X"
+        },
+        {
+          "name": "故障标志太敏A-b",
+          "code": "OBC-CF0104.1.1",
+          "english_name": "故障标志太敏A-b"
+        },
+        {
+          "name": "故障标志太敏A-a",
+          "code": "OBC-CF0104.0.1",
+          "english_name": "故障标志太敏A-a"
+        },
+        {
+          "name": "姿态模式",
+          "code": "OBC-CF0105.7.8",
+          "english_name": "姿态模式"
+        },
+        {
+          "name": "姿态模式持续时间",
+          "code": "OBC-CF0106.7.32",
+          "english_name": "姿态模式持续时间"
+        },
+        {
+          "name": "任务指向标识",
+          "code": "OBC-CF0110.7.8",
+          "english_name": "任务指向标识"
+        },
+        {
+          "name": "安全模式累计时间",
+          "code": "OBC-CF0111.7.32",
+          "english_name": "安全模式累计时间"
+        },
+        {
+          "name": "角动量x",
+          "code": "OBC-CF0115.7.32",
+          "english_name": "角动量x"
+        },
+        {
+          "name": "角动量y",
+          "code": "OBC-CF0119.7.32",
+          "english_name": "角动量y"
+        },
+        {
+          "name": "角动量z",
+          "code": "OBC-CF0123.7.32",
+          "english_name": "角动量z"
+        },
+        {
+          "name": "角速度x",
+          "code": "OBC-CF0127.7.32",
+          "english_name": "角速度x"
+        },
+        {
+          "name": "角速度y",
+          "code": "OBC-CF0131.7.32",
+          "english_name": "角速度y"
+        },
+        {
+          "name": "角速度z",
+          "code": "OBC-CF0135.7.32",
+          "english_name": "角速度z"
+        },
+        {
+          "name": "姿态四元数q0",
+          "code": "OBC-CF0139.7.32",
+          "english_name": "姿态四元数q0"
+        },
+        {
+          "name": "姿态四元数q1",
+          "code": "OBC-CF0143.7.32",
+          "english_name": "姿态四元数q1"
+        },
+        {
+          "name": "姿态四元数q2",
+          "code": "OBC-CF0147.7.32",
+          "english_name": "姿态四元数q2"
+        },
+        {
+          "name": "姿态四元数q3",
+          "code": "OBC-CF0151.7.32",
+          "english_name": "姿态四元数q3"
+        },
+        {
+          "name": "偏差四元数q0",
+          "code": "OBC-CF0155.7.32",
+          "english_name": "偏差四元数q0"
+        },
+        {
+          "name": "偏差四元数q1",
+          "code": "OBC-CF0159.7.32",
+          "english_name": "偏差四元数q1"
+        },
+        {
+          "name": "偏差四元数q2",
+          "code": "OBC-CF0163.7.32",
+          "english_name": "偏差四元数q2"
+        },
+        {
+          "name": "偏差四元数q3",
+          "code": "OBC-CF0167.7.32",
+          "english_name": "偏差四元数q3"
+        },
+        {
+          "name": "定姿方法标记",
+          "code": "OBC-CF0171.7.8",
+          "english_name": "定姿方法标记"
+        },
+        {
+          "name": "卫星姿态更新标志",
+          "code": "OBC-CF0172.7.8",
+          "english_name": "卫星姿态更新标志"
+        },
+        {
+          "name": "卫星姿态可信标志",
+          "code": "OBC-CF0173.7.8",
+          "english_name": "卫星姿态可信标志"
+        },
+        {
+          "name": "GPS轨道有效计数",
+          "code": "OBC-CF0174.7.16",
+          "english_name": "GPS轨道有效计数"
+        },
+        {
+          "name": "使用GPS测量确定轨道",
+          "code": "OBC-CF0176.7.8",
+          "english_name": "使用GPS测量确定轨道"
+        },
+        {
+          "name": "温度采集4-屏幕",
+          "code": "OBC-CF0177.7.16",
+          "english_name": "温度采集4-屏幕"
+        },
+        {
+          "name": "温度采集6-储箱",
+          "code": "OBC-CF0179.7.16",
+          "english_name": "温度采集6-储箱"
+        },
+        {
+          "name": "温度采集7-冯相机",
+          "code": "OBC-CF0181.7.16",
+          "english_name": "温度采集7-冯相机"
+        },
+        {
+          "name": "温度采集8-帆板",
+          "code": "OBC-CF0183.7.16",
+          "english_name": "温度采集8-帆板"
+        },
+        {
+          "name": "X测控接收计数",
+          "code": "OBC-CF0185.7.8",
+          "english_name": "X测控接收计数"
+        },
+        {
+          "name": "X遥控帧同步锁定状态",
+          "code": "OBC-CF0186.7.1",
+          "english_name": "X遥控帧同步锁定状态"
+        },
+        {
+          "name": "X遥控码同步锁定状态",
+          "code": "OBC-CF0186.6.1",
+          "english_name": "X遥控码同步锁定状态"
+        },
+        {
+          "name": "X遥控载波锁定状态",
+          "code": "OBC-CF0186.5.1",
+          "english_name": "X遥控载波锁定状态"
+        },
+        {
+          "name": "X上注帧同步锁定状态",
+          "code": "OBC-CF0186.4.1",
+          "english_name": "X上注帧同步锁定状态"
+        },
+        {
+          "name": "X上注码同步锁定状态",
+          "code": "OBC-CF0186.3.1",
+          "english_name": "X上注码同步锁定状态"
+        },
+        {
+          "name": "X上注载波锁定状态",
+          "code": "OBC-CF0186.2.1",
+          "english_name": "X上注载波锁定状态"
+        },
+        {
+          "name": "X上行工作模式",
+          "code": "OBC-CF0186.1.1",
+          "english_name": "X上行工作模式"
+        },
+        {
+          "name": "X发射机开关状态",
+          "code": "OBC-CF0186.0.1",
+          "english_name": "X发射机开关状态"
+        },
+        {
+          "name": "网口状态",
+          "code": "OBC-CF0187.7.1",
+          "english_name": "网口状态"
+        },
+        {
+          "name": "发射机工作模式",
+          "code": "OBC-CF0187.6.1",
+          "english_name": "发射机工作模式"
+        },
+        {
+          "name": "射频锁定状态",
+          "code": "OBC-CF0187.5.1",
+          "english_name": "射频锁定状态"
+        },
+        {
+          "name": "数传锁定状态",
+          "code": "OBC-CF0187.4.1",
+          "english_name": "数传锁定状态"
+        },
+        {
+          "name": "数传速率",
+          "code": "OBC-CF0187.1.1",
+          "english_name": "数传速率"
+        },
+        {
+          "name": "数据门状态",
+          "code": "OBC-CF0187.0.1",
+          "english_name": "数据门状态"
+        },
+        {
+          "name": "UV接收计数",
+          "code": "OBC-CF0188.7.8",
+          "english_name": "UV接收计数"
+        },
+        {
+          "name": "展开状态",
+          "code": "OBC-CF0189.7.16",
+          "english_name": "展开状态"
+        }
+      ]
     }
-  ]
+  ],
+  "catalog_revision": "2026-10-29"
 }
