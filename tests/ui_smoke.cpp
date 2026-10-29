@@ -82,6 +82,11 @@ private slots:
         const auto *overview=window.findChild<QLabel*>("currentHeading");
         QVERIFY(overview!=nullptr);
         QVERIFY(overview->text().contains(QStringLiteral("未解析")));
+        auto *unified=window.findChild<QTableWidget*>("overviewUnifiedTable");
+        QVERIFY(unified!=nullptr);
+        QCOMPARE(unified->columnCount(),8);
+        for(auto *card:window.findChildren<QGroupBox*>("statusCard"))
+            QVERIFY(card->isHidden());
     }
     void switchingTabsWithEmptyDataDoesNotCrash() {
         MainWindow window;
