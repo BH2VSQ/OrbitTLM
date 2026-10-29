@@ -1,6 +1,7 @@
 #pragma once
 #include <QScrollBar>
 #include <QCoreApplication>
+#include <QLabel>
 #include <QJsonObject>
 #include <QScrollArea>
 #include <QFrame>
@@ -27,33 +28,49 @@
 #include <QQuaternion>
 #include <QVector3D>
 #include <QWidget>
+#include <QHash>
 #include <algorithm>
 #include <cmath>
 #include <limits>
-// Runtime translator used by custom-painted widgets and tab strips that do not
-// expose their text through QLabel/QPushButton for the normal localization pass.
-inline QString orbitWidgetText(const QString &source){
-    auto *app=QCoreApplication::instance();
-    if(!app||app->property("orbitTlmLanguage").toString()!=QStringLiteral("en-US"))return source;
-    const QJsonObject map=app->property("orbitTlmTranslations").value<QJsonObject>();
-    const auto exact=map.constFind(source);
-    if(exact!=map.constEnd())return exact.value().toString(source);
-    QString translated=source;
-    QStringList keys=map.keys();
-    std::sort(keys.begin(),keys.end(),[](const QString &a,const QString &b){return a.size()>b.size();});
-    for(const QString &key:keys){
-        const QString value=map.value(key).toString();
-        if(key.isEmpty()||key==value||!translated.contains(key))continue;
-        translated.replace(key,value);
-    }
-    return translated;
-}
 inline bool orbitContainsCjk(const QString &text){
     for(const QChar ch:text){
         const ushort u=ch.unicode();
         if((u>=0x3400&&u<=0x9fff)||(u>=0xf900&&u<=0xfaff))return true;
     }
     return false;
+}
+// Runtime translator used by custom-painted widgets and table builders. The
+// former hot path scanned every translation phrase for every telemetry value,
+// including numeric/ASCII-only values. Cache repeated strings and skip phrase
+// matching when the input contains no CJK characters.
+inline QString orbitWidgetText(const QString &source){
+    auto *app=QCoreApplication::instance();
+    if(!app||app->property("orbitTlmLanguage").toString()!=QStringLiteral("en-US"))return source;
+    static QString cacheLanguage;
+    static QHash<QString,QString> cache;
+    const QString language=app->property("orbitTlmLanguage").toString();
+    if(cacheLanguage!=language){cache.clear();cacheLanguage=language;}
+    const auto cached=cache.constFind(source);
+    if(cached!=cache.constEnd())return cached.value();
+    const QJsonObject map=app->property("orbitTlmTranslations").value<QJsonObject>();
+    const auto exact=map.constFind(source);
+    if(exact!=map.constEnd()){
+        const QString result=exact.value().toString(source);
+        if(source.size()<=256&&cache.size()<20000)cache.insert(source,result);
+        return result;
+    }
+    if(!orbitContainsCjk(source))return source;
+    QString translated=source;
+    const QStringList keys=app->property("orbitTlmTranslationKeys").toStringList();
+    for(const QString &key:keys){
+        if(key.isEmpty()||!translated.contains(key))continue;
+        const QString value=map.value(key).toString();
+        if(key==value)continue;
+        translated.replace(key,value);
+        if(!orbitContainsCjk(translated))break;
+    }
+    if(source.size()<=256&&cache.size()<20000)cache.insert(source,translated);
+    return translated;
 }
 inline QString orbitEnglishFieldLabel(const QString &source,const QString &catalogEnglish,const QString &code){
     if(!catalogEnglish.isEmpty()&&!orbitContainsCjk(catalogEnglish))return catalogEnglish;
@@ -124,14 +141,14 @@ public:
         scrollRowLayout->setContentsMargins(0,0,0,0);scrollRowLayout->setSpacing(4);
         previous_=new QPushButton(QStringLiteral("◀"),scrollRow_);
         previous_->setObjectName(QStringLiteral("packetTabPrevious"));
-        previous_->setFixedSize(30,66);previous_->setToolTip(orbitWidgetText(QStringLiteral("向左翻页子包标签")));
+        previous_->setFixedSize(26,48);previous_->setToolTip(orbitWidgetText(QStringLiteral("向左翻页子包标签")));
         next_=new QPushButton(QStringLiteral("▶"),scrollRow_);
         next_->setObjectName(QStringLiteral("packetTabNext"));
-        next_->setFixedSize(30,66);next_->setToolTip(orbitWidgetText(QStringLiteral("向右翻页子包标签")));
+        next_->setFixedSize(26,48);next_->setToolTip(orbitWidgetText(QStringLiteral("向右翻页子包标签")));
         scrollArea_=new QScrollArea(scrollRow_);
         scrollArea_->setObjectName(QStringLiteral("packetTabScrollArea"));
         scrollArea_->setWidgetResizable(false);
-        scrollArea_->setFixedHeight(70);
+        scrollArea_->setFixedHeight(52);
         scrollArea_->setFrameShape(QFrame::NoFrame);
         scrollArea_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         scrollArea_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -145,7 +162,7 @@ public:
         scrollTabsLayout_->setAlignment(Qt::AlignLeft|Qt::AlignTop);
         scrollArea_->setWidget(scrollContents_);
         scrollRowLayout->addWidget(previous_);scrollRowLayout->addWidget(scrollArea_,1);scrollRowLayout->addWidget(next_);
-        scrollRow_->setMinimumHeight(70);
+        scrollRow_->setMinimumHeight(52);
         root->addWidget(scrollRow_,0);
         scrollRow_->hide();
 
@@ -167,8 +184,13 @@ public:
         const int index=int(buttons_.size());pages_.push_back(page);labels_.push_back(text);visible_.push_back(true);
         stack_->addWidget(page);
         auto *button=new QToolButton;
-        button->setToolButtonStyle(Qt::ToolButtonTextOnly);button->setText(text);button->setToolTip(text);
-        button->setCheckable(true);button->setAutoRaise(false);button->setMinimumHeight(30);
+        button->setToolButtonStyle(Qt::ToolButtonTextOnly);button->setText(text);
+        QString tooltipSource=page->property("orbitSourceTabTooltip").toString();
+        if(tooltipSource.isEmpty())tooltipSource=page->property("orbitSourceTabText").toString();
+        if(tooltipSource.isEmpty())tooltipSource=text;
+        button->setProperty("orbitSourceToolTip",tooltipSource);
+        button->setToolTip(orbitWidgetText(tooltipSource));
+        button->setCheckable(true);button->setAutoRaise(false);button->setMinimumHeight(24);
         button->setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
         applyTabButtonStyle(button);button->adjustSize();button->setFixedSize(button->sizeHint());
         buttons_.push_back(button);
@@ -211,8 +233,27 @@ public:
         labels_[index]=text;buttons_[index]->setText(text);applyTabButtonStyle(buttons_[index]);
         buttons_[index]->adjustSize();buttons_[index]->setFixedSize(buttons_[index]->sizeHint());refreshTabWrapping();
     }
+    void setTabTexts(const QStringList &texts){
+        const int n=qMin(count(),texts.size());
+        bool changed=false;
+        for(int i=0;i<n;++i){
+            if(labels_[i]==texts.at(i)&&buttons_[i]->text()==texts.at(i))continue;
+            labels_[i]=texts.at(i);
+            buttons_[i]->setText(texts.at(i));
+            applyTabButtonStyle(buttons_[i]);
+            buttons_[i]->adjustSize();
+            buttons_[i]->setFixedSize(buttons_[i]->sizeHint());
+            changed=true;
+        }
+        // Reflow all tabs exactly once, and only if at least one label changed.
+        if(changed)refreshTabWrapping();
+    }
     QString tabText(int index) const { return index>=0&&index<count()?labels_.at(index):QString(); }
-    void setTabToolTip(int index,const QString &tip){if(index>=0&&index<count())buttons_[index]->setToolTip(tip);}
+    void setTabToolTip(int index,const QString &tip){
+        if(index<0||index>=count())return;
+        buttons_[index]->setProperty("orbitSourceToolTip",tip);
+        buttons_[index]->setToolTip(orbitWidgetText(tip));
+    }
     void setWrappedTabText(int index,const QString &text){setTabText(index,text);}
     void refreshTabWrapping(){
         if(tabLayout_){tabLayout_->invalidate();tabLayout_->activate();}
@@ -237,12 +278,12 @@ private:
         if(!button)return;
         if(tabLevel_==QStringLiteral("packet")){
             button->setStyleSheet(QStringLiteral(
-                "QToolButton {background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:5px;padding:5px 9px;font-weight:500;}"
+                "QToolButton {background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:5px;padding:2px 6px;font-weight:500;}"
                 "QToolButton:checked {background:#0f766e;color:white;border-color:#115e59;font-weight:700;}"
                 "QToolButton:hover {background:#ccfbf1;border-color:#5eead4;}"));
         }else{
             button->setStyleSheet(QStringLiteral(
-                "QToolButton {background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;border-radius:6px;padding:5px 10px;font-weight:600;}"
+                "QToolButton {background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;border-radius:6px;padding:2px 7px;font-weight:600;}"
                 "QToolButton:checked {background:#2563eb;color:white;border-color:#1d4ed8;font-weight:700;}"
                 "QToolButton:hover {background:#bfdbfe;border-color:#60a5fa;}"));
         }
@@ -264,7 +305,7 @@ private:
 
 class AttitudeWidget final : public QWidget {
 public:
-    explicit AttitudeWidget(QWidget *parent=nullptr):QWidget(parent){setMinimumSize(220,210);}
+    explicit AttitudeWidget(QWidget *parent=nullptr):QWidget(parent){setMinimumSize(180,150);}
     void setQuaternion(const QQuaternion &q,bool available){
         active_=available;
         rotation_=q.normalized();
@@ -317,8 +358,8 @@ struct ReplayTimelineItem {
 class ReplayTimelineWidget final : public QWidget {
 public:
     explicit ReplayTimelineWidget(QWidget *parent=nullptr):QWidget(parent){
-        setMinimumHeight(94);
-        setMaximumHeight(138);
+        setMinimumHeight(80);
+        setMaximumHeight(112);
         setMouseTracking(true);
         setFocusPolicy(Qt::StrongFocus);
         setToolTip(orbitWidgetText(QStringLiteral("单击定位；拖动左右浏览；滚轮缩放时间轴")));
@@ -498,7 +539,7 @@ private:
 
 class ImagePreview final : public QWidget {
 public:
-    explicit ImagePreview(QWidget *parent=nullptr):QWidget(parent){setMinimumSize(260,190);}
+    explicit ImagePreview(QWidget *parent=nullptr):QWidget(parent){setMinimumSize(220,145);}
     void setImage(const QPixmap &image){image_=image;update();}
 protected:
     void paintEvent(QPaintEvent *) override {

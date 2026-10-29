@@ -65,14 +65,17 @@ namespace {
 QLabel *subtitle(const QString &text,QWidget *parent=nullptr){
     auto *label=new QLabel(text,parent);
     label->setObjectName("subtitle");
-    label->setWordWrap(true);
+    // Keep secondary/status copy to one compact line; the full text remains
+    // available as a tooltip instead of consuming the page's vertical space.
+    label->setWordWrap(false);
+    label->setToolTip(text);
     return label;
 }
 QWidget *metricCard(const QString &label,QLabel *&number){
     auto *panel=new QFrame;
     panel->setObjectName("metricCard");
     auto *layout=new QVBoxLayout(panel);
-    layout->setSpacing(4);layout->setContentsMargins(14,10,14,10);
+    layout->setSpacing(2);layout->setContentsMargins(8,5,8,5);
     layout->addWidget(subtitle(label));
     number=new QLabel(QStringLiteral("—"));
     number->setObjectName("metricNumber");
@@ -84,7 +87,7 @@ QGroupBox *statusCard(const QString &title){
     auto *card=new QGroupBox(title);
     card->setObjectName("statusCard");
     auto *layout=new QVBoxLayout(card);
-    layout->setContentsMargins(4,13,4,4);
+    layout->setContentsMargins(4,11,4,3);
     layout->setSpacing(0);
     auto *table=new QTableWidget(0,4,card);
     table->setObjectName("statusTable");
@@ -98,6 +101,7 @@ QGroupBox *statusCard(const QString &title){
     table->setWordWrap(false);
     table->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    table->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     table->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
     table->horizontalHeader()->setSectionResizeMode(1,QHeaderView::Stretch);
     table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::ResizeToContents);
@@ -110,6 +114,8 @@ void setupTable(QTableWidget *table){
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::SingleSelection);
     table->verticalHeader()->hide();
+    table->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+    table->verticalHeader()->setDefaultSectionSize(18);
     table->setShowGrid(false);
     table->setAlternatingRowColors(false);
     table->horizontalHeader()->setStretchLastSection(true);
@@ -120,7 +126,9 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
     setWindowTitle(uiText(QStringLiteral("OrbitTLM · 卫星遥测回放工作台")));
     setMinimumSize(720,480);
     const QRect available=QGuiApplication::primaryScreen()?QGuiApplication::primaryScreen()->availableGeometry():QRect(0,0,1280,800);
-    resize(qBound(720,available.width()-80,1080),qBound(480,available.height()-100,640));
+    // A taller, still margin-preserving default reduces nested vertical scrolling
+    // on common 768p–900p displays without making the window full-screen.
+    resize(qBound(720,available.width()-96,1240),qBound(480,available.height()-72,780));
     live_=new orbit::LiveTcp(this);
     loadApplicationSettings();
     // Load translation data before building widgets so dynamically populated
@@ -225,31 +233,31 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
 void MainWindow::applyStyles(){
     setStyleSheet(QStringLiteral(R"(
         QMainWindow { background:#f3f6fb; color:#182940; }
-        QWidget { color:#1f3045; font-size:9pt; }
+        QWidget { color:#1f3045; font-size:8.5pt; }
         QMenuBar { background:#ffffff; padding:3px 5px; border-bottom:1px solid #e0e7f0; }
         QMenuBar::item:selected, QMenu::item:selected {background:#e7f1fd;}
         QMenu { background:#ffffff; border:1px solid #dbe3ee; }
         QToolBar { background:#ffffff; border:0; border-bottom:1px solid #e0e7f0;
-                   spacing:4px; padding:3px 6px; }
-        QToolButton, QPushButton {padding:3px 7px; border:1px solid #d6e0ec;
+                   spacing:3px; padding:2px 5px; }
+        QToolButton, QPushButton {padding:2px 6px; border:1px solid #d6e0ec;
                   border-radius:7px; background:#ffffff; font-weight:500;}
         QToolButton:hover,QPushButton:hover {background:#edf5ff; border-color:#92bcf0;}
         QPushButton#primaryButton {background:#256cb4; border-color:#256cb4; color:white;}
         QPushButton#primaryButton:hover {background:#1f5b98;}
         QComboBox,QSpinBox,QLineEdit {background:white; border:1px solid #d4deeb;
-                  border-radius:6px; padding:2px 5px; min-height:15px;}
+                  border-radius:5px; padding:1px 4px; min-height:14px;}
         QLineEdit:focus,QComboBox:focus {border:1px solid #3c87d0;}
         QFrame#metricCard, QFrame#heroCard, QFrame#panel {
                   background:#ffffff; border:1px solid #e2e8f1; border-radius:10px;}
-        QLabel#subtitle {color:#6d7f95; font-size:12px;}
+        QLabel#subtitle {color:#6d7f95; font-size:11px;}
         QLabel#metricNumber {font-size:18px; font-weight:700; color:#1d3b5e;}
         QLabel#currentHeading {font-size:16px; font-weight:700; color:#152d4c;}
         QLabel#detailHeading {font-size:13px; font-weight:700; color:#193958;}
-        QLabel#note {color:#6b7f96; font-size:12px;}
+        QLabel#note {color:#6b7f96; font-size:11px;}
         QTabWidget::pane {background:white; border:1px solid #e1e8f1;
                          border-radius:8px;}
         QTabBar::tab {background:#edf2f8; border:0; border-radius:4px;
-                      margin-right:2px; padding:3px 6px; min-width:42px;}
+                      margin-right:2px; padding:2px 5px; min-width:40px;}
         QTabBar::tab:selected {background:#dcecff; color:#18558f; font-weight:700;}
         QTabBar::tab:hover {background:#e3effb;}
         QTableWidget,QTreeWidget,QPlainTextEdit {background:white;
@@ -257,18 +265,19 @@ void MainWindow::applyStyles(){
                      border-radius:6px; gridline-color:#edf2f6;}
         QHeaderView::section {background:#f5f8fc; border:none;
                               border-bottom:1px solid #e1e8f1;
-                              color:#56718b; font-weight:600; padding:2px 3px;}
-        QTableWidget::item {padding:1px 3px; border-bottom:1px solid #eff2f7;}
+                              color:#56718b; font-weight:600; padding:1px 3px;}
+        QTableWidget::item {padding:0px 3px; border-bottom:1px solid #eff2f7;}
+        QTreeWidget::item {padding:0px 2px;}
         QTableWidget::item:selected,QTreeWidget::item:selected {background:#e2f1ff;color:#183c64;}
         QGroupBox#statusCard {background:#ffffff; border:1px solid #e1e8f1;
-                             border-radius:9px; margin-top:12px; font-weight:700;}
-        QGroupBox#statusCard::title {subcontrol-origin:margin; left:14px;
-                                    padding:0 6px;color:#245b8c;}
+                             border-radius:8px; margin-top:8px; font-weight:700;}
+        QGroupBox#statusCard::title {subcontrol-origin:margin; left:10px;
+                                    padding:0 4px;color:#245b8c;}
         QLabel#statusContent {font-weight:400; color:#38516c; line-height:150%; padding:2px;}
         QScrollArea#statusScroll {background:transparent;}
-        QLabel#attitudeModeLabel {font-size:11px; font-weight:700; color:#174f83;
+        QLabel#attitudeModeLabel {font-size:10px; font-weight:700; color:#174f83;
                                   background:#eaf4ff; border:1px solid #cfe4fb;
-                                  border-radius:6px; padding:7px 10px;}
+                                  border-radius:5px; padding:3px 6px;}
         QSplitter::handle {background:#edf1f7;}
         QStatusBar {background:#ffffff; color:#61768d; border-top:1px solid #e0e7f0;}
         QSlider::groove:horizontal {height:6px; background:#d9e4f0; border-radius:3px;}
@@ -350,13 +359,18 @@ void MainWindow::buildMenus(){
         connect(languageAction,&QAction::triggered,this,[this,code]{
             languageCode_=code;
             applyLanguage();
-            if(sourceLabel_){
-                const QString source=sourceLabel_->property("orbitDynamicSource").toString();
-                if(!source.isEmpty())sourceLabel_->setText(uiText(source));
+            // Translation pass uses the retained source text for live summaries and
+            // updates all existing table/tree cells in-place. Avoid rebuilding frame
+            // tables, rescanning the replay history, recreating charts, or decoding an
+            // SSDV JPEG as a side effect of changing the language.
+            if(positionLabel_)
+                positionLabel_->setText(currentIndex_<0?QStringLiteral("0 / %1").arg(business_.size()):
+                    QStringLiteral("%1 / %2").arg(currentIndex_+1).arg(business_.size()));
+            if(rawHex_){
+                // Raw HEX is a plain-text document rather than a table cell, so only
+                // reformat the currently selected packet; this does not walk history.
+                updateRawPacket(currentIndex_);
             }
-            updateFrameList();
-            showEvent(currentIndex_);
-            updateMetrics();
             if(tcpStatusLabel_){
                 const QString status=tcpConnected_?QStringLiteral("TCP：已连接"):
                     (tcpConnecting_?QStringLiteral("TCP：连接中"):QStringLiteral("TCP：未连接"));
@@ -369,8 +383,22 @@ void MainWindow::buildMenus(){
                 playPauseButton_->setText(uiText(playPauseButton_->isChecked()?QStringLiteral("暂停"):QStringLiteral("播放")));
             if(replayCollapseButton_)
                 replayCollapseButton_->setText(uiText(replayListCollapsed_?QStringLiteral("展开时间轴"):QStringLiteral("收起时间轴")));
-            const int imageId=selectedImageId();
-            if(imageId>=0){updateImageProgress(imageId);decodeSsdvImage(imageId,false);}
+            // Chart objects are not QWidget descendants, so update their stored
+            // source titles directly without rebuilding their data series.
+            if(engineeringChart_&&engineeringChart_->chart()){
+                auto *chart=engineeringChart_->chart();
+                const QString title=chart->property("orbitSourceTitle").toString();
+                if(!title.isEmpty())chart->setTitle(uiText(title));
+            }
+            if(attitudeChart_&&attitudeChart_->chart()){
+                auto *chart=attitudeChart_->chart();
+                const QString title=chart->property("orbitSourceTitle").toString();
+                if(!title.isEmpty())chart->setTitle(uiText(title));
+            }
+            if(imageCoverage_){
+                const QString sourceFormat=imageCoverage_->property("orbitSourceFormat").toString();
+                if(!sourceFormat.isEmpty())imageCoverage_->setFormat(uiText(sourceFormat));
+            }
             saveApplicationSettings();
         });
     }
@@ -495,8 +523,23 @@ bool MainWindow::loadLanguageFile(){
     const QJsonObject map=root.value(QStringLiteral("translations")).toObject();
     if(map.isEmpty())return false;
     translations_=map;
+    uiTextCache_.clear();
+    // Build the substring-fallback replacement order only once per language load.
+    // Previously uiText(), orbitWidgetText() and localizeItemText() each sorted
+    // the whole dictionary for every visible and hidden field, making English
+    // switching disproportionately slow on telemetry catalogs.
+    translationKeysByLength_.clear();
+    const QStringList allKeys=translations_.keys();
+    translationKeysByLength_.reserve(allKeys.size());
+    for(const QString &key:allKeys){
+        if(!key.isEmpty() && orbitContainsCjk(key) && translations_.value(key).toString()!=key)
+            translationKeysByLength_.push_back(key);
+    }
+    std::sort(translationKeysByLength_.begin(),translationKeysByLength_.end(),
+              [](const QString &a,const QString &b){return a.size()>b.size();});
     if(QCoreApplication::instance()){
         QCoreApplication::instance()->setProperty("orbitTlmTranslations",QVariant::fromValue(map));
+        QCoreApplication::instance()->setProperty("orbitTlmTranslationKeys",translationKeysByLength_);
         QCoreApplication::instance()->setProperty("orbitTlmLanguage",languageCode_);
     }
     return true;
@@ -504,6 +547,9 @@ bool MainWindow::loadLanguageFile(){
 
 void MainWindow::applyLanguage(){
     if(!loadLanguageFile())return;
+    // Suppress repeated repainting while hundreds of catalog rows and controls are
+    // localized. Layout updates are batched separately for wrapped tab strips.
+    setUpdatesEnabled(false);
     auto translated=[this](QObject *object,const QString &current,const char *propertyName)->QString{
         const QVariant saved=object->property(propertyName);
         QString source;
@@ -516,30 +562,39 @@ void MainWindow::applyLanguage(){
     };
     setWindowTitle(translated(this,windowTitle(),"orbitSourceWindowTitle"));
     const auto dynamicLabel=[this](const QLabel *label){
-        return label==sourceLabel_||label==message_||label==currentTitle_||label==currentMeta_||
-            label==integrityLabel_||label==attitudeModeLabel_||label==frameMetric_||
-            label==recognizedMetric_||label==unknownMetric_||label==timeMetric_||
-            label==imageMetric_||label==transportMetric_||label==positionLabel_||
-            label==engineeringSummary_||label==fieldDetail_||label==attitudeInfo_||
-            label==imageInfo_||label==diagnosticsSummary_||label==tcpStatusLabel_;
+        return label==currentMeta_||label==integrityLabel_||label==frameMetric_||
+            label==recognizedMetric_||label==unknownMetric_||
+            label==imageMetric_||label==positionLabel_||label==tcpStatusLabel_;
     };
     for(QWidget *widget:findChildren<QWidget*>()){
         if(auto *label=qobject_cast<QLabel*>(widget)){
-            if(!dynamicLabel(label))label->setText(translated(label,label->text(),"orbitSourceText"));
+            if(!dynamicLabel(label)){
+                const QString value=translated(label,label->text(),"orbitSourceText");
+                if(label->text()!=value)label->setText(value);
+            }
         }
-        if(auto *button=qobject_cast<QAbstractButton*>(widget))
-            button->setText(translated(button,button->text(),"orbitSourceText"));
-        if(auto *group=qobject_cast<QGroupBox*>(widget))
-            group->setTitle(translated(group,group->title(),"orbitSourceText"));
-        if(auto *line=qobject_cast<QLineEdit*>(widget))
-            line->setPlaceholderText(translated(line,line->placeholderText(),"orbitSourcePlaceholder"));
-        if(auto *plain=qobject_cast<QPlainTextEdit*>(widget))
-            plain->setPlaceholderText(translated(plain,plain->placeholderText(),"orbitSourcePlaceholder"));
+        if(auto *button=qobject_cast<QAbstractButton*>(widget)){
+            const QString value=translated(button,button->text(),"orbitSourceText");
+            if(button->text()!=value)button->setText(value);
+        }
+        if(auto *group=qobject_cast<QGroupBox*>(widget)){
+            const QString value=translated(group,group->title(),"orbitSourceText");
+            if(group->title()!=value)group->setTitle(value);
+        }
+        if(auto *line=qobject_cast<QLineEdit*>(widget)){
+            const QString value=translated(line,line->placeholderText(),"orbitSourcePlaceholder");
+            if(line->placeholderText()!=value)line->setPlaceholderText(value);
+        }
+        if(auto *plain=qobject_cast<QPlainTextEdit*>(widget)){
+            const QString value=translated(plain,plain->placeholderText(),"orbitSourcePlaceholder");
+            if(plain->placeholderText()!=value)plain->setPlaceholderText(value);
+        }
         if(!widget->toolTip().isEmpty()){
             const QString tipSource=widget->property("orbitSourceToolTip").isValid()
                 ?widget->property("orbitSourceToolTip").toString():widget->toolTip();
             if(!widget->property("orbitSourceToolTip").isValid())widget->setProperty("orbitSourceToolTip",tipSource);
-            widget->setToolTip(uiText(tipSource));
+            const QString tip=uiText(tipSource);
+            if(widget->toolTip()!=tip)widget->setToolTip(tip);
         }
         if(auto *combo=qobject_cast<QComboBox*>(widget)){
             constexpr int role=Qt::UserRole+121;
@@ -548,7 +603,8 @@ void MainWindow::applyLanguage(){
                 QString source;
                 if(saved.isValid())source=saved.toString();
                 else{source=combo->itemText(i);combo->setItemData(i,source,role);}
-                combo->setItemText(i,uiText(source));
+                const QString value=uiText(source);
+                if(combo->itemText(i)!=value)combo->setItemText(i,value);
             }
         }
         if(auto *tabs=qobject_cast<QTabWidget*>(widget)){
@@ -556,23 +612,29 @@ void MainWindow::applyLanguage(){
             while(sources.size()<tabs->count())sources.push_back(tabs->tabText(sources.size()));
             if(sources.size()>tabs->count())sources=sources.mid(0,tabs->count());
             tabs->setProperty("orbitSourceTabTexts",sources);
-            for(int i=0;i<tabs->count();++i)tabs->setTabText(i,uiText(sources[i]));
+            for(int i=0;i<tabs->count();++i){
+                const QString value=uiText(sources[i]);
+                if(tabs->tabText(i)!=value)tabs->setTabText(i,value);
+            }
         }
         if(auto *menu=qobject_cast<QMenu*>(widget)){
             const QString source=translated(menu,menu->title(),"orbitSourceText");
             if(menu->menuAction())menu->menuAction()->setProperty("orbitSourceText",menu->property("orbitSourceText"));
-            menu->setTitle(source);
+            if(menu->title()!=source)menu->setTitle(source);
         }
         if(auto *toolbar=qobject_cast<QToolBar*>(widget))
             toolbar->setWindowTitle(translated(toolbar,toolbar->windowTitle(),"orbitSourceWindowTitle"));
         if(auto *table=qobject_cast<QTableWidget*>(widget)){
+            const bool hadUpdates=table->updatesEnabled();
+            table->setUpdatesEnabled(false);
             constexpr int headerRole=Qt::UserRole+122;
             constexpr int cellRole=Qt::UserRole+123;
             for(int i=0;i<table->columnCount();++i){
                 if(auto *headerItem=table->horizontalHeaderItem(i)){
                     QVariant saved=headerItem->data(headerRole);QString source;
                     if(saved.isValid())source=saved.toString();else{source=headerItem->text();headerItem->setData(headerRole,source);}
-                    headerItem->setText(uiText(source));
+                    const QString value=uiText(source);
+                    if(headerItem->text()!=value)headerItem->setText(value);
                 }
             }
             for(int row=0;row<table->rowCount();++row)for(int col=0;col<table->columnCount();++col){
@@ -580,19 +642,27 @@ void MainWindow::applyLanguage(){
                     QVariant saved=cell->data(cellRole);QString source;
                     if(saved.isValid())source=saved.toString();else{source=cell->text();cell->setData(cellRole,source);}
                     const QString explicitEnglish=cell->data(Qt::UserRole+125).toString();
-                    cell->setText(languageCode_==QStringLiteral("en-US")&&!explicitEnglish.isEmpty()
-                                      ?explicitEnglish:uiText(source));
+                    const QString value=languageCode_==QStringLiteral("en-US")&&!explicitEnglish.isEmpty()
+                                      ?explicitEnglish:uiText(source);
+                    if(cell->text()!=value)cell->setText(value);
                     const QVariant tipSource=cell->data(Qt::UserRole+124);
-                    if(tipSource.isValid())cell->setToolTip(uiText(tipSource.toString()));
+                    if(tipSource.isValid()){
+                        const QString tip=uiText(tipSource.toString());
+                        if(cell->toolTip()!=tip)cell->setToolTip(tip);
+                    }
                 }
             }
+            table->setUpdatesEnabled(hadUpdates);
         }
         if(auto *tree=qobject_cast<QTreeWidget*>(widget)){
+            const bool hadUpdates=tree->updatesEnabled();
+            tree->setUpdatesEnabled(false);
             constexpr int role=Qt::UserRole+122;
             if(auto *header=tree->headerItem())for(int i=0;i<tree->columnCount();++i){
                 QVariant saved=header->data(i,role);QString source;
                 if(saved.isValid())source=saved.toString();else{source=header->text(i);header->setData(i,role,source);}
-                header->setText(i,uiText(source));
+                const QString value=uiText(source);
+                if(header->text(i)!=value)header->setText(i,value);
             }
             std::function<void(QTreeWidgetItem*)> translateNode=[&](QTreeWidgetItem *node){
                 if(!node)return;
@@ -601,46 +671,73 @@ void MainWindow::applyLanguage(){
                     if(saved.isValid())source=saved.toString();
                     else{source=node->text(column);node->setData(column,Qt::UserRole+124,source);}
                     const QString explicitEnglish=column==0?node->data(0,Qt::UserRole+125).toString():QString();
-                    node->setText(column,languageCode_==QStringLiteral("en-US")&&!explicitEnglish.isEmpty()
-                                           ?explicitEnglish:uiText(source));
+                    const QString value=languageCode_==QStringLiteral("en-US")&&!explicitEnglish.isEmpty()
+                                           ?explicitEnglish:uiText(source);
+                    if(node->text(column)!=value)node->setText(column,value);
                     const QVariant tooltipSource=node->data(column,Qt::UserRole+126);
-                    if(tooltipSource.isValid())node->setToolTip(column,uiText(tooltipSource.toString()));
+                    if(tooltipSource.isValid()){
+                        const QString tip=uiText(tooltipSource.toString());
+                        if(node->toolTip(column)!=tip)node->setToolTip(column,tip);
+                    }
                 }
                 for(int child=0;child<node->childCount();++child)translateNode(node->child(child));
             };
             for(int row=0;row<tree->topLevelItemCount();++row)translateNode(tree->topLevelItem(row));
+            tree->setUpdatesEnabled(hadUpdates);
         }
         if(auto *wrapped=qobject_cast<AutoWrapTabWidget*>(widget)){
+            QStringList translatedTabs;
+            translatedTabs.reserve(wrapped->count());
             for(int i=0;i<wrapped->count();++i){
                 QWidget *page=wrapped->widget(i);
-                if(!page)continue;
-                const QString source=page->property("orbitSourceTabText").toString();
-                if(!source.isEmpty())wrapped->setTabText(i,uiText(source));
-                wrapped->setTabToolTip(i,uiText(page->toolTip().isEmpty()?source:page->toolTip()));
+                QString source=page?page->property("orbitSourceTabText").toString():QString();
+                if(source.isEmpty())source=wrapped->tabText(i);
+                translatedTabs.push_back(uiText(source));
+                if(page){
+                    QString tooltipSource=page->property("orbitSourceTabTooltip").toString();
+                    if(tooltipSource.isEmpty())tooltipSource=source;
+                    wrapped->setTabToolTip(i,tooltipSource);
+                }
             }
+            wrapped->setTabTexts(translatedTabs);
         }
     }
-    for(QAction *action:findChildren<QAction*>())
-        action->setText(translated(action,action->text(),"orbitSourceText"));
+    for(QAction *action:findChildren<QAction*>()){
+        const QString value=translated(action,action->text(),"orbitSourceText");
+        if(action->text()!=value)action->setText(value);
+    }
     if(languageMenu_)for(QAction *action:languageMenu_->actions()){
         QSignalBlocker blocker(action);
         action->setCheckable(true);
         action->setChecked(action->data().toString()==languageCode_);
     }
+    setUpdatesEnabled(true);
+    update();
+}
+
+void MainWindow::setTranslatedLabel(QLabel *label,const QString &source){
+    if(!label)return;
+    label->setProperty("orbitSourceText",source);
+    label->setText(uiText(source));
 }
 
 QString MainWindow::uiText(const QString &source) const{
+    const auto cached=uiTextCache_.constFind(source);
+    if(cached!=uiTextCache_.constEnd())return cached.value();
     const auto exact=translations_.constFind(source);
-    if(exact!=translations_.constEnd())return exact.value().toString(source);
-    if(languageCode_!=QStringLiteral("en-US"))return source;
+    if(exact!=translations_.constEnd()){
+        const QString result=exact.value().toString(source);
+        if(source.size()<=256&&uiTextCache_.size()<20000)uiTextCache_.insert(source,result);
+        return result;
+    }
+    if(languageCode_!=QStringLiteral("en-US")||!orbitContainsCjk(source))return source;
     QString translated=source;
-    QStringList keys=translations_.keys();
-    std::sort(keys.begin(),keys.end(),[](const QString &a,const QString &b){return a.size()>b.size();});
-    for(const QString &key:keys){
-        if(key.isEmpty()||key==translations_.value(key).toString())continue;
+    for(const QString &key:translationKeysByLength_){
         if(!translated.contains(key))continue;
         translated.replace(key,translations_.value(key).toString());
+        if(!orbitContainsCjk(translated))break;
     }
+    if(source.size()<=256&&uiTextCache_.size()<20000)uiTextCache_.insert(source,translated);
     return translated;
 }
 
@@ -730,14 +827,15 @@ void MainWindow::buildWorkspace(){
     auto *root=new QWidget;
     setCentralWidget(root);
     auto *main=new QVBoxLayout(root);
-    main->setContentsMargins(12,12,12,9);
-    main->setSpacing(9);
+    main->setContentsMargins(8,7,8,6);
+    main->setSpacing(5);
     auto *fileBar=new QFrame;
     fileBar->setObjectName("panel");
     auto *fileLayout=new QHBoxLayout(fileBar);
-    fileLayout->setContentsMargins(15,9,15,9);
+    fileLayout->setContentsMargins(8,4,8,4);
     sourceLabel_=new QLabel;
-    sourceLabel_->setWordWrap(true);
+    sourceLabel_->setWordWrap(false);
+    sourceLabel_->setToolTip(QStringLiteral("LOG/BIN session input paths"));
     fileLayout->addWidget(sourceLabel_,1);
     message_=new QLabel(QStringLiteral("离线会话 · 应用层 CRC 未校验"));
     message_->setObjectName("note");
@@ -751,7 +849,7 @@ void MainWindow::buildWorkspace(){
 
     pages_=new QTabWidget;
     pages_->setObjectName("mainPages");
-    pages_->setMinimumHeight(250);
+    pages_->setMinimumHeight(190);
     buildOverview(pages_);
     buildEngineering(pages_);
     buildAttitude(pages_);
@@ -764,8 +862,8 @@ void MainWindow::buildWorkspace(){
     replayPanel_->setObjectName("panel");
     replayPanel_->setMinimumHeight(0);
     auto *replayLayout=new QVBoxLayout(replayPanel_);
-    replayLayout->setContentsMargins(8,4,8,4);
-    replayLayout->setSpacing(3);
+    replayLayout->setContentsMargins(6,3,6,3);
+    replayLayout->setSpacing(2);
     auto *header=new QWidget(replayPanel_);
     auto *headerLayout=new QHBoxLayout(header);
     headerLayout->setContentsMargins(0,0,0,0);
@@ -945,7 +1043,7 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
     rightLayout->addWidget(fieldDetail_);
     engineeringChart_=new QChartView(new QChart);
     engineeringChart_->setRenderHint(QPainter::Antialiasing);
-    engineeringChart_->setMinimumHeight(120);
+    engineeringChart_->setMinimumHeight(88);
     rightLayout->addWidget(engineeringChart_,2);
     split->addWidget(right);
     split->setStretchFactor(1,1);split->setSizes({230,700});
@@ -964,13 +1062,13 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
         if(item->data(0,Qt::UserRole).isNull())return;
         const QString code=item->data(0,Qt::UserRole).toString();
         const QString packet=item->data(0,Qt::UserRole+1).toString();
-        fieldDetail_->setText(uiText(QStringLiteral("字段编号 %1 · 位位置 %2 · 换算公式 %3\n英文名：%4\n定义来源：%5\n当前会话尚未找到该字段的已解码样本。"))
+        setTranslatedLabel(fieldDetail_,QStringLiteral("字段编号 %1 · 位位置 %2 · 换算公式 %3\n英文名：%4\n定义来源：%5\n当前会话尚未找到该字段的已解码样本。")
             .arg(code,item->data(0,Qt::UserRole+2).toString(),item->data(0,Qt::UserRole+3).toString(),
                  item->data(0,Qt::UserRole+4).toString(),item->data(0,Qt::UserRole+5).toString()));
         bool hasSample=false;
         for(int i=0;i<business_.size();++i)if(i<=currentIndex_ && business_[i].packetName==packet)
             for(const auto &f:business_[i].fields)if(f.code==code){
-                fieldDetail_->setText(uiText(QStringLiteral("字段编号 %1 · 位位置 %2\n原始 HEX：%3 · 原始值：%4\n当前工程值：%5 %6\n换算公式：%7\n定义来源：%8"))
+                setTranslatedLabel(fieldDetail_,QStringLiteral("字段编号 %1 · 位位置 %2\n原始 HEX：%3 · 原始值：%4\n当前工程值：%5 %6\n换算公式：%7\n定义来源：%8")
                     .arg(f.code,f.bits,f.rawHex,f.rawNumber,f.value,f.unit,f.formula,f.definitionEvidence));
                 hasSample=true;
                 break;
@@ -1022,8 +1120,9 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                 auto *errorLayout=new QVBoxLayout(errorPage);
                 errorLayout->addWidget(new QLabel(QStringLiteral("官方遥测字段目录无法读取：%1").arg(catalogName)));
                 errorPage->setProperty("orbitSourceTabText",QStringLiteral("目录错误"));
+                errorPage->setProperty("orbitSourceTabTooltip",treeSatellite+QStringLiteral(" · 目录错误"));
                 const int errorTab=systems->addTab(errorPage,uiText(QStringLiteral("目录错误")));
-                systems->setTabToolTip(errorTab,uiText(treeSatellite+QStringLiteral(" · 目录错误")));
+                systems->setTabToolTip(errorTab,treeSatellite+QStringLiteral(" · 目录错误"));
                 continue;
             }
         }
@@ -1039,8 +1138,9 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
             errorLayout->addWidget(new QLabel(QStringLiteral("遥测目录格式错误：%1（%2）")
                 .arg(catalogName,parseError.errorString())));
             errorPage->setProperty("orbitSourceTabText",QStringLiteral("目录错误"));
+            errorPage->setProperty("orbitSourceTabTooltip",treeSatellite+QStringLiteral(" · 目录错误"));
             const int errorTab=systems->addTab(errorPage,uiText(QStringLiteral("目录错误")));
-            systems->setTabToolTip(errorTab,uiText(treeSatellite+QStringLiteral(" · 目录错误")));
+            systems->setTabToolTip(errorTab,treeSatellite+QStringLiteral(" · 目录错误"));
             continue;
         }
 
@@ -1065,6 +1165,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
             auto *groupPage=new QWidget;
             groupPage->setProperty("treeSatellite",treeSatellite);
             groupPage->setProperty("orbitSourceTabText",groupName);
+            groupPage->setProperty("orbitSourceTabTooltip",treeSatellite+QStringLiteral(" · ")+groupName);
             auto *groupLayout=new QVBoxLayout(groupPage);
             groupLayout->setContentsMargins(2,2,2,2);
             groupLayout->setSpacing(2);
@@ -1090,7 +1191,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                 setupTable(table);
                 table->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
                 table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-                table->verticalHeader()->setDefaultSectionSize(17);
+                table->verticalHeader()->setDefaultSectionSize(16);
                 table->horizontalHeader()->setSectionResizeMode(0,QHeaderView::Interactive);
                 table->horizontalHeader()->setSectionResizeMode(1,QHeaderView::Interactive);
                 table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::Stretch);
@@ -1140,7 +1241,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
             }
             groupLayout->addWidget(packetTabs,1);
             const int systemTab=systems->addTab(groupPage,uiText(groupName));
-            systems->setTabToolTip(systemTab,uiText(treeSatellite+QStringLiteral(" · ")+groupName));
+            systems->setTabToolTip(systemTab,treeSatellite+QStringLiteral(" · ")+groupName);
         }
     }
 
@@ -1213,7 +1314,8 @@ void MainWindow::buildImages(QTabWidget *tabs){
     imageCoverage_=new QProgressBar;
     imageCoverage_->setRange(0,1);
     imageCoverage_->setValue(0);
-    imageCoverage_->setFormat(uiText(QStringLiteral("尚无观测序号")));
+    imageCoverage_->setProperty("orbitSourceFormat",QStringLiteral("尚无观测序号"));
+    imageCoverage_->setFormat(uiText(imageCoverage_->property("orbitSourceFormat").toString()));
     layout->addWidget(imageCoverage_);
     auto *split=new QSplitter(Qt::Horizontal);
     imagePreview_=new ImagePreview;
