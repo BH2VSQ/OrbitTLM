@@ -1,6 +1,11 @@
 #include "mainwindow.h"
 #include "mainwindow_widgets.h"
 #include <QAction>
+#include <QAbstractButton>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QSaveFile>
+#include <QSignalBlocker>
 #include <QApplication>
 #include <QChart>
 #include <QChartView>
@@ -107,13 +112,15 @@ void setupTable(QTableWidget *table){
 }
 MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
     setWindowTitle(QStringLiteral("OrbitTLM · 卫星遥测回放工作台"));
-    setMinimumSize(1100,690);
+    setMinimumSize(800,690);
     resize(1480,910);
     live_=new orbit::LiveTcp(this);
+    loadApplicationSettings();
     applyStyles();
     buildToolbar();
     buildWorkspace();
     buildMenus();
+    applyLanguage();
     timer_=new QTimer(this);timer_->setInterval(500);
     connect(timer_,&QTimer::timeout,this,[this]{
         if(business_.isEmpty()){timer_->stop();return;}
@@ -161,7 +168,7 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
             if(left.satellite!=right.satellite)return left.satellite<right.satellite;
             return left.hash<right.hash;
         });
-        rebuildSession();
+        rebuildSession(true);
         if(stored){
             statusBar()->showMessage(QStringLiteral("已保存至 %1.db（按时间排序，重复帧自动忽略）").arg(frame.satellite),5000);
         }
@@ -187,6 +194,11 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
     updateWebHistory();
     showEvent(-1);
     setDiagnosticsVisible(false);
+    // Attempt the saved TCP endpoint once on every application start; never show a modal prompt.
+    QTimer::singleShot(0,this,[this]{
+        if(live_&&!tcpHost_.trimmed().isEmpty()&&tcpPort_>=1&&tcpPort_<=65535)
+            live_->start(tcpHost_.trimmed(),quint16(tcpPort_),QStringLiteral("AUTO"));
+    });
 }
 void MainWindow::applyStyles(){
     setStyleSheet(QStringLiteral(R"(
@@ -245,6 +257,13 @@ void MainWindow::applyStyles(){
 void MainWindow::buildToolbar(){
     auto *bar=addToolBar(QStringLiteral("遥测工作台"));
     bar->setMovable(false);
+    replayListAction_=bar->addAction(QStringLiteral("数据回放列表"));
+    replayListAction_->setCheckable(true);
+    replayListAction_->setChecked(true);
+    connect(replayListAction_,&QAction::toggled,this,[this](bool visible){
+        setReplayListCollapsed(!visible);
+    });
+    bar->addSeparator();
     auto *log=bar->addAction(QStringLiteral("导入 LOG"));
     connect(log,&QAction::triggered,this,[this]{
         const QString p=QFileDialog::getOpenFileName(this,QStringLiteral("选择解码日志"),{},
@@ -267,10 +286,8 @@ void MainWindow::buildToolbar(){
     auto *import=bar->addAction(QStringLiteral("开始导入"));
     connect(import,&QAction::triggered,this,[this]{importSession();});
     bar->addSeparator();
-    auto *exportCsv=bar->addAction(QStringLiteral("导出遥测 CSV"));
-    connect(exportCsv,&QAction::triggered,this,[this]{exportEngineering(true);});
-    auto *exportQ=bar->addAction(QStringLiteral("导出四元数"));
-    connect(exportQ,&QAction::triggered,this,[this]{exportQuaternions(false);});
+    auto *exportData=bar->addAction(QStringLiteral("统一导出"));
+    connect(exportData,&QAction::triggered,this,[this]{showExportDialog();});
     bar->addSeparator();
     auto *connectTcp=bar->addAction(QStringLiteral("连接 TCP"));
     tcpStatusLabel_=new QLabel(QStringLiteral("TCP：未连接"),bar);
@@ -278,13 +295,8 @@ void MainWindow::buildToolbar(){
     tcpStatusLabel_->setMinimumWidth(112);
     bar->addWidget(tcpStatusLabel_);
     connect(connectTcp,&QAction::triggered,this,[this]{
-        bool ok=false;
-        const QString address=QInputDialog::getText(this,QStringLiteral("TCP 实时输入"),
-          QStringLiteral("主机地址"),QLineEdit::Normal,"127.0.0.1",&ok);
-        if(!ok||address.trimmed().isEmpty())return;
-        const int port=QInputDialog::getInt(this,QStringLiteral("TCP 实时输入"),
-            QStringLiteral("端口"),9985,1,65535,1,&ok);
-        if(ok)live_->start(address,quint16(port),QStringLiteral("AUTO"));
+        if(tcpHost_.trimmed().isEmpty()||tcpPort_<1||tcpPort_>65535){configureTcpServer();return;}
+        live_->start(tcpHost_.trimmed(),quint16(tcpPort_),QStringLiteral("AUTO"));
     });
     auto *stop=bar->addAction(QStringLiteral("断开"));
     connect(stop,&QAction::triggered,live_,&orbit::LiveTcp::stop);
@@ -306,14 +318,27 @@ void MainWindow::buildMenus(){
             QMessageBox::warning(this,QStringLiteral("打开 HTML 历史失败"),path);
     });
     file->addSeparator();
-    file->addAction(QStringLiteral("导出传输帧 CSV"),[this]{exportFrames(true);});
-    file->addAction(QStringLiteral("导出传输帧 JSON"),[this]{exportFrames(false);});
-    file->addAction(QStringLiteral("导出业务遥测 CSV"),[this]{exportEngineering(true);});
-    file->addAction(QStringLiteral("导出业务遥测 JSON"),[this]{exportEngineering(false);});
-    file->addAction(QStringLiteral("导出 SAT-S3 四元数"),[this]{exportQuaternions(false);});
-    file->addAction(QStringLiteral("导出实验性候选四元数"),[this]{exportQuaternions(true);});
-    file->addAction(QStringLiteral("导出 KISS 应用包"),[this]{exportKiss();});
+    file->addAction(QStringLiteral("统一导出…"),[this]{showExportDialog();});
     auto *tools=menuBar()->addMenu(QStringLiteral("工具(&T)"));
+    tools->addAction(QStringLiteral("TCP 服务器设置…"),[this]{configureTcpServer();});
+    languageMenu_=tools->addMenu(QStringLiteral("界面语言"));
+    const QDir languageDirectory(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("i18n")));
+    for(const QString &fileName:languageDirectory.entryList({QStringLiteral("*.json")},QDir::Files,QDir::Name)){
+        QFile languageFile(languageDirectory.filePath(fileName));
+        if(!languageFile.open(QIODevice::ReadOnly))continue;
+        const QJsonObject languageObject=QJsonDocument::fromJson(languageFile.readAll()).object();
+        const QString code=languageObject.value(QStringLiteral("code")).toString(QFileInfo(fileName).completeBaseName());
+        const QString label=languageObject.value(QStringLiteral("displayName")).toString(code);
+        auto *languageAction=languageMenu_->addAction(label);
+        languageAction->setCheckable(true);
+        languageAction->setData(code);
+        languageAction->setChecked(code==languageCode_);
+        connect(languageAction,&QAction::triggered,this,[this,code]{
+            languageCode_=code;
+            applyLanguage();
+            saveApplicationSettings();
+        });
+    }
     tools->addAction(QStringLiteral("载入自定义字段规则 JSON"),[this]{
         const QString p=QFileDialog::getOpenFileName(this,QStringLiteral("选择字段规则"),{},
                                                        QStringLiteral("JSON 文件 (*.json)"));
@@ -332,6 +357,263 @@ void MainWindow::buildMenus(){
     debug->setCheckable(true);
     connect(debug,&QAction::toggled,this,[this](bool active){setDiagnosticsVisible(active);});
 }
+void MainWindow::setReplayListCollapsed(bool collapsed){
+    if(!workspaceSplitter_||replayListCollapsed_==collapsed)return;
+    if(collapsed){
+        const QList<int> sizes=workspaceSplitter_->sizes();
+        if(!sizes.isEmpty()&&sizes.first()>0)replayPanelWidth_=sizes.first();
+        replayListCollapsed_=true;
+        workspaceSplitter_->setSizes({0,std::max(1,workspaceSplitter_->width())});
+        resize(std::max(800,width()-replayPanelWidth_),height());
+    }else{
+        replayListCollapsed_=false;
+        resize(width()+replayPanelWidth_,height());
+        workspaceSplitter_->setSizes({replayPanelWidth_,std::max(1,workspaceSplitter_->width()-replayPanelWidth_)});
+    }
+    if(replayListAction_){
+        QSignalBlocker blocker(replayListAction_);
+        replayListAction_->setChecked(!collapsed);
+    }
+}
+
+void MainWindow::loadApplicationSettings(){
+    const QString dataDirectory=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+    QDir().mkpath(dataDirectory);
+    const QString settingsPath=QDir(dataDirectory).filePath(QStringLiteral("app-settings.json"));
+    QFile settingsFile(settingsPath);
+    if(!settingsFile.open(QIODevice::ReadOnly))return;
+    const QJsonObject settings=QJsonDocument::fromJson(settingsFile.readAll()).object();
+    tcpHost_=settings.value(QStringLiteral("tcpHost")).toString(tcpHost_).trimmed();
+    tcpPort_=settings.value(QStringLiteral("tcpPort")).toInt(tcpPort_);
+    languageCode_=settings.value(QStringLiteral("language")).toString(languageCode_);
+    if(tcpHost_.isEmpty())tcpHost_=QStringLiteral("127.0.0.1");
+    if(tcpPort_<1||tcpPort_>65535)tcpPort_=9985;
+}
+
+void MainWindow::saveApplicationSettings(){
+    const QString dataDirectory=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+    if(!QDir().mkpath(dataDirectory)){
+        statusBar()->showMessage(uiText(QStringLiteral("无法创建应用配置目录：%1")).arg(dataDirectory),9000);return;
+    }
+    QJsonObject settings;
+    settings.insert(QStringLiteral("tcpHost"),tcpHost_.trimmed());
+    settings.insert(QStringLiteral("tcpPort"),tcpPort_);
+    settings.insert(QStringLiteral("language"),languageCode_);
+    QSaveFile file(QDir(dataDirectory).filePath(QStringLiteral("app-settings.json")));
+    if(!file.open(QIODevice::WriteOnly)||file.write(QJsonDocument(settings).toJson(QJsonDocument::Indented))<0||!file.commit())
+        statusBar()->showMessage(uiText(QStringLiteral("保存应用配置失败：%1")).arg(file.errorString()),9000);
+}
+
+void MainWindow::configureTcpServer(){
+    QDialog dialog(this);
+    dialog.setWindowTitle(uiText(QStringLiteral("TCP 服务器设置")));
+    auto *layout=new QFormLayout(&dialog);
+    auto *hostEdit=new QLineEdit(tcpHost_,&dialog);
+    hostEdit->setPlaceholderText(uiText(QStringLiteral("例如 192.168.1.100")));
+    auto *portEdit=new QSpinBox(&dialog);
+    portEdit->setRange(1,65535);
+    portEdit->setValue(tcpPort_);
+    layout->addRow(uiText(QStringLiteral("服务器地址")),hostEdit);
+    layout->addRow(uiText(QStringLiteral("端口")),portEdit);
+    auto *buttons=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel,&dialog);
+    buttons->button(QDialogButtonBox::Ok)->setText(uiText(QStringLiteral("确定")));
+    buttons->button(QDialogButtonBox::Cancel)->setText(uiText(QStringLiteral("取消")));
+    layout->addRow(buttons);
+    connect(buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);
+    connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
+    if(dialog.exec()!=QDialog::Accepted)return;
+    if(hostEdit->text().trimmed().isEmpty()){
+        QMessageBox::warning(this,uiText(QStringLiteral("TCP 服务器设置")),uiText(QStringLiteral("服务器地址不能为空。")));return;
+    }
+    tcpHost_=hostEdit->text().trimmed();
+    tcpPort_=portEdit->value();
+    saveApplicationSettings();
+    live_->start(tcpHost_,quint16(tcpPort_),QStringLiteral("AUTO"));
+}
+
+bool MainWindow::loadLanguageFile(){
+    QString path=QDir(QCoreApplication::applicationDirPath()).filePath(
+        QStringLiteral("i18n/")+languageCode_+QStringLiteral(".json"));
+    QFile file(path);
+    if(!file.open(QIODevice::ReadOnly)&&languageCode_!=QStringLiteral("zh-CN")){
+        languageCode_=QStringLiteral("zh-CN");
+        path=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("i18n/zh-CN.json"));
+        file.setFileName(path);
+        if(!file.open(QIODevice::ReadOnly))return false;
+    }else if(!file.isOpen()&&!file.open(QIODevice::ReadOnly))return false;
+    const QJsonObject root=QJsonDocument::fromJson(file.readAll()).object();
+    const QJsonObject map=root.value(QStringLiteral("translations")).toObject();
+    if(map.isEmpty())return false;
+    translations_=map;
+    return true;
+}
+
+void MainWindow::applyLanguage(){
+    if(!loadLanguageFile())return;
+    auto translated=[this](QObject *object,const QString &current,const char *propertyName)->QString{
+        const QVariant saved=object->property(propertyName);
+        QString source;
+        if(saved.isValid())source=saved.toString();
+        else{
+            if(!translations_.contains(current))return current;
+            source=current;
+            object->setProperty(propertyName,source);
+        }
+        return translations_.value(source).toString(source);
+    };
+    setWindowTitle(translated(this,windowTitle(),"orbitSourceWindowTitle"));
+    const auto dynamicLabel=[this](const QLabel *label){
+        return label==sourceLabel_||label==message_||label==currentTitle_||label==currentMeta_||
+            label==integrityLabel_||label==attitudeModeLabel_||label==frameMetric_||
+            label==recognizedMetric_||label==unknownMetric_||label==timeMetric_||
+            label==imageMetric_||label==transportMetric_||label==positionLabel_||
+            label==engineeringSummary_||label==fieldDetail_||label==attitudeInfo_||
+            label==imageInfo_||label==diagnosticsSummary_||label==tcpStatusLabel_;
+    };
+    for(QWidget *widget:findChildren<QWidget*>()){
+        if(auto *label=qobject_cast<QLabel*>(widget)){
+            if(!dynamicLabel(label))label->setText(translated(label,label->text(),"orbitSourceText"));
+        }
+        if(auto *button=qobject_cast<QAbstractButton*>(widget))
+            button->setText(translated(button,button->text(),"orbitSourceText"));
+        if(auto *group=qobject_cast<QGroupBox*>(widget))
+            group->setTitle(translated(group,group->title(),"orbitSourceText"));
+        if(auto *line=qobject_cast<QLineEdit*>(widget))
+            line->setPlaceholderText(translated(line,line->placeholderText(),"orbitSourcePlaceholder"));
+        if(auto *plain=qobject_cast<QPlainTextEdit*>(widget))
+            plain->setPlaceholderText(translated(plain,plain->placeholderText(),"orbitSourcePlaceholder"));
+        if(auto *combo=qobject_cast<QComboBox*>(widget)){
+            constexpr int role=Qt::UserRole+121;
+            for(int i=0;i<combo->count();++i){
+                QVariant saved=combo->itemData(i,role);
+                QString source;
+                if(saved.isValid())source=saved.toString();
+                else{source=combo->itemText(i);combo->setItemData(i,source,role);}
+                combo->setItemText(i,translations_.value(source).toString(source));
+            }
+        }
+        if(auto *tabs=qobject_cast<QTabWidget*>(widget)){
+            QStringList sources=tabs->property("orbitSourceTabTexts").toStringList();
+            while(sources.size()<tabs->count())sources.push_back(tabs->tabText(sources.size()));
+            if(sources.size()>tabs->count())sources=sources.mid(0,tabs->count());
+            tabs->setProperty("orbitSourceTabTexts",sources);
+            for(int i=0;i<tabs->count();++i)tabs->setTabText(i,translations_.value(sources[i]).toString(sources[i]));
+        }
+        if(auto *table=qobject_cast<QTableWidget*>(widget)){
+            constexpr int role=Qt::UserRole+122;
+            for(int i=0;i<table->columnCount();++i){
+                if(auto *item=table->horizontalHeaderItem(i)){
+                    QVariant saved=item->data(role);QString source;
+                    if(saved.isValid())source=saved.toString();else{source=item->text();item->setData(role,source);}
+                    item->setText(translations_.value(source).toString(source));
+                }
+            }
+        }
+        if(auto *tree=qobject_cast<QTreeWidget*>(widget)){
+            constexpr int role=Qt::UserRole+122;
+            if(auto *header=tree->headerItem())for(int i=0;i<tree->columnCount();++i){
+                QVariant saved=header->data(i,role);QString source;
+                if(saved.isValid())source=saved.toString();else{source=header->text(i);header->setData(i,role,source);}
+                header->setText(i,translations_.value(source).toString(source));
+            }
+        }
+    }
+    for(QAction *action:findChildren<QAction*>())
+        action->setText(translated(action,action->text(),"orbitSourceText"));
+    if(languageMenu_)for(QAction *action:languageMenu_->actions()){
+        QSignalBlocker blocker(action);
+        action->setCheckable(true);
+        action->setChecked(action->data().toString()==languageCode_);
+    }
+}
+
+QString MainWindow::uiText(const QString &source) const{
+    return translations_.value(source).toString(source);
+}
+
+void MainWindow::showExportDialog(){
+    QDialog dialog(this);
+    dialog.setWindowTitle(uiText(QStringLiteral("统一导出")));
+    auto *layout=new QVBoxLayout(&dialog);
+    layout->addWidget(new QLabel(uiText(QStringLiteral("选择要导出的数据类型（可多选）")),&dialog));
+    auto *grid=new QGridLayout;
+    layout->addLayout(grid);
+    auto makeCheck=[&](const QString &label,bool enabled,int row,int col){
+        auto *box=new QCheckBox(uiText(label),&dialog);box->setEnabled(enabled);grid->addWidget(box,row,col);return box;
+    };
+    auto *frameCsv=makeCheck(QStringLiteral("传输帧 CSV"),!frames_.isEmpty(),0,0);
+    auto *frameJson=makeCheck(QStringLiteral("传输帧 JSON"),!frames_.isEmpty(),0,1);
+    auto *engineeringCsv=makeCheck(QStringLiteral("业务遥测 CSV"),!business_.isEmpty(),1,0);
+    auto *engineeringJson=makeCheck(QStringLiteral("业务遥测 JSON"),!business_.isEmpty(),1,1);
+    auto *quaternion=makeCheck(QStringLiteral("SAT-S3 四元数 CSV"),!business_.isEmpty()&&resolvedSatellite()!=QStringLiteral("BY04"),2,0);
+    auto *candidateQuaternion=makeCheck(QStringLiteral("实验性候选四元数 CSV"),!frames_.isEmpty(),2,1);
+    auto *kiss=makeCheck(QStringLiteral("KISS 应用包 JSON"),!packets_.isEmpty(),3,0);
+    auto *ssdv=makeCheck(QStringLiteral("SSDV 候选分片"),!images_.isEmpty(),3,1);
+    auto *jpeg=makeCheck(QStringLiteral("重建当前 SSDV 图像为 JPEG"),!images_.isEmpty(),4,0);
+    auto *directoryRow=new QHBoxLayout;
+    auto *directory=new QLineEdit(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("exports")),&dialog);
+    auto *browse=new QPushButton(uiText(QStringLiteral("浏览…")),&dialog);
+    directoryRow->addWidget(directory,1);directoryRow->addWidget(browse);
+    layout->addWidget(new QLabel(uiText(QStringLiteral("导出目录")),&dialog));layout->addLayout(directoryRow);
+    connect(browse,&QPushButton::clicked,&dialog,[&]{
+        const QString selected=QFileDialog::getExistingDirectory(&dialog,uiText(QStringLiteral("选择导出目录")),directory->text());
+        if(!selected.isEmpty())directory->setText(selected);
+    });
+    auto *buttons=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel,&dialog);
+    buttons->button(QDialogButtonBox::Ok)->setText(uiText(QStringLiteral("开始导出")));
+    buttons->button(QDialogButtonBox::Cancel)->setText(uiText(QStringLiteral("取消")));
+    layout->addWidget(buttons);
+    connect(buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);
+    connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
+    if(dialog.exec()!=QDialog::Accepted)return;
+    QList<QCheckBox*> selected;
+    for(QCheckBox *box:{frameCsv,frameJson,engineeringCsv,engineeringJson,quaternion,candidateQuaternion,kiss,ssdv,jpeg})
+        if(box->isEnabled()&&box->isChecked())selected.push_back(box);
+    if(selected.isEmpty()){
+        QMessageBox::information(this,uiText(QStringLiteral("统一导出")),uiText(QStringLiteral("请至少选择一种可导出的数据。")));return;
+    }
+    const QString enteredDirectory=directory->text().trimmed();
+    if(enteredDirectory.isEmpty()){
+        QMessageBox::warning(this,uiText(QStringLiteral("统一导出")),uiText(QStringLiteral("无法创建导出目录。")));return;
+    }
+    const QString outDir=QDir::cleanPath(enteredDirectory);
+    if(!QDir().mkpath(outDir)){
+        QMessageBox::warning(this,uiText(QStringLiteral("统一导出")),uiText(QStringLiteral("无法创建导出目录。")));return;
+    }
+    QStringList planned;
+    if(frameCsv->isChecked())planned<<QStringLiteral("frames.csv");
+    if(frameJson->isChecked())planned<<QStringLiteral("frames.json");
+    if(engineeringCsv->isChecked())planned<<QStringLiteral("engineering.csv");
+    if(engineeringJson->isChecked())planned<<QStringLiteral("engineering.json");
+    if(quaternion->isChecked())planned<<QStringLiteral("SAT-S3-quaternions.csv");
+    if(candidateQuaternion->isChecked())planned<<QStringLiteral("candidate-quaternion.csv");
+    if(kiss->isChecked())planned<<QStringLiteral("kiss-packets.json");
+    if(ssdv->isChecked())planned<<QStringLiteral("satellite.ssdv");
+    if(jpeg->isChecked()){
+        int row=imageTable_?imageTable_->currentRow():-1;if(row<0||row>=images_.size())row=0;
+        if(row>=0&&row<images_.size())planned<<QStringLiteral("BY70-4_ID%1.jpg").arg(images_[row].imageId);
+    }
+    QStringList existing;
+    for(const QString &name:planned)if(QFileInfo::exists(QDir(outDir).filePath(name)))existing<<name;
+    if(!existing.isEmpty()&&QMessageBox::question(this,uiText(QStringLiteral("确认覆盖")),
+        uiText(QStringLiteral("以下文件已存在，是否覆盖？
+%1")).arg(existing.join(QStringLiteral("
+"))),
+        QMessageBox::Yes|QMessageBox::No,QMessageBox::No)!=QMessageBox::Yes)return;
+    exportDirectoryOverride_=QDir(outDir).absolutePath();
+    if(frameCsv->isChecked())exportFrames(true);
+    if(frameJson->isChecked())exportFrames(false);
+    if(engineeringCsv->isChecked())exportEngineering(true);
+    if(engineeringJson->isChecked())exportEngineering(false);
+    if(quaternion->isChecked())exportQuaternions(false);
+    if(candidateQuaternion->isChecked())exportQuaternions(true);
+    if(kiss->isChecked())exportKiss();
+    if(ssdv->isChecked())exportSsdv();
+    if(jpeg->isChecked())decodeSsdv();
+    exportDirectoryOverride_.clear();
+    statusBar()->showMessage(uiText(QStringLiteral("所选导出任务已执行：%1")).arg(QDir(outDir).absolutePath()),9000);
+}
+
 void MainWindow::buildWorkspace(){
     auto *root=new QWidget;
     setCentralWidget(root);
@@ -349,11 +631,14 @@ void MainWindow::buildWorkspace(){
     message_->setObjectName("note");
     fileLayout->addWidget(message_);
     main->addWidget(fileBar);
-    auto *split=new QSplitter(Qt::Horizontal);
+    workspaceSplitter_=new QSplitter(Qt::Horizontal);
+    auto *split=workspaceSplitter_;
     split->setChildrenCollapsible(false);
+    split->setCollapsible(0,true);
     auto *left=new QFrame;
     left->setObjectName("panel");
-    left->setMinimumWidth(460);
+    left->setMinimumWidth(0);
+    replayPanel_=left;
     auto *leftLayout=new QVBoxLayout(left);
     leftLayout->setContentsMargins(13,12,13,12);
     leftLayout->setSpacing(8);
@@ -398,7 +683,8 @@ void MainWindow::buildWorkspace(){
     split->addWidget(pages_);
     split->setStretchFactor(0,0);
     split->setStretchFactor(1,1);
-    split->setSizes({490,960});
+    replayPanelWidth_=490;
+    split->setSizes({replayPanelWidth_,960});
     main->addWidget(split,1);
     auto *transport=new QFrame;
     transport->setObjectName("panel");
@@ -739,9 +1025,9 @@ void MainWindow::buildImages(QTabWidget *tabs){
     row->addWidget(imageApid_);
     auto *scan=new QPushButton(QStringLiteral("扫描候选分片"));
     row->addWidget(scan);
-    auto *save=new QPushButton(QStringLiteral("保存 SSDV 数据"));
+    auto *save=new QPushButton(QStringLiteral("统一导出…"));
     row->addWidget(save);
-    auto *decode=new QPushButton(QStringLiteral("重建 JPEG"));
+    auto *decode=new QPushButton(QStringLiteral("重建 JPEG 预览"));
     row->addWidget(decode);
     row->addStretch(1);
     layout->addLayout(row);
@@ -768,7 +1054,7 @@ void MainWindow::buildImages(QTabWidget *tabs){
         const int idx=imageTable_->currentRow();
         if(idx>=0&&idx<images_.size())updateImageProgress(images_[idx].imageId);
     });
-    connect(save,&QPushButton::clicked,this,[this]{exportSsdv();});
+    connect(save,&QPushButton::clicked,this,[this]{showExportDialog();});
     connect(decode,&QPushButton::clicked,this,[this]{decodeSsdv();});
     tabs->addTab(page,QStringLiteral("图像数据"));
 }

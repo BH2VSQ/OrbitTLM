@@ -324,7 +324,7 @@ void MainWindow::loadHistory(){
     sourceLabel_->setText(QStringLiteral("历史会话：")+selected);
     statusBar()->showMessage(QStringLiteral("历史会话已恢复：")+selected,9000);
 }
-void MainWindow::rebuildSession(){
+void MainWindow::rebuildSession(bool preferLatest){
     timer_->stop();
     packets_=orbit::Transport::reassemble(frames_,&transportStats_);
     orbit::BusinessStats bs;
@@ -337,7 +337,7 @@ void MainWindow::rebuildSession(){
     updateMetrics();
     timeline_->setRange(0,std::max(0,int(business_.size())-1));
     currentIndex_=-1;
-    if(!business_.isEmpty())selectEvent(0);
+    if(!business_.isEmpty())selectEvent(preferLatest?business_.size()-1:0);
     else showEvent(-1);
     updateWebHistory();
 }
@@ -1430,9 +1430,10 @@ void MainWindow::exportSsdv(){
         QMessageBox::information(this,QStringLiteral("保存图像数据"),
             QStringLiteral("当前没有 SSDV 候选分片，请先扫描正确的图像 APID。"));return;
     }
-    const QString path=QFileDialog::getSaveFileName(this,
+    const QString path=exportDirectoryOverride_.isEmpty()?QFileDialog::getSaveFileName(this,
        QStringLiteral("保存 SSDV 候选数据"),"satellite.ssdv",
-       QStringLiteral("SSDV 数据 (*.ssdv *.bin)"));
+       QStringLiteral("SSDV 数据 (*.ssdv *.bin)")):
+       QDir(exportDirectoryOverride_).filePath(QStringLiteral("satellite.ssdv"));
     if(path.isEmpty())return;
     QString error;
     if(!orbit::ImageTools::savePackets(images_,path,&error))
@@ -1468,9 +1469,13 @@ void MainWindow::decodeSsdv(){
         .arg(imageId).arg(image.width()).arg(image.height()).arg(rebuilt.receivedPackets)
         .arg(rebuilt.complete?QStringLiteral("检测到图像结束标志"):QStringLiteral("当前为可恢复预览")));
 
-    const QString outputPath=QFileDialog::getSaveFileName(this,
-        QStringLiteral("保存重建的 JPEG"),QStringLiteral("BY70-4_ID%1.jpg").arg(imageId),
-        QStringLiteral("JPEG 图像 (*.jpg *.jpeg)"));
+    // The image-tab action only rebuilds and previews. File writing is done by the unified export dialog.
+    if(exportDirectoryOverride_.isEmpty()){
+        statusBar()->showMessage(uiText(QStringLiteral("JPEG 已在软件内重建并显示；如需保存，请使用统一导出界面。")),9000);
+        return;
+    }
+    const QString jpegName=QStringLiteral("BY70-4_ID%1.jpg").arg(imageId);
+    const QString outputPath=QDir(exportDirectoryOverride_).filePath(jpegName);
     if(outputPath.isEmpty()){
         statusBar()->showMessage(QStringLiteral("JPEG 已在软件内重建并显示，尚未保存到磁盘"),9000);
         return;
@@ -1500,8 +1505,10 @@ void MainWindow::inspectRawFrame(int index){
 }
 void MainWindow::exportFrames(bool csv){
     if(frames_.isEmpty())return;
-    const QString path=QFileDialog::getSaveFileName(this,QStringLiteral("导出原始传输帧"),
-        csv?"frames.csv":"frames.json",csv?QStringLiteral("CSV (*.csv)"):QStringLiteral("JSON (*.json)"));
+    const QString defaultName=csv?QStringLiteral("frames.csv"):QStringLiteral("frames.json");
+    const QString path=exportDirectoryOverride_.isEmpty()?QFileDialog::getSaveFileName(this,QStringLiteral("导出原始传输帧"),
+        defaultName,csv?QStringLiteral("CSV (*.csv)"):QStringLiteral("JSON (*.json)")):
+        QDir(exportDirectoryOverride_).filePath(defaultName);
     if(path.isEmpty())return;
     QString error;
     const bool ok=csv?orbit::Protocol::exportCsv(path,frames_,&error):
@@ -1514,10 +1521,11 @@ void MainWindow::exportEngineering(bool csv){
         QMessageBox::information(this,QStringLiteral("业务遥测"),
              QStringLiteral("暂无可导出的业务包；请先导入会话。"));return;
     }
-    const QString path=QFileDialog::getSaveFileName(this,
-        QStringLiteral("导出业务遥测字段"),
-        csv?"engineering.csv":"engineering.json",
-        csv?QStringLiteral("CSV (*.csv)"):QStringLiteral("JSON (*.json)"));
+    const QString defaultName=csv?QStringLiteral("engineering.csv"):QStringLiteral("engineering.json");
+    const QString path=exportDirectoryOverride_.isEmpty()?QFileDialog::getSaveFileName(this,
+        QStringLiteral("导出业务遥测字段"),defaultName,
+        csv?QStringLiteral("CSV (*.csv)"):QStringLiteral("JSON (*.json)")):
+        QDir(exportDirectoryOverride_).filePath(defaultName);
     if(path.isEmpty())return;
     QString error;
     const bool ok=csv?orbit::BusinessCatalog::exportCsv(path,business_,&error):
@@ -1533,11 +1541,13 @@ void MainWindow::exportQuaternions(bool experimental){
                            "不能套用 ASRTU-1 的 SAT-S3 字段定义导出四元数。"));
         return;
     }
-    const QString path=QFileDialog::getSaveFileName(this,
+    const QString defaultName=experimental?QStringLiteral("candidate-quaternion.csv"):
+                                            QStringLiteral("SAT-S3-quaternions.csv");
+    const QString path=exportDirectoryOverride_.isEmpty()?QFileDialog::getSaveFileName(this,
         experimental?QStringLiteral("实验性候选四元数（非正式姿态）"):
-                     QStringLiteral("SAT-S3 解算四元数"),
-        experimental?"candidate-quaternion.csv":"SAT-S3-quaternions.csv",
-        QStringLiteral("CSV (*.csv)"));
+                     QStringLiteral("SAT-S3 解算四元数"),defaultName,
+        QStringLiteral("CSV (*.csv)")):
+        QDir(exportDirectoryOverride_).filePath(defaultName);
     if(path.isEmpty())return;
     QString error;
     const bool ok=experimental?
@@ -1548,8 +1558,9 @@ void MainWindow::exportQuaternions(bool experimental){
 }
 void MainWindow::exportKiss(){
     if(packets_.isEmpty())return;
-    const QString path=QFileDialog::getSaveFileName(this,QStringLiteral("导出 KISS 应用包"),
-                                                     "kiss-packets.json",QStringLiteral("JSON (*.json)"));
+    const QString path=exportDirectoryOverride_.isEmpty()?QFileDialog::getSaveFileName(this,QStringLiteral("导出 KISS 应用包"),
+                                                     "kiss-packets.json",QStringLiteral("JSON (*.json)")):
+        QDir(exportDirectoryOverride_).filePath(QStringLiteral("kiss-packets.json"));
     if(path.isEmpty())return;
     QString error;
     if(!orbit::Transport::exportJson(path,packets_,&error))

@@ -8,6 +8,7 @@
 #include <QMainWindow>
 #include <QPixmap>
 #include <QHash>
+#include <QJsonObject>
 class QCheckBox;
 class QComboBox;
 class QChartView;
@@ -26,6 +27,9 @@ class QSpinBox;
 class QProgressBar;
 class QStackedWidget;
 class QFrame;
+class QAction;
+class QMenu;
+class QSplitter;
 class AttitudeWidget;
 class ImagePreview;
 class MainWindow final : public QMainWindow {
@@ -33,6 +37,14 @@ public:
     explicit MainWindow(QWidget *parent=nullptr);
 private:
     void buildMenus();
+    void setReplayListCollapsed(bool collapsed);
+    void showExportDialog();
+    void configureTcpServer();
+    void loadApplicationSettings();
+    void saveApplicationSettings();
+    void applyLanguage();
+    bool loadLanguageFile();
+    QString uiText(const QString &source) const;
     void buildToolbar();
     void buildWorkspace();
     void buildOverview(QTabWidget *tabs);
@@ -48,7 +60,7 @@ private:
     void updatePaths();
     void importSession();
     void loadHistory();
-    void rebuildSession();
+    void rebuildSession(bool preferLatest=false);
     void updateMetrics();
     void populateEvents();
     void applyEventFilter();
@@ -97,6 +109,17 @@ private:
     QPixmap decodedImage_;
     QString imagePath_;
     int currentIndex_=-1;
+    QSplitter *workspaceSplitter_=nullptr;
+    QFrame *replayPanel_=nullptr;
+    QAction *replayListAction_=nullptr;
+    QMenu *languageMenu_=nullptr;
+    bool replayListCollapsed_=false;
+    int replayPanelWidth_=490;
+    QString tcpHost_=QStringLiteral("127.0.0.1");
+    int tcpPort_=9985;
+    QString languageCode_=QStringLiteral("zh-CN");
+    QJsonObject translations_;
+    QString exportDirectoryOverride_;
     QLabel *sourceLabel_=nullptr,*message_=nullptr,*currentTitle_=nullptr,
            *currentMeta_=nullptr,*integrityLabel_=nullptr,*attitudeModeLabel_=nullptr,*frameMetric_=nullptr,
            *recognizedMetric_=nullptr,*unknownMetric_=nullptr,*timeMetric_=nullptr,

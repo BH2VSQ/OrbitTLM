@@ -118,6 +118,9 @@ foreach(target OrbitTLM OrbitTLM-cli orbit_tests)
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/web/index.template.html"
         "$<TARGET_FILE_DIR:${target}>/web/index.template.html"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/i18n"
+        "$<TARGET_FILE_DIR:${target}>/i18n"
       VERBATIM)
   endif()
 endforeach()
@@ -127,6 +130,7 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees"
         DESTINATION "bin")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/web/index.template.html"
         DESTINATION "bin/web")
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/i18n" DESTINATION "bin")
 install(FILES "${ORBITTLM_SSDV_DIR}/ssdv.c" "${ORBITTLM_SSDV_DIR}/ssdv.h"
               "${ORBITTLM_SSDV_DIR}/rs8.c" "${ORBITTLM_SSDV_DIR}/rs8.h" "${ORBITTLM_SSDV_DIR}/COPYING"
         DESTINATION "share/OrbitTLM/third_party/ssdv_dslwp")
