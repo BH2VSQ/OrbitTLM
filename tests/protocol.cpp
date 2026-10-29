@@ -183,17 +183,28 @@ private slots:
         pa.classification="ccsds_space_packet_candidate";
         pa.data=bytes.left(128);
         pb=pa;pb.sequence=12;pb.data=bytes.mid(128);
+        // Header-looking telemetry is not an SSDV image unless its CRC passes
+        // or it is corroborated by another valid packet in that same image.
         const auto found=ImageTools::candidatesFromKiss({pa,pb},0x321);
-        QCOMPARE(found.size(),1);
-        QCOMPARE(found[0].packetId,1);
-        QCOMPARE(found[0].width,320);
+        QCOMPARE(found.size(),0);
         QCOMPARE(ImageTools::candidatesFromKiss({pa,pb},0x320).size(),0);
         b.sequence=14;
         pb.sequence=14;
         QCOMPARE(ImageTools::candidatesFromKiss({pa,pb},0x321).size(),0);
     }
 
-    void ssdvMissingAndBadPacketsStillProducePartialJpeg(){
+    void oneCrcBadSsdvLikePacketIsNotPromoted(){
+        QByteArray bytes(218,char(0x24));
+        bytes[0]=char(58); bytes[1]=char(0); bytes[2]=char(1);
+        bytes[3]=char(126); bytes[4]=char(16); bytes[5]=char(0);
+        bytes[6]=char(0); bytes[7]=char(0); bytes[8]=char(1);
+        QString error;
+        const auto found=ImageTools::parseBinaryPackets(bytes,0x321,true,&error);
+        QCOMPARE(found.size(),0);
+        QVERIFY(!error.isEmpty());
+    }
+
+    void ssdvAllCrcBadPacketsAreRejectedSafely(){
         auto makeNormalPacket=[](int packetId){
             QByteArray bytes(256,char(0x11));
             bytes[0]=char(0x55); bytes[1]=char(0x67); // SSDV NO-FEC packet header
@@ -214,16 +225,12 @@ private slots:
             packets.push_back(packet);
         }
         const DecodedImage decoded=ImageTools::decodeImage(packets,42,false);
-        QVERIFY2(!decoded.jpeg.isEmpty(),qPrintable(decoded.error));
-        QCOMPARE(decoded.jpeg.left(2),QByteArray::fromHex("FFD8"));
-        QCOMPARE(decoded.jpeg.right(2),QByteArray::fromHex("FFD9"));
-        QCOMPARE(decoded.width,320);
-        QCOMPARE(decoded.height,240);
-        QVERIFY(decoded.missingPacketIds.contains(1));
+        QVERIFY(decoded.jpeg.isEmpty());
+        QVERIFY(!decoded.error.isEmpty());
         QVERIFY(decoded.badPacketIds.contains(0));
         QVERIFY(decoded.badPacketIds.contains(2));
     }
-    void dslwpCanBuildPreviewWhenPacketZeroIsMissing(){
+    void dslwpBadOnlyImageFailsWithoutInvokingJpegDecode(){
         QByteArray bytes(218,char(0x22));
         bytes[0]=char(9);                         // image ID
         bytes[1]=char(0); bytes[2]=char(2);       // only packet 2 was received
@@ -235,9 +242,9 @@ private slots:
         packet.width=320; packet.height=240;
         packet.status=QStringLiteral("ssdv_crc32_failed");
         const DecodedImage decoded=ImageTools::decodeImage({packet},9,true);
-        QVERIFY2(!decoded.jpeg.isEmpty(),qPrintable(decoded.error));
-        QCOMPARE(decoded.jpeg.left(2),QByteArray::fromHex("FFD8"));
-        QCOMPARE(decoded.jpeg.right(2),QByteArray::fromHex("FFD9"));
+        QVERIFY(decoded.jpeg.isEmpty());
+        QVERIFY(!decoded.error.isEmpty());
+        QVERIFY(decoded.badPacketIds.contains(2));
         QVERIFY(decoded.missingPacketIds.contains(0));
         QVERIFY(decoded.missingPacketIds.contains(1));
         QVERIFY(decoded.badPacketIds.contains(2));
@@ -646,6 +653,13 @@ private slots:
         QCOMPARE(imported[0].imageId,0x33);
         QCOMPARE(imported[0].packetId,0x0011);
         QCOMPARE(imported[0].status,QString("ssdv_crc32_pass"));
+        // A valid later fragment must still produce a partial JPEG when packet
+        // zero is missing; the internal header-only bootstrap must not inherit
+        // EOI from the source fragment or feed unchecked data to the decoder.
+        const auto partial=ImageTools::decodeImage(imported,0x33,true);
+        QVERIFY2(!partial.jpeg.isEmpty(),qPrintable(partial.error));
+        QCOMPARE(partial.width,480);
+        QCOMPARE(partial.height,352);
     }
     void by04DslwpNativeVcidOneImageWithSourceVerifiedCrc(){
         QByteArray frame(223,char(0));

@@ -16,6 +16,8 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QBuffer>
+#include <QImageReader>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -564,8 +566,14 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     if(!card)return;
     auto *table=overviewTables_.value(card,card->findChild<QTableWidget*>("statusTable"));
     if(!table)return;
-    const bool by04=resolvedSatellite()==QStringLiteral("BY04");
+    table->clearContents();
+    const QString activeSatellite=resolvedSatellite();
+    const bool by04=activeSatellite==QStringLiteral("BY04");
     if(card==attitudeCard_)card->setTitle(by04?uiText(QStringLiteral("姿态与轨道")):uiText(QStringLiteral("姿态与 GPS 轨道")));
+    if(index<0||index>=business_.size()){
+        table->setRowCount(0);
+        return;
+    }
     const QString title=card->title();
     struct Row {
         QString name;
@@ -579,6 +587,7 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     QSet<QString> seen;
     auto add=[&](const QString &name,const QString &packet,const EngineeringField &field,bool manual=false){
         if(name.isEmpty()||seen.contains(name))return;
+        if(!by04&&name.contains(QStringLiteral("射频"))&&name.contains(QStringLiteral("1.8V"))&&name.contains(QStringLiteral("电流")))return;
         seen.insert(name);rows.push_back({name,packet,field,manual,{},false});
     };
     auto addBy04=[&](const QString &name,const QStringList &sources,bool combine=false){
@@ -658,8 +667,8 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     }else if(title==QStringLiteral("姿态与 GPS 轨道")){
         const QStringList fixed={QStringLiteral("解算四元数q0"),QStringLiteral("解算四元数q1"),
             QStringLiteral("解算四元数q2"),QStringLiteral("解算四元数q3"),
-            QStringLiteral("GPS速度X"),QStringLiteral("GPS速度Y"),
-            QStringLiteral("升交点赤经"),QStringLiteral("近地点角距"),QStringLiteral("GPS速度Z"),
+            QStringLiteral("升交点赤经"),QStringLiteral("近地点角距"),
+            QStringLiteral("GPS速度X"),QStringLiteral("GPS速度Y"),QStringLiteral("GPS速度Z"),
             QStringLiteral("半长轴"),QStringLiteral("偏心率"),QStringLiteral("轨道倾角")};
         for(const QString &name:fixed){
             bool added=false;
@@ -771,7 +780,7 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
                 bool found=false;
                 for(int i=qMin(index,int(business_.size())-1);i>=0&&!found;--i){
                     const auto &packet=business_[i];
-                    if(by04&&packet.transport.satellite!="BY04")continue;
+                    if(orbit::canonicalSatelliteName(packet.transport.satellite)!=activeSatellite)continue;
                     for(const auto &field:packet.fields){
                         if(field.nameCn!=sourceName||field.value.isEmpty()||field.status==QStringLiteral("invalid_source_bit_position"))continue;
                         if(field.status.startsWith("raw_")&&!(by04&&field.status==QStringLiteral("raw_bits")))continue;
@@ -793,7 +802,7 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
             int from=qMin(index,int(business_.size())-1);
             for(int i=from;i>=0&&(value==QStringLiteral("未解析")||value.isEmpty());--i){
                 const auto &packet=business_[i];
-                if(by04&&packet.transport.satellite!="BY04")continue;
+                if(orbit::canonicalSatelliteName(packet.transport.satellite)!=activeSatellite)continue;
                 if(!row.packet.isEmpty()&&packet.packetName!=row.packet)continue;
                 for(const auto &field:packet.fields){
                     bool matched=false;
@@ -863,7 +872,7 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
         if(value==QStringLiteral("未解析"))valueItem->setForeground(QColor("#64748b"));
         if(!when.isEmpty())valueItem->setToolTip(uiText(QStringLiteral("接收时间：%1")).arg(when));
     }
-    table->verticalHeader()->setDefaultSectionSize(20);
+    table->verticalHeader()->setDefaultSectionSize(16);
     if(by04)table->resizeRowsToContents();
 }
 
@@ -1576,47 +1585,79 @@ void MainWindow::setDiagnosticsVisible(bool visible){
 void MainWindow::populateImageTable(){
     if(!imageTable_)return;
     const int priorImageId=selectedImageId();
-    QSet<int> uniqueIds;
-    for(const auto &packet:images_)if(packet.imageId>=0)uniqueIds.insert(packet.imageId);
-    QList<int> ids=uniqueIds.values();
-    std::sort(ids.begin(),ids.end());
-    QSignalBlocker blocker(imageTable_);
-    imageTable_->setRowCount(ids.size());
-    int restoreRow=-1;
-    for(int row=0;row<ids.size();++row){
-        const int imageId=ids[row];
+    const QString priorSatellite=selectedImageSatellite();
+    const int priorPacketSize=selectedImagePacketSize();
+    struct ImageGroup {
+        QString satellite; int imageId=-1; int packetSize=0;
         QSet<int> sequences,badSequences,unverifiedSequences,goodSequences;
         int width=-1,height=-1,lo=std::numeric_limits<int>::max(),hi=-1;
-        for(const auto &packet:images_)if(packet.imageId==imageId){
-            if(packet.packetId>=0){
-                sequences.insert(packet.packetId);lo=std::min(lo,packet.packetId);hi=std::max(hi,packet.packetId);
-                if(packet.status==QStringLiteral("ssdv_crc32_failed"))badSequences.insert(packet.packetId);
-                else if(packet.status==QStringLiteral("bin_only_unverified")||packet.status==QStringLiteral("candidate_unverified"))unverifiedSequences.insert(packet.packetId);
-                else goodSequences.insert(packet.packetId);
-            }
-            if(packet.width>0)width=packet.width;
-            if(packet.height>0)height=packet.height;
+    };
+    QVector<ImageGroup> groups;
+    QHash<QString,int> groupIndex;
+    auto groupKey=[](const orbit::ImagePacket &packet){
+        return QStringLiteral("%1|%2|%3").arg(orbit::canonicalSatelliteName(packet.satellite))
+            .arg(packet.bytes.size()).arg(packet.imageId);
+    };
+    for(const auto &packet:images_){
+        if(packet.imageId<0)continue;
+        const QString key=groupKey(packet);
+        int index=groupIndex.value(key,-1);
+        if(index<0){
+            index=groups.size();groupIndex.insert(key,index);
+            ImageGroup group;group.satellite=orbit::canonicalSatelliteName(packet.satellite);
+            group.imageId=packet.imageId;group.packetSize=packet.bytes.size();groups.push_back(group);
         }
-        const int missing=hi>=0?qMax(0,hi+1-sequences.size()):0;
-        auto *idItem=item(QString::number(imageId));
-        idItem->setData(Qt::UserRole,imageId);
-        const QString idTooltip=QStringLiteral("图像 ID %1，共 %2 个不同包序号").arg(imageId).arg(sequences.size());
-        idItem->setData(Qt::UserRole+124,idTooltip);
+        auto &group=groups[index];
+        if(packet.packetId>=0){
+            group.sequences.insert(packet.packetId);
+            group.lo=std::min(group.lo,packet.packetId);group.hi=std::max(group.hi,packet.packetId);
+            if(packet.status==QStringLiteral("ssdv_crc32_failed")||packet.status==QStringLiteral("ssdv_crc_failed"))
+                group.badSequences.insert(packet.packetId);
+            else if(packet.status==QStringLiteral("bin_only_unverified")||packet.status==QStringLiteral("candidate_unverified"))
+                group.unverifiedSequences.insert(packet.packetId);
+            else group.goodSequences.insert(packet.packetId);
+        }
+        if(packet.width>0)group.width=packet.width;
+        if(packet.height>0)group.height=packet.height;
+    }
+    std::stable_sort(groups.begin(),groups.end(),[](const ImageGroup &a,const ImageGroup &b){
+        if(a.satellite!=b.satellite)return a.satellite<b.satellite;
+        if(a.imageId!=b.imageId)return a.imageId<b.imageId;
+        return a.packetSize<b.packetSize;
+    });
+    QSignalBlocker blocker(imageTable_);
+    imageTable_->clearContents();imageTable_->setRowCount(groups.size());
+    int restoreRow=-1;
+    for(int row=0;row<groups.size();++row){
+        const auto &group=groups[row];
+        const int missing=group.hi>=0?qMax(0,group.hi+1-group.sequences.size()):0;
+        auto *idItem=item(QStringLiteral("%1 · ID %2 · %3B")
+            .arg(group.satellite.isEmpty()?QStringLiteral("未知卫星"):group.satellite)
+            .arg(group.imageId).arg(group.packetSize));
+        idItem->setData(Qt::UserRole,group.imageId);
+        idItem->setData(Qt::UserRole+1,group.satellite);
+        idItem->setData(Qt::UserRole+2,group.packetSize);
+        const QString idTooltip=QStringLiteral("%1 · 图像 ID %2 · %3 字节分片 · %4 个不同包序号")
+            .arg(group.satellite).arg(group.imageId).arg(group.packetSize).arg(group.sequences.size());
         idItem->setToolTip(uiText(idTooltip));
-        const QString resolution=width>0&&height>0?QStringLiteral("%1 × %2").arg(width).arg(height):QStringLiteral("—");
-        const QString coverage=uiText(QStringLiteral("缺块 %1 · 坏块 %2")).arg(missing).arg(badSequences.size());
+        const QString resolution=group.width>0&&group.height>0?
+            QStringLiteral("%1 × %2").arg(group.width).arg(group.height):QStringLiteral("—");
+        const QString coverage=uiText(QStringLiteral("缺块 %1 · 坏块 %2"))
+            .arg(missing).arg(group.badSequences.size());
         QString validation;
-        if(!badSequences.isEmpty())validation=uiText(QStringLiteral("存在 CRC 坏块"));
-        else if(!unverifiedSequences.isEmpty())validation=uiText(QStringLiteral("含未验证分片"));
-        else if(!sequences.isEmpty()&&goodSequences.size()==sequences.size())validation=uiText(QStringLiteral("已观测分片 CRC 通过"));
+        if(!group.badSequences.isEmpty())validation=uiText(QStringLiteral("存在 CRC 坏块"));
+        else if(!group.unverifiedSequences.isEmpty())validation=uiText(QStringLiteral("含未验证分片"));
+        else if(!group.sequences.isEmpty()&&group.goodSequences.size()==group.sequences.size())
+            validation=uiText(QStringLiteral("已观测分片 CRC 通过"));
         else validation=uiText(QStringLiteral("尚无可验证分片"));
-        const QStringList cells={QString::number(imageId),QString::number(sequences.size()),resolution,coverage,validation};
+        const QStringList cells={QString::number(group.sequences.size()),resolution,coverage,validation};
         imageTable_->setItem(row,0,idItem);
-        for(int col=1;col<cells.size();++col)imageTable_->setItem(row,col,item(cells[col]));
-        if(imageId==priorImageId)restoreRow=row;
+        for(int col=0;col<cells.size();++col)imageTable_->setItem(row,col+1,item(cells[col]));
+        if(group.imageId==priorImageId&&group.satellite==priorSatellite&&group.packetSize==priorPacketSize)
+            restoreRow=row;
     }
     imageTable_->clearSelection();
-    if(!ids.isEmpty())imageTable_->setCurrentCell(restoreRow>=0?restoreRow:0,0);
+    if(!groups.isEmpty())imageTable_->setCurrentCell(restoreRow>=0?restoreRow:0,0);
 }
 int MainWindow::selectedImageId()const{
     if(!imageTable_)return -1;
@@ -1628,6 +1669,18 @@ int MainWindow::selectedImageId()const{
     const int stored=entry->data(Qt::UserRole).toInt(&ok);
     if(ok)return stored;
     return entry->text().toInt(&ok);
+}
+QString MainWindow::selectedImageSatellite()const{
+    if(!imageTable_)return {};
+    const int row=imageTable_->currentRow();
+    if(row<0||row>=imageTable_->rowCount()||!imageTable_->item(row,0))return {};
+    return orbit::canonicalSatelliteName(imageTable_->item(row,0)->data(Qt::UserRole+1).toString());
+}
+int MainWindow::selectedImagePacketSize()const{
+    if(!imageTable_)return 0;
+    const int row=imageTable_->currentRow();
+    if(row<0||row>=imageTable_->rowCount()||!imageTable_->item(row,0))return 0;
+    return imageTable_->item(row,0)->data(Qt::UserRole+2).toInt();
 }
 
 void MainWindow::appendSsdvTimelineEvents(){
@@ -1680,20 +1733,21 @@ void MainWindow::scanSsdv(){
         return packet.bytes.size()==218;
     });
     std::stable_sort(found.begin(),found.end(),[](const orbit::ImagePacket &a,const orbit::ImagePacket &b){
+        if(a.satellite!=b.satellite)return a.satellite<b.satellite;
         if(a.imageId!=b.imageId)return a.imageId<b.imageId;
         if(a.packetId!=b.packetId)return a.packetId<b.packetId;
         return a.bytes.size()<b.bytes.size();
     });
     auto rank=[](const orbit::ImagePacket &packet){
         if(packet.status==QStringLiteral("ssdv_crc32_pass")||packet.status==QStringLiteral("ssdv_crc_pass"))return 3;
-        if(packet.status==QStringLiteral("bin_only_unverified"))return 2;
-        if(packet.status==QStringLiteral("candidate_unverified"))return 1;
+        if(packet.status==QStringLiteral("ssdv_crc32_failed")||packet.status==QStringLiteral("ssdv_crc_failed"))return 1;
         return 0;
     };
-    QHash<QString,int> unique;
-    images_.clear();
+    QHash<QString,int> unique;images_.clear();
     for(const auto &packet:found){
-        const QString key=QStringLiteral("%1:%2:%3").arg(packet.imageId).arg(packet.packetId).arg(packet.bytes.size());
+        const QString key=QStringLiteral("%1:%2:%3:%4")
+            .arg(orbit::canonicalSatelliteName(packet.satellite)).arg(packet.bytes.size())
+            .arg(packet.imageId).arg(packet.packetId);
         const auto existing=unique.constFind(key);
         if(existing==unique.cend()){
             unique.insert(key,images_.size());images_.push_back(packet);
@@ -1709,54 +1763,59 @@ void MainWindow::scanSsdv(){
     }
     populateImageTable();
     imageApid_->setEnabled(!hasShortSsdv&&resolvedSatellite()!=QStringLiteral("BY04"));
-    QSet<int> ids;for(const auto &packet:images_)ids.insert(packet.imageId);
-    imageInfo_->setText(uiText(QStringLiteral("%1 · 已扫描 %2 个 SSDV 数据帧，发现 %3 个图像 ID；选择一张图像即可查看恢复预览。"))
+    QSet<QString> groups;
+    for(const auto &packet:images_)groups.insert(QStringLiteral("%1:%2:%3")
+        .arg(orbit::canonicalSatelliteName(packet.satellite)).arg(packet.bytes.size()).arg(packet.imageId));
+    imageInfo_->setText(uiText(QStringLiteral("%1 · 已扫描 %2 个 SSDV 数据帧，发现 %3 个卫星/图像组合。选择图像条目即可查看恢复预览。"))
         .arg(hasShortSsdv?uiText(QStringLiteral("VC1 218 字节 SSDV（ASRTU-1 / BY04 兼容格式）")):
              uiText(QStringLiteral("APID %1 标准 SSDV")).arg(imageApid_->value()))
-        .arg(images_.size()).arg(ids.size()));
-    decodedImage_=QPixmap();
-    if(imagePreview_)imagePreview_->setImage(decodedImage_);
+        .arg(images_.size()).arg(groups.size()));
+    decodedImage_=QPixmap();if(imagePreview_)imagePreview_->setImage(decodedImage_);
     if(!images_.isEmpty()){
-        QList<int> imageIds=ids.values();std::sort(imageIds.begin(),imageIds.end());
-        int previewImageId=imageIds.first();
-        for(const int imageId:imageIds){
-            if(decodeSsdvImage(imageId,false)){previewImageId=imageId;break;}
-        }
-        int previewRow=0;
-        for(int row=0;row<imageTable_->rowCount();++row)
-            if(imageTable_->item(row,0)&&imageTable_->item(row,0)->data(Qt::UserRole).toInt()==previewImageId){previewRow=row;break;}
+        // Scanning must never invoke the JPEG decoder for every candidate. Keep
+        // the preview blank until the user selects a row, so malformed fragments
+        // cannot crash or stall the entire receive/replay operation.
         {
             QSignalBlocker blocker(imageTable_);
-            imageTable_->setCurrentCell(previewRow,0);
+            imageTable_->clearSelection();
+            imageTable_->setCurrentCell(-1,-1);
         }
-        updateImageProgress(previewImageId);
+        imageCoverage_->setRange(0,1);imageCoverage_->setValue(0);
+        imageCoverage_->setFormat(uiText(QStringLiteral("请选择图像查看分片覆盖情况")));
+        imageCoverageNote_->setText(uiText(QStringLiteral("检测到 %1 个卫星/图像组合；选择一项后尝试安全重建预览。" )).arg(imageTable_->rowCount()));
     }else{
-        imageCoverage_->setRange(0,1);
-        imageCoverage_->setValue(0);
+        imageCoverage_->setRange(0,1);imageCoverage_->setValue(0);
         imageCoverage_->setFormat(uiText(QStringLiteral("尚无观测序号")));
-        imageCoverageNote_->setText(uiText(QStringLiteral("未识别到 SSDV 分片。请检查卫星、VCID/APID 和导入数据格式。")));
+        imageCoverageNote_->setText(uiText(QStringLiteral("未识别到具有可靠结构或 CRC 佐证的 SSDV 分片。请检查卫星、VCID/APID 和输入数据格式。")));
     }
 }
 
 void MainWindow::updateImageProgress(int imageId){
+    QString targetSatellite=selectedImageId()==imageId?selectedImageSatellite():QString();
+    int targetSize=selectedImageId()==imageId?selectedImagePacketSize():0;
+    if(targetSatellite.isEmpty())for(const auto &packet:images_)if(packet.imageId==imageId){
+        targetSatellite=orbit::canonicalSatelliteName(packet.satellite);targetSize=packet.bytes.size();break;
+    }
     QSet<int> sequences,badSequences;
     int lo=std::numeric_limits<int>::max(),hi=-1;
-    for(const auto &packet:images_)if(packet.imageId==imageId){
+    for(const auto &packet:images_){
+        if(packet.imageId!=imageId)continue;
+        if(!targetSatellite.isEmpty()&&orbit::canonicalSatelliteName(packet.satellite)!=targetSatellite)continue;
+        if(targetSize>0&&packet.bytes.size()!=targetSize)continue;
         if(packet.packetId>=0){sequences.insert(packet.packetId);lo=std::min(lo,packet.packetId);hi=std::max(hi,packet.packetId);}
-        if(packet.status==QStringLiteral("ssdv_crc32_failed"))badSequences.insert(packet.packetId);
+        if(packet.status==QStringLiteral("ssdv_crc32_failed")||packet.status==QStringLiteral("ssdv_crc_failed"))badSequences.insert(packet.packetId);
     }
+    for(int id:sequences)badSequences.remove(id);
     if(hi<lo){
         imageCoverage_->setRange(0,1);imageCoverage_->setValue(0);
         imageCoverage_->setFormat(uiText(QStringLiteral("尚无观测序号")));
-        imageCoverageNote_->setText(uiText(QStringLiteral("图像 ID %1 尚无可用包序号" )).arg(imageId));
-        return;
+        imageCoverageNote_->setText(uiText(QStringLiteral("图像 ID %1 尚无可用包序号" )).arg(imageId));return;
     }
-    const int span=hi+1;
-    const int missing=qMax(0,span-sequences.size());
-    imageCoverage_->setRange(0,qMax(1,span));
-    imageCoverage_->setValue(qMin(span,sequences.size()));
+    const int span=hi+1,missing=qMax(0,span-sequences.size());
+    imageCoverage_->setRange(0,qMax(1,span));imageCoverage_->setValue(qMin(span,sequences.size()));
     imageCoverage_->setFormat(uiText(QStringLiteral("已观测 %v / %m 个序号")));
-    QString note=uiText(QStringLiteral("图像 ID %1 · 包序号 %2–%3 · 已观测 %4 · 缺块 %5 · CRC 坏块 %6；未观测区间外的总包数未知。"))
+    QString note=uiText(QStringLiteral("%1 · 图像 ID %2 · 包序号 %3–%4 · 已观测 %5 · 缺块 %6 · CRC 坏块 %7；未观测区间外的总包数未知。"))
+        .arg(targetSatellite.isEmpty()?uiText(QStringLiteral("当前图像")):targetSatellite)
         .arg(imageId).arg(lo).arg(hi).arg(sequences.size()).arg(missing).arg(badSequences.size());
     if(missing>0){
         QStringList ids;int totalMissing=0;
@@ -1792,45 +1851,60 @@ void MainWindow::exportSsdv(){
 }
 bool MainWindow::decodeSsdvImage(int imageId,bool showErrors){
     if(images_.isEmpty())return false;
-    bool shortPacket=false;
-    for(const auto &packet:images_)if(packet.imageId==imageId){
-        shortPacket=packet.bytes.size()==218;
-        break;
+    QString targetSatellite=selectedImageId()==imageId?selectedImageSatellite():QString();
+    int targetSize=selectedImageId()==imageId?selectedImagePacketSize():0;
+    if(targetSatellite.isEmpty())for(const auto &packet:images_)if(packet.imageId==imageId){
+        targetSatellite=orbit::canonicalSatelliteName(packet.satellite);targetSize=packet.bytes.size();break;
     }
-    const auto rebuilt=orbit::ImageTools::decodeImage(images_,imageId,shortPacket);
-    QString diagnostic=uiText(QStringLiteral("缺块 %1 · CRC 坏块 %2 · 有效分片 %3"))
+    QVector<orbit::ImagePacket> selected;
+    for(const auto &packet:images_){
+        if(packet.imageId!=imageId)continue;
+        if(!targetSatellite.isEmpty()&&orbit::canonicalSatelliteName(packet.satellite)!=targetSatellite)continue;
+        if(targetSize>0&&packet.bytes.size()!=targetSize)continue;
+        selected.push_back(packet);
+    }
+    if(selected.isEmpty())return false;
+    const bool shortPacket=selected.first().bytes.size()==218;
+    const auto rebuilt=orbit::ImageTools::decodeImage(selected,imageId,shortPacket);
+    const QString diagnostic=uiText(QStringLiteral("缺块 %1 · CRC 坏块 %2 · 有效分片 %3"))
         .arg(rebuilt.missingPacketIds.size()).arg(rebuilt.badPacketIds.size()).arg(rebuilt.receivedPackets);
+    auto clearPreview=[this]{decodedImage_=QPixmap();if(imagePreview_)imagePreview_->setImage(decodedImage_);};
     if(rebuilt.jpeg.isEmpty()){
-        // Never leave the previous image visible when the selected image cannot
-        // be reconstructed; otherwise the preview appears to belong to the new ID.
-        decodedImage_=QPixmap();
-        if(imagePreview_)imagePreview_->setImage(decodedImage_);
-        if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("图像 ID %1 暂无可解码预览。%2 当前数据仍会保留，可继续接收或导入其他分片。"))
-            .arg(imageId).arg(diagnostic));
+        clearPreview();
+        if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("%1 · 图像 ID %2 暂无安全可解码预览。%3 %4"))
+            .arg(targetSatellite).arg(imageId).arg(diagnostic).arg(uiText(rebuilt.error)));
         if(showErrors)QMessageBox::warning(this,uiText(QStringLiteral("SSDV 图片重建失败")),
-            (rebuilt.error.isEmpty()?uiText(QStringLiteral("当前分片无法重建 JPEG。")):uiText(rebuilt.error))+
+            (rebuilt.error.isEmpty()?uiText(QStringLiteral("当前分片无法安全重建 JPEG。")):uiText(rebuilt.error))+
             QStringLiteral("\n\n")+diagnostic);
         return false;
     }
     QByteArray jpeg=rebuilt.jpeg;
-    // Missing tail packets can leave a JPEG without EOI. Add the marker only to
-    // the in-memory preview candidate; the captured SSDV packet bytes are never modified.
     if(!jpeg.endsWith(QByteArray::fromHex("FFD9")))jpeg+=QByteArray::fromHex("FFD9");
-    QImage image=QImage::fromData(jpeg,"JPEG");
+    QBuffer jpegBuffer(&jpeg);
+    if(!jpegBuffer.open(QIODevice::ReadOnly)){clearPreview();return false;}
+    QImageReader reader(&jpegBuffer,"JPEG");
+    const QSize reported=reader.size();
+    if(!reported.isValid()||reported.width()>4080||reported.height()>4080||
+       quint64(reported.width())*quint64(reported.height())>16646400ULL){
+        clearPreview();
+        if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("图像 ID %1 的 JPEG 尺寸异常，已安全拒绝预览。%2"))
+            .arg(imageId).arg(diagnostic));
+        return false;
+    }
+    QImageReader::setAllocationLimit(64);
+    const QImage image=reader.read();
     if(image.isNull()){
-        decodedImage_=QPixmap();
-        if(imagePreview_)imagePreview_->setImage(decodedImage_);
-        if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("图像 ID %1 已识别分片，但 JPEG 仍不完整。%2"))
+        clearPreview();
+        if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("图像 ID %1 的 JPEG 不完整，无法显示。%2"))
             .arg(imageId).arg(diagnostic));
         if(showErrors)QMessageBox::warning(this,uiText(QStringLiteral("SSDV 图片重建失败")),
             uiText(QStringLiteral("解码器输出尚不能转换为预览图像。缺块和坏块统计已保留。"))+
             QStringLiteral("\n\n")+diagnostic);
         return false;
     }
-    decodedImage_=QPixmap::fromImage(image);
-    if(imagePreview_)imagePreview_->setImage(decodedImage_);
-    QString details=uiText(QStringLiteral("图像 ID %1 · %2 × %3 · 已使用 %4 个有效分片 · %5 · %6"))
-        .arg(imageId).arg(image.width()).arg(image.height()).arg(rebuilt.receivedPackets)
+    decodedImage_=QPixmap::fromImage(image);if(imagePreview_)imagePreview_->setImage(decodedImage_);
+    QString details=uiText(QStringLiteral("%1 · 图像 ID %2 · %3 × %4 · 已使用 %5 个有效分片 · %6 · %7"))
+        .arg(targetSatellite).arg(imageId).arg(image.width()).arg(image.height()).arg(rebuilt.receivedPackets)
         .arg(rebuilt.complete?uiText(QStringLiteral("检测到图像结束标志")):uiText(QStringLiteral("部分恢复预览")))
         .arg(diagnostic);
     if(!rebuilt.missingPacketIds.isEmpty()){
@@ -1841,9 +1915,10 @@ bool MainWindow::decodeSsdvImage(int imageId,bool showErrors){
     if(!rebuilt.badPacketIds.isEmpty()){
         QStringList ids;for(int i=0;i<rebuilt.badPacketIds.size()&&i<24;++i)ids<<QString::number(rebuilt.badPacketIds[i]);
         if(rebuilt.badPacketIds.size()>ids.size())ids<<QStringLiteral("… (+%1)").arg(rebuilt.badPacketIds.size()-ids.size());
-        details+=uiText(QStringLiteral(" · 坏块序号：%1")).arg(ids.join(QStringLiteral(", ")));
+        details+=uiText(QStringLiteral(" · CRC 坏块序号：%1")).arg(ids.join(QStringLiteral(", ")));
     }
     if(imageInfo_)imageInfo_->setText(details);
+    if(showErrors&&!rebuilt.complete)statusBar()->showMessage(uiText(QStringLiteral("已生成部分恢复预览；缺块和 CRC 坏块仍已标记。")),8000);
     return true;
 }
 void MainWindow::decodeSsdv(){
@@ -1870,9 +1945,15 @@ void MainWindow::decodeSsdv(){
         QMessageBox::warning(this,uiText(QStringLiteral("JPEG 保存失败")),output.errorString());
         return;
     }
-    bool shortPacket=false;
-    for(const auto &packet:images_)if(packet.imageId==imageId){shortPacket=packet.bytes.size()==218;break;}
-    auto rebuilt=orbit::ImageTools::decodeImage(images_,imageId,shortPacket);
+    QVector<orbit::ImagePacket> selected;
+    const QString targetSatellite=selectedImageSatellite();
+    const int targetSize=selectedImagePacketSize();
+    for(const auto &packet:images_)if(packet.imageId==imageId&&
+        (targetSatellite.isEmpty()||orbit::canonicalSatelliteName(packet.satellite)==targetSatellite)&&
+        (targetSize<=0||packet.bytes.size()==targetSize))selected.push_back(packet);
+    if(selected.isEmpty()){QMessageBox::warning(this,uiText(QStringLiteral("JPEG 保存失败")),uiText(QStringLiteral("没有找到当前选中图像的数据帧。")));return;}
+    const bool shortPacket=selected.first().bytes.size()==218;
+    auto rebuilt=orbit::ImageTools::decodeImage(selected,imageId,shortPacket);
     QByteArray jpeg=rebuilt.jpeg;
     if(!jpeg.isEmpty()&&!jpeg.endsWith(QByteArray::fromHex("FFD9")))jpeg+=QByteArray::fromHex("FFD9");
     if(jpeg.isEmpty()||output.write(jpeg)!=jpeg.size()||!output.commit()){
@@ -1888,18 +1969,23 @@ void MainWindow::exportSelectedImageBin(){
         return;
     }
     int imageId=selectedImageId();
-    if(imageId<0){
-        imageId=images_.first().imageId;
+    if(imageId<0)imageId=images_.first().imageId;
+    QString targetSatellite=selectedImageSatellite();
+    int targetSize=selectedImagePacketSize();
+    if(targetSatellite.isEmpty()){
+        for(const auto &packet:images_)if(packet.imageId==imageId){targetSatellite=orbit::canonicalSatelliteName(packet.satellite);targetSize=packet.bytes.size();break;}
     }
     QVector<orbit::ImagePacket> selected;
-    for(const auto &packet:images_)if(packet.imageId==imageId)selected.push_back(packet);
+    for(const auto &packet:images_)if(packet.imageId==imageId&&
+        (targetSatellite.isEmpty()||orbit::canonicalSatelliteName(packet.satellite)==targetSatellite)&&
+        (targetSize<=0||packet.bytes.size()==targetSize))selected.push_back(packet);
     std::stable_sort(selected.begin(),selected.end(),[](const orbit::ImagePacket &a,const orbit::ImagePacket &b){
         if(a.packetId!=b.packetId)return a.packetId<b.packetId;
         return a.bytes.size()<b.bytes.size();
     });
     if(selected.isEmpty())return;
     const QString path=QFileDialog::getSaveFileName(this,uiText(QStringLiteral("导出所选图像 BIN")),
-        QStringLiteral("image_%1.bin").arg(imageId),uiText(QStringLiteral("BIN 文件 (*.bin);;所有文件 (*.*)")));
+        QStringLiteral("image_%1_%2.bin").arg(targetSatellite).arg(imageId),uiText(QStringLiteral("BIN 文件 (*.bin);;所有文件 (*.*)")));
     if(path.isEmpty())return;
     QString error;
     if(!orbit::ImageTools::savePackets(selected,path,&error)){
@@ -1964,28 +2050,22 @@ void MainWindow::importImageBin(){
     if(images_.isEmpty())return;
     int imageId=selectedImageId();
     if(imageId<0)imageId=images_.first().imageId;
-    bool decodedAny=decodeSsdvImage(imageId,false);
-    if(!decodedAny){
-        QSet<int> attempted;
-        for(const auto &packet:images_){
-            if(attempted.contains(packet.imageId))continue;
-            attempted.insert(packet.imageId);
-            if(decodeSsdvImage(packet.imageId,false)){imageId=packet.imageId;decodedAny=true;break;}
-        }
-    }
+    bool decodedAny=false;
     for(int row=0;row<imageTable_->rowCount();++row){
-        if(imageTable_->item(row,0)&&imageTable_->item(row,0)->data(Qt::UserRole).toInt()==imageId){
-            QSignalBlocker blocker(imageTable_);
-            imageTable_->setCurrentCell(row,0);
-            break;
-        }
+        imageTable_->setCurrentCell(row,0);
+        imageId=selectedImageId();
+        updateImageProgress(imageId);
+        if(decodeSsdvImage(imageId,false)){decodedAny=true;break;}
     }
+    if(imageTable_->rowCount()>0&&selectedImageId()<0)imageTable_->setCurrentCell(0,0);
+    imageId=selectedImageId();
     updateImageProgress(imageId);
     if(imageInfo_){
-        QSet<int> imageIds;
-        for(const auto &packet:images_)imageIds.insert(packet.imageId);
+        QSet<QString> imageIds;
+        for(const auto &packet:images_)imageIds.insert(QStringLiteral("%1:%2:%3")
+            .arg(orbit::canonicalSatelliteName(packet.satellite)).arg(packet.bytes.size()).arg(packet.imageId));
         const int imageCount=imageIds.size();
-        imageInfo_->setText(uiText(QStringLiteral("已导入 %1 · %2 个 SSDV 分片，合并为 %3 个图像 ID。选择图像 ID 可查看该图像的恢复预览。"))
+        imageInfo_->setText(uiText(QStringLiteral("已导入 %1 · %2 个 SSDV 分片，合并为 %3 个卫星/图像组合。选择图像条目可查看恢复预览。"))
             .arg(QFileInfo(path).fileName()).arg(images_.size()).arg(imageCount));
     }
     // Reflect imported packet events on the same replay axis without resetting

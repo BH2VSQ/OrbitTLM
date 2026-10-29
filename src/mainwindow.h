@@ -89,6 +89,8 @@ private:
     void updateImageProgress(int imageId);
     void populateImageTable();
     int selectedImageId() const;
+    QString selectedImageSatellite() const;
+    int selectedImagePacketSize() const;
     void appendSsdvTimelineEvents();
     QString satellite() const;
     QString resolvedSatellite() const;

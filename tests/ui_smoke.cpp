@@ -8,6 +8,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QPushButton>
+#include <QGroupBox>
 #include <QStandardPaths>
 
 class UiSmoke:public QObject {
@@ -60,11 +61,24 @@ private slots:
         QCOMPARE(event->horizontalHeaderItem(1)->text(),QStringLiteral("数据包 / 事件"));
         QCOMPARE(event->rowCount(),0);
         QVERIFY(event->isHidden());
-        const auto *collapse=window.findChild<QPushButton*>("replayCollapseButton");
+        auto *collapse=window.findChild<QPushButton*>("replayCollapseButton");
         QVERIFY(collapse!=nullptr);
         const auto *playPause=window.findChild<QPushButton*>("playPauseButton");
         QVERIFY(playPause!=nullptr);
         QCOMPARE(playPause->text(),QStringLiteral("播放"));
+        auto *previous=window.findChild<QPushButton*>("replayPreviousButton");
+        auto *next=window.findChild<QPushButton*>("replayNextButton");
+        QVERIFY(previous!=nullptr); QVERIFY(next!=nullptr);
+        QVERIFY(!previous->isHidden()); QVERIFY(!next->isHidden());
+        collapse->click(); QApplication::processEvents();
+        QVERIFY(timeline->isHidden());
+        QVERIFY(!previous->isHidden()); QVERIFY(!playPause->isHidden()); QVERIFY(!next->isHidden());
+        collapse->click(); QApplication::processEvents();
+        QVERIFY(!timeline->isHidden());
+        for(auto *card:window.findChildren<QGroupBox*>("statusCard")){
+            auto *table=card->findChild<QTableWidget*>("statusTable");
+            if(table)QCOMPARE(table->rowCount(),0);
+        }
         const auto *overview=window.findChild<QLabel*>("currentHeading");
         QVERIFY(overview!=nullptr);
         QVERIFY(overview->text().contains(QStringLiteral("未解析")));

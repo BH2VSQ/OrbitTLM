@@ -791,7 +791,17 @@
     "接收时间：%1\n记录时间依据：%2\n航天器标识 SCID：0x%3\nMFC：%4\n虚拟信道：%5\n候选 APID：%6\nFEC/来源：%7\n帧质量：%8\n校验：应用层 CRC 未执行\n诊断：%9\nSHA-256：%10\n\n原始 223 字节信息帧：\n%11": "Receive time: %1\nTimestamp basis: %2\nSpacecraft ID (SCID): 0x%3\nMFC: %4\nVirtual channel: %5\nCandidate APID: %6\nFEC / source: %7\nFrame quality: %8\nIntegrity: application-layer CRC not checked\nDiagnostics: %9\nSHA-256: %10\n\nRaw 223-byte information frame:\n%11",
     "BY04 的姿态工程遥测位置和换算尚未确认，不能套用 ASRTU-1 的 SAT-S3 字段定义导出四元数。": "The engineering telemetry offsets and conversions for BY04 attitude data are not yet confirmed. Do not apply the ASRTU-1 SAT-S3 field definitions to export quaternions.",
     "缺失序号：%1。": "Missing packet IDs: %1.",
-    "CRC 坏块序号：%1。": "CRC-failed packet IDs: %1."
+    "CRC 坏块序号：%1。": "CRC-failed packet IDs: %1.",
+    "所选图像没有 CRC 通过的有效 SSDV 分片；为避免误识别数据导致崩溃，已跳过 JPEG 重建。": "The selected image has no CRC-verified SSDV fragments. JPEG reconstruction was skipped to avoid crashes caused by misidentified data.",
+    "所选图像没有可安全解码的 CRC 通过分片。": "The selected image has no CRC-verified fragments that can be decoded safely.",
+    "图像分片尺寸不一致，已停止重建以避免损坏的 JPEG 输出。": "Image fragments have inconsistent dimensions. Reconstruction was stopped to avoid producing a corrupt JPEG.",
+    "无法从候选分片建立 SSDV JPEG 图像头，无法生成部分预览。": "Could not initialize the SSDV JPEG header from candidate fragments; a partial preview cannot be generated.",
+    "有效分片不足以生成 JPEG，或输出超出安全缓冲区限制。": "There are too few valid fragments to generate a JPEG, or the output exceeded the safety buffer limit.",
+    "有效图像头或分片不足，无法重建 JPEG。": "There are not enough valid image headers or fragments to reconstruct a JPEG.",
+    "请选择图像查看分片覆盖情况": "Select an image to view fragment coverage",
+    "检测到 %1 个卫星/图像组合；选择一项后尝试安全重建预览。": "Detected %1 satellite/image groups. Select one to attempt safe preview reconstruction.",
+    "未识别到具有可靠结构或 CRC 佐证的 SSDV 分片。请检查卫星、VCID/APID 和输入数据格式。": "No SSDV fragments with a reliable structure or CRC corroboration were detected. Check the satellite, VCID/APID, and input data format.",
+    "系统内存不足，无法分配 SSDV JPEG 缓冲区。": "There is not enough system memory to allocate the SSDV JPEG buffer."
   },
   "无法从候选分片读取 SSDV 图像头，不能生成部分预览。": "Could not read an SSDV image header from the candidate fragments; a partial preview cannot be generated.",
   "已接收 %1 个有效分片，正在使用缺块填充策略，但当前数据仍不足以生成 JPEG。": "Received %1 valid fragments. Missing-block padding was attempted, but the current data is still insufficient to generate a JPEG.",

@@ -23,6 +23,7 @@
 #include <QCoreApplication>
 #include <QUrl>
 #include <QFont>
+#include <QScreen>
 #include <QFormLayout>
 #include <QFrame>
 #include <functional>
@@ -83,7 +84,7 @@ QGroupBox *statusCard(const QString &title){
     auto *card=new QGroupBox(title);
     card->setObjectName("statusCard");
     auto *layout=new QVBoxLayout(card);
-    layout->setContentsMargins(5,16,5,5);
+    layout->setContentsMargins(4,13,4,4);
     layout->setSpacing(0);
     auto *table=new QTableWidget(0,4,card);
     table->setObjectName("statusTable");
@@ -92,7 +93,7 @@ QGroupBox *statusCard(const QString &title){
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionMode(QAbstractItemView::NoSelection);
     table->verticalHeader()->hide();
-    table->verticalHeader()->setDefaultSectionSize(20);
+    table->verticalHeader()->setDefaultSectionSize(16);
     table->setShowGrid(true);
     table->setWordWrap(false);
     table->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
@@ -117,8 +118,9 @@ void setupTable(QTableWidget *table){
 }
 MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
     setWindowTitle(uiText(QStringLiteral("OrbitTLM · 卫星遥测回放工作台")));
-    setMinimumSize(800,690);
-    resize(1480,910);
+    setMinimumSize(720,480);
+    const QRect available=QGuiApplication::primaryScreen()?QGuiApplication::primaryScreen()->availableGeometry():QRect(0,0,1280,800);
+    resize(qBound(720,available.width()-80,1080),qBound(480,available.height()-100,640));
     live_=new orbit::LiveTcp(this);
     loadApplicationSettings();
     // Load translation data before building widgets so dynamically populated
@@ -223,31 +225,31 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
 void MainWindow::applyStyles(){
     setStyleSheet(QStringLiteral(R"(
         QMainWindow { background:#f3f6fb; color:#182940; }
-        QWidget { color:#1f3045; }
-        QMenuBar { background:#ffffff; padding:5px; border-bottom:1px solid #e0e7f0; }
+        QWidget { color:#1f3045; font-size:9pt; }
+        QMenuBar { background:#ffffff; padding:3px 5px; border-bottom:1px solid #e0e7f0; }
         QMenuBar::item:selected, QMenu::item:selected {background:#e7f1fd;}
         QMenu { background:#ffffff; border:1px solid #dbe3ee; }
         QToolBar { background:#ffffff; border:0; border-bottom:1px solid #e0e7f0;
-                   spacing:9px; padding:9px 12px; }
-        QToolButton, QPushButton {padding:7px 13px; border:1px solid #d6e0ec;
+                   spacing:4px; padding:3px 6px; }
+        QToolButton, QPushButton {padding:3px 7px; border:1px solid #d6e0ec;
                   border-radius:7px; background:#ffffff; font-weight:500;}
         QToolButton:hover,QPushButton:hover {background:#edf5ff; border-color:#92bcf0;}
         QPushButton#primaryButton {background:#256cb4; border-color:#256cb4; color:white;}
         QPushButton#primaryButton:hover {background:#1f5b98;}
         QComboBox,QSpinBox,QLineEdit {background:white; border:1px solid #d4deeb;
-                  border-radius:7px; padding:6px 9px; min-height:19px;}
+                  border-radius:6px; padding:2px 5px; min-height:15px;}
         QLineEdit:focus,QComboBox:focus {border:1px solid #3c87d0;}
         QFrame#metricCard, QFrame#heroCard, QFrame#panel {
                   background:#ffffff; border:1px solid #e2e8f1; border-radius:10px;}
         QLabel#subtitle {color:#6d7f95; font-size:12px;}
-        QLabel#metricNumber {font-size:20px; font-weight:700; color:#1d3b5e;}
-        QLabel#currentHeading {font-size:21px; font-weight:700; color:#152d4c;}
-        QLabel#detailHeading {font-size:16px; font-weight:700; color:#193958;}
+        QLabel#metricNumber {font-size:18px; font-weight:700; color:#1d3b5e;}
+        QLabel#currentHeading {font-size:16px; font-weight:700; color:#152d4c;}
+        QLabel#detailHeading {font-size:13px; font-weight:700; color:#193958;}
         QLabel#note {color:#6b7f96; font-size:12px;}
         QTabWidget::pane {background:white; border:1px solid #e1e8f1;
                          border-radius:8px;}
         QTabBar::tab {background:#edf2f8; border:0; border-radius:4px;
-                      margin-right:2px; padding:5px 8px; min-width:48px;}
+                      margin-right:2px; padding:3px 6px; min-width:42px;}
         QTabBar::tab:selected {background:#dcecff; color:#18558f; font-weight:700;}
         QTabBar::tab:hover {background:#e3effb;}
         QTableWidget,QTreeWidget,QPlainTextEdit {background:white;
@@ -255,7 +257,7 @@ void MainWindow::applyStyles(){
                      border-radius:6px; gridline-color:#edf2f6;}
         QHeaderView::section {background:#f5f8fc; border:none;
                               border-bottom:1px solid #e1e8f1;
-                              color:#56718b; font-weight:600; padding:3px 4px;}
+                              color:#56718b; font-weight:600; padding:2px 3px;}
         QTableWidget::item {padding:1px 3px; border-bottom:1px solid #eff2f7;}
         QTableWidget::item:selected,QTreeWidget::item:selected {background:#e2f1ff;color:#183c64;}
         QGroupBox#statusCard {background:#ffffff; border:1px solid #e1e8f1;
@@ -264,7 +266,7 @@ void MainWindow::applyStyles(){
                                     padding:0 6px;color:#245b8c;}
         QLabel#statusContent {font-weight:400; color:#38516c; line-height:150%; padding:2px;}
         QScrollArea#statusScroll {background:transparent;}
-        QLabel#attitudeModeLabel {font-size:15px; font-weight:700; color:#174f83;
+        QLabel#attitudeModeLabel {font-size:11px; font-weight:700; color:#174f83;
                                   background:#eaf4ff; border:1px solid #cfe4fb;
                                   border-radius:6px; padding:7px 10px;}
         QSplitter::handle {background:#edf1f7;}
@@ -393,14 +395,14 @@ void MainWindow::buildMenus(){
 void MainWindow::setReplayListCollapsed(bool collapsed){
     if(!replayPanel_||replayListCollapsed_==collapsed)return;
     replayListCollapsed_=collapsed;
-    if(replayContent_)replayContent_->setVisible(!collapsed);
-    replayPanel_->setMaximumHeight(collapsed?48:QWIDGETSIZE_MAX);
+    if(timeline_)timeline_->setVisible(!collapsed);
+    replayPanel_->setMaximumHeight(collapsed?100:QWIDGETSIZE_MAX);
     replayPanel_->setMinimumHeight(collapsed?0:145);
     if(replayCollapseButton_)
         replayCollapseButton_->setText(uiText(collapsed?QStringLiteral("展开时间轴"):QStringLiteral("收起时间轴")));
     if(workspaceSplitter_){
         const int total=qMax(220,workspaceSplitter_->height());
-        const int panelHeight=collapsed?48:178;
+        const int panelHeight=collapsed?98:178;
         workspaceSplitter_->setSizes({qMax(1,total-panelHeight),panelHeight});
     }
 }
@@ -762,8 +764,8 @@ void MainWindow::buildWorkspace(){
     replayPanel_->setObjectName("panel");
     replayPanel_->setMinimumHeight(0);
     auto *replayLayout=new QVBoxLayout(replayPanel_);
-    replayLayout->setContentsMargins(12,7,12,7);
-    replayLayout->setSpacing(5);
+    replayLayout->setContentsMargins(8,4,8,4);
+    replayLayout->setSpacing(3);
     auto *header=new QWidget(replayPanel_);
     auto *headerLayout=new QHBoxLayout(header);
     headerLayout->setContentsMargins(0,0,0,0);
@@ -796,7 +798,9 @@ void MainWindow::buildWorkspace(){
     transportLayout->setContentsMargins(0,0,0,0);
     transportLayout->setSpacing(6);
     auto *back=new QPushButton(QStringLiteral("上一条"),transport);
+    back->setObjectName(QStringLiteral("replayPreviousButton"));
     auto *next=new QPushButton(QStringLiteral("下一条"),transport);
+    next->setObjectName(QStringLiteral("replayNextButton"));
     playPauseButton_=new QPushButton(QStringLiteral("播放"),transport);
     playPauseButton_->setObjectName(QStringLiteral("playPauseButton"));
     playPauseButton_->setCheckable(true);
@@ -925,7 +929,7 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
     setupTable(engineeringTable_);
     engineeringTable_->horizontalHeader()->setSectionResizeMode(1,QHeaderView::Stretch);
     engineeringTable_->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
-    engineeringTable_->verticalHeader()->setDefaultSectionSize(34);
+    engineeringTable_->verticalHeader()->setDefaultSectionSize(22);
     split->addWidget(engineeringTable_);
     auto *right=new QWidget;auto *rightLayout=new QVBoxLayout(right);
     rightLayout->setContentsMargins(5,2,5,2);
@@ -941,7 +945,7 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
     rightLayout->addWidget(fieldDetail_);
     engineeringChart_=new QChartView(new QChart);
     engineeringChart_->setRenderHint(QPainter::Antialiasing);
-    engineeringChart_->setMinimumHeight(165);
+    engineeringChart_->setMinimumHeight(120);
     rightLayout->addWidget(engineeringChart_,2);
     split->addWidget(right);
     split->setStretchFactor(1,1);split->setSizes({230,700});
@@ -1086,7 +1090,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                 setupTable(table);
                 table->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
                 table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-                table->verticalHeader()->setDefaultSectionSize(22);
+                table->verticalHeader()->setDefaultSectionSize(17);
                 table->horizontalHeader()->setSectionResizeMode(0,QHeaderView::Interactive);
                 table->horizontalHeader()->setSectionResizeMode(1,QHeaderView::Interactive);
                 table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::Stretch);
@@ -1215,7 +1219,7 @@ void MainWindow::buildImages(QTabWidget *tabs){
     imagePreview_=new ImagePreview;
     split->addWidget(imagePreview_);
     imageTable_=new QTableWidget(0,5);
-    imageTable_->setHorizontalHeaderLabels({QStringLiteral("图像 ID"),
+    imageTable_->setHorizontalHeaderLabels({QStringLiteral("卫星 / 图像 ID"),
         QStringLiteral("帧数"),QStringLiteral("分辨率"),QStringLiteral("缺块 / 坏块") ,QStringLiteral("校验状态")});
     setupTable(imageTable_);
     imageTable_->horizontalHeader()->setStretchLastSection(true);
