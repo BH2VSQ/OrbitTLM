@@ -89,8 +89,10 @@ Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
     f.quality="structural_only";
     f.error="TM frame accepted; application CRC and RS parity not verified here";
     const int scid=((first&0x3f)<<4)|(second>>4);
-    if(scid==0x205)f.satellite=QStringLiteral("BY04");
-    else if(f.satellite==QStringLiteral("AUTO"))f.satellite=QStringLiteral("ASRTU-1");
+    // Only infer the spacecraft when AUTO was selected. Explicit choices must
+    // remain authoritative so satellite-specific fields stay isolated.
+    if(f.satellite==QStringLiteral("AUTO"))
+        f.satellite=(scid==0x205?QStringLiteral("BY04"):QStringLiteral("ASRTU-1"));
     const QString effectiveSatellite=f.satellite;
     f.fields.push_back({"tm.spacecraft_id",QString::number(scid),"","verified_protocol"});
     f.fields.push_back({"tm.vcid",QString::number(f.vcid),"","verified_protocol"});
