@@ -137,15 +137,15 @@ int telemetrySwitchState(const EngineeringField &field,const QString &value){
 }
 }
 QString MainWindow::satellite() const{
-    return satelliteSelect_?canonicalSatelliteName(satelliteSelect_->currentData().toString()):QStringLiteral("ASRTU-1");
+    return satelliteSelect_?orbit::canonicalSatelliteName(satelliteSelect_->currentData().toString()):QStringLiteral("ASRTU-1");
 }
 QString MainWindow::resolvedSatellite() const{
     const QString selected=satellite();
     if(selected!=QStringLiteral("AUTO"))return selected;
     for(const auto &frame:frames_)
-        if(!frame.satellite.isEmpty()&&frame.satellite!=QStringLiteral("AUTO"))return canonicalSatelliteName(frame.satellite);
+        if(!frame.satellite.isEmpty()&&frame.satellite!=QStringLiteral("AUTO"))return orbit::canonicalSatelliteName(frame.satellite);
     for(const auto &packet:packets_)
-        if(!packet.satellite.isEmpty()&&packet.satellite!=QStringLiteral("AUTO"))return canonicalSatelliteName(packet.satellite);
+        if(!packet.satellite.isEmpty()&&packet.satellite!=QStringLiteral("AUTO"))return orbit::canonicalSatelliteName(packet.satellite);
     return QStringLiteral("AUTO");
 }
 QString MainWindow::qualityLabel(const QString &value) const{
@@ -946,7 +946,7 @@ void MainWindow::populateEngineering(int index){
                 fieldTreeFieldItems_.insert(definition.packetName+QLatin1Char('|')+code,entry);
             }
         };
-        const auto definitions=by04?By04Decoder::definitionPackets():catalog_.definitionPackets();
+        const auto definitions=by04?orbit::By04Decoder::definitionPackets():catalog_.definitionPackets();
         if(by04){
             struct PanelPacket { QString label; QString code; };
             static const QVector<PanelPacket> panel={
