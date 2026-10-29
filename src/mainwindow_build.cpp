@@ -596,10 +596,8 @@ void MainWindow::showExportDialog(){
     QStringList existing;
     for(const QString &name:planned)if(QFileInfo::exists(QDir(outDir).filePath(name)))existing<<name;
     if(!existing.isEmpty()&&QMessageBox::question(this,uiText(QStringLiteral("确认覆盖")),
-        uiText(QStringLiteral("以下文件已存在，是否覆盖？
-%1")).arg(existing.join(QStringLiteral("
-"))),
-        QMessageBox::Yes|QMessageBox::No,QMessageBox::No)!=QMessageBox::Yes)return;
+    uiText(QStringLiteral("以下文件已存在，是否覆盖？\n%1")).arg(existing.join(QStringLiteral("\n"))),
+    QMessageBox::Yes|QMessageBox::No,QMessageBox::No)!=QMessageBox::Yes)return;
     exportDirectoryOverride_=QDir(outDir).absolutePath();
     if(frameCsv->isChecked())exportFrames(true);
     if(frameJson->isChecked())exportFrames(false);
