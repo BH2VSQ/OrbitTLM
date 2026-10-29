@@ -744,7 +744,8 @@ void MainWindow::buildWorkspace(){
 
     workspaceSplitter_=new QSplitter(Qt::Vertical);
     workspaceSplitter_->setChildrenCollapsible(false);
-    workspaceSplitter_->setCollapsible(1,true);
+    // A splitter child index is only valid after that child has been added.
+    // Configure the replay panel's collapsible state after adding both children below.
 
     pages_=new QTabWidget;
     pages_->setObjectName("mainPages");
@@ -837,6 +838,7 @@ void MainWindow::buildWorkspace(){
     eventTable_->hide();
 
     workspaceSplitter_->addWidget(replayPanel_);
+    workspaceSplitter_->setCollapsible(1,true);
     workspaceSplitter_->setStretchFactor(0,1);
     workspaceSplitter_->setStretchFactor(1,0);
     workspaceSplitter_->setSizes({670,178});

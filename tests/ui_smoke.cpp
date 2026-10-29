@@ -48,12 +48,23 @@ private slots:
         QVERIFY(zhAction->isChecked());
         QVERIFY(window.findChild<QPushButton*>("exportSelectedImageBin")!=nullptr);
         QVERIFY(window.findChild<QPushButton*>("importImageBin")!=nullptr);
-        const auto *event=window.findChild<QTableWidget*>("eventTimeline");
-        QVERIFY(event!=nullptr);
+        // The visible replay surface is the custom keyframe timeline. The table
+        // is retained only as a hidden event model for stable filtering/selection.
+        const auto *timeline=window.findChild<QWidget*>("replayKeyframeTimeline");
+        QVERIFY2(timeline!=nullptr,"The bottom replay keyframe timeline must be created");
+        QVERIFY(!timeline->isHidden());
+        const auto *event=window.findChild<QTableWidget*>("eventTimelineModel");
+        QVERIFY2(event!=nullptr,"The hidden event model must remain available");
         QCOMPARE(event->columnCount(),4);
         QCOMPARE(event->horizontalHeaderItem(0)->text(),QStringLiteral("时间"));
         QCOMPARE(event->horizontalHeaderItem(1)->text(),QStringLiteral("数据包 / 事件"));
-        QVERIFY(event->rowCount()==0);
+        QCOMPARE(event->rowCount(),0);
+        QVERIFY(event->isHidden());
+        const auto *collapse=window.findChild<QPushButton*>("replayCollapseButton");
+        QVERIFY(collapse!=nullptr);
+        const auto *playPause=window.findChild<QPushButton*>("playPauseButton");
+        QVERIFY(playPause!=nullptr);
+        QCOMPARE(playPause->text(),QStringLiteral("播放"));
         const auto *overview=window.findChild<QLabel*>("currentHeading");
         QVERIFY(overview!=nullptr);
         QVERIFY(overview->text().contains(QStringLiteral("未解析")));
