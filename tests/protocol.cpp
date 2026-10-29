@@ -193,21 +193,53 @@ private slots:
         QCOMPARE(ImageTools::candidatesFromKiss({pa,pb},0x321).size(),0);
     }
 
-    void ssdvMissingAndBadPacketsReturnDiagnosticsWithoutWaiting(){
+    void ssdvMissingAndBadPacketsStillProducePartialJpeg(){
+        auto makeNormalPacket=[](int packetId){
+            QByteArray bytes(256,char(0x11));
+            bytes[0]=char(0x55); bytes[1]=char(0x67); // SSDV NO-FEC packet header
+            bytes[6]=char(42);                       // image ID
+            bytes[7]=char((packetId>>8)&0xff); bytes[8]=char(packetId&0xff);
+            bytes[9]=char(20); bytes[10]=char(15);   // 320 x 240
+            bytes[11]=char(0);                      // quality 4 / MCU mode 0
+            bytes[12]=char(0); bytes[13]=char(0); bytes[14]=char(0);
+            return bytes; // Deliberately invalid CRC; retain its structurally valid header.
+        };
         QVector<ImagePacket> packets;
         for(const int packetId : {0,2}){
             ImagePacket packet;
-            packet.bytes=QByteArray(256,char(0)); // Deliberately corrupt SSDV data.
-            packet.imageId=42;
-            packet.packetId=packetId;
+            packet.bytes=makeNormalPacket(packetId);
+            packet.imageId=42; packet.packetId=packetId;
+            packet.width=320; packet.height=240;
             packet.status=QStringLiteral("candidate_unverified");
             packets.push_back(packet);
         }
         const DecodedImage decoded=ImageTools::decodeImage(packets,42,false);
-        QVERIFY(decoded.jpeg.isEmpty());
-        QVERIFY(!decoded.error.isEmpty());
+        QVERIFY2(!decoded.jpeg.isEmpty(),qPrintable(decoded.error));
+        QCOMPARE(decoded.jpeg.left(2),QByteArray::fromHex("FFD8"));
+        QCOMPARE(decoded.jpeg.right(2),QByteArray::fromHex("FFD9"));
+        QCOMPARE(decoded.width,320);
+        QCOMPARE(decoded.height,240);
         QVERIFY(decoded.missingPacketIds.contains(1));
         QVERIFY(decoded.badPacketIds.contains(0));
+        QVERIFY(decoded.badPacketIds.contains(2));
+    }
+    void dslwpCanBuildPreviewWhenPacketZeroIsMissing(){
+        QByteArray bytes(218,char(0x22));
+        bytes[0]=char(9);                         // image ID
+        bytes[1]=char(0); bytes[2]=char(2);       // only packet 2 was received
+        bytes[3]=char(20); bytes[4]=char(15);     // 320 x 240
+        bytes[5]=char(0);                         // quality 4 / MCU mode 0
+        bytes[6]=char(0); bytes[7]=char(0); bytes[8]=char(2);
+        ImagePacket packet;
+        packet.bytes=bytes; packet.imageId=9; packet.packetId=2;
+        packet.width=320; packet.height=240;
+        packet.status=QStringLiteral("ssdv_crc32_failed");
+        const DecodedImage decoded=ImageTools::decodeImage({packet},9,true);
+        QVERIFY2(!decoded.jpeg.isEmpty(),qPrintable(decoded.error));
+        QCOMPARE(decoded.jpeg.left(2),QByteArray::fromHex("FFD8"));
+        QCOMPARE(decoded.jpeg.right(2),QByteArray::fromHex("FFD9"));
+        QVERIFY(decoded.missingPacketIds.contains(0));
+        QVERIFY(decoded.missingPacketIds.contains(1));
         QVERIFY(decoded.badPacketIds.contains(2));
     }
     void ssdvBinaryExportKeepsEveryFrameByte(){

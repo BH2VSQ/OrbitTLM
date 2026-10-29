@@ -1801,6 +1801,10 @@ bool MainWindow::decodeSsdvImage(int imageId,bool showErrors){
     QString diagnostic=uiText(QStringLiteral("缺块 %1 · CRC 坏块 %2 · 有效分片 %3"))
         .arg(rebuilt.missingPacketIds.size()).arg(rebuilt.badPacketIds.size()).arg(rebuilt.receivedPackets);
     if(rebuilt.jpeg.isEmpty()){
+        // Never leave the previous image visible when the selected image cannot
+        // be reconstructed; otherwise the preview appears to belong to the new ID.
+        decodedImage_=QPixmap();
+        if(imagePreview_)imagePreview_->setImage(decodedImage_);
         if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("图像 ID %1 暂无可解码预览。%2 当前数据仍会保留，可继续接收或导入其他分片。"))
             .arg(imageId).arg(diagnostic));
         if(showErrors)QMessageBox::warning(this,uiText(QStringLiteral("SSDV 图片重建失败")),
@@ -1814,6 +1818,8 @@ bool MainWindow::decodeSsdvImage(int imageId,bool showErrors){
     if(!jpeg.endsWith(QByteArray::fromHex("FFD9")))jpeg+=QByteArray::fromHex("FFD9");
     QImage image=QImage::fromData(jpeg,"JPEG");
     if(image.isNull()){
+        decodedImage_=QPixmap();
+        if(imagePreview_)imagePreview_->setImage(decodedImage_);
         if(imageInfo_)imageInfo_->setText(uiText(QStringLiteral("图像 ID %1 已识别分片，但 JPEG 仍不完整。%2"))
             .arg(imageId).arg(diagnostic));
         if(showErrors)QMessageBox::warning(this,uiText(QStringLiteral("SSDV 图片重建失败")),

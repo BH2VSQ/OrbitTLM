@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <map>
 #include <limits>
+#include <utility>
 #include <vector>
 extern "C" {
 #include <third_party/ssdv_dslwp/ssdv.h>
@@ -209,28 +210,73 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
             if(observed.find(id)==observed.end())decoded.missingPacketIds.push_back(id);
     }
     std::sort(decoded.badPacketIds.begin(),decoded.badPacketIds.end());
-    if(ordered.empty()){
+    if(observed.empty()){
         decoded.error=QStringLiteral("所选图像没有可用的 SSDV 分片，或分片长度与解码模式不匹配。");
         return decoded;
     }
-    if(ordered.find(0)==ordered.end()){
-        decoded.error=QStringLiteral("缺少 SSDV 首包（序号 0），无法初始化 JPEG 头。请导入更完整的 log 或 BIN 记录。");
-        return decoded;
-    }
+
+    // A damaged or missing packet zero must not prevent a partial image preview.
+    // The SSDV header carries the image dimensions, quantisation mode and MCU
+    // layout in every packet. Build a header-only packet zero from the most
+    // trustworthy packet for this image, and set its MCU id to 0xffff so the
+    // decoder emits JPEG headers without consuming the damaged payload. The
+    // normal decoder then fills missing MCU ranges with blank blocks.
+    auto makeHeaderOnlyPacket=[&](const ImagePacket &source)->ImagePacket{
+        ImagePacket bootstrap=source;
+        QByteArray bytes=source.bytes;
+        if(shortPacketFormat){
+            if(bytes.size()!=SSDV_PKT_SIZE_DSLWP||bytes.size()<9)return ImagePacket{};
+            bytes[1]=char(0); bytes[2]=char(0); // packet ID = 0
+            bytes[6]=char(0);                    // first MCU offset
+            bytes[7]=char(0xff); bytes[8]=char(0xff); // no MCU in bootstrap
+        }else{
+            if(bytes.size()!=SSDV_PKT_SIZE||bytes.size()<15)return ImagePacket{};
+            bytes[0]=char(0x55);                  // standard SSDV sync byte
+            bytes[7]=char(0); bytes[8]=char(0);  // packet ID = 0
+            bytes[12]=char(0);                   // first MCU offset
+            bytes[13]=char(0xff); bytes[14]=char(0xff); // no MCU in bootstrap
+        }
+        bootstrap.bytes=bytes;
+        bootstrap.packetId=0;
+        bootstrap.status=QStringLiteral("synthetic_header_only");
+        return bootstrap;
+    };
+
+    // Keep dimensions available even when every received packet failed CRC.
+    const ImagePacket *metadataSource=nullptr;
+    if(!ordered.empty())metadataSource=&ordered.begin()->second;
+    else if(observed.find(0)!=observed.end())metadataSource=&observed.find(0)->second;
+    else metadataSource=&observed.begin()->second;
+    decoded.width=metadataSource->width;
+    decoded.height=metadataSource->height;
     decoded.receivedPackets=int(ordered.size());
     for(const auto &entry:ordered){
         const auto &packet=entry.second;
-        decoded.width=packet.width;
-        decoded.height=packet.height;
-        if(packet.status=="ssdv_crc32_pass")++decoded.crcPassedPackets;
+        if(packet.width>0)decoded.width=packet.width;
+        if(packet.height>0)decoded.height=packet.height;
+        if(packet.status==QStringLiteral("ssdv_crc32_pass")||
+           packet.status==QStringLiteral("ssdv_crc_pass"))++decoded.crcPassedPackets;
+    }
+
+    std::map<int,ImagePacket> feedOrdered=ordered;
+    bool syntheticBootstrap=false;
+    if(feedOrdered.find(0)==feedOrdered.end()){
+        ImagePacket bootstrap=makeHeaderOnlyPacket(*metadataSource);
+        if(bootstrap.bytes.isEmpty()){
+            decoded.error=QStringLiteral("无法从候选分片读取 SSDV 图像头，不能生成部分预览。");
+            return decoded;
+        }
+        feedOrdered.emplace(0,std::move(bootstrap));
+        syntheticBootstrap=true;
     }
 
     std::vector<std::uint8_t> jpegBuffer(32U*1024U*1024U);
-    // Match the receiver's recovery strategy: if one damaged packet prevents
-    // reconstruction, discard that packet and restart with the remaining
-    // ordered packets. A later retransmission can still provide a clean copy.
-    int restartBudget=int(ordered.size());
-    while(!ordered.empty()&&restartBudget-->=0){
+    // Retry after dropping a packet that the JPEG state machine cannot consume.
+    // If the actual packet zero fails, replace it with a header-only bootstrap
+    // once and continue; do not lose the image header along with its damaged MCU.
+    int restartBudget=int(feedOrdered.size())+2;
+    bool replacedPacketZero=false;
+    while(!feedOrdered.empty()&&restartBudget-->=0){
         ssdv_t decoder{};
         if(ssdv_dec_init(&decoder)!=SSDV_OK){
             decoded.error=QStringLiteral("SSDV 解码器初始化失败。");
@@ -241,7 +287,7 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
             return decoded;
         }
         int rejectedId=-1;
-        for(const auto &entry:ordered){
+        for(const auto &entry:feedOrdered){
             const auto *bytes=reinterpret_cast<const std::uint8_t*>(entry.second.bytes.constData());
             const char result=ssdv_dec_feed(&decoder,bytes,mode);
             if(result==SSDV_BUFFER_FULL){
@@ -252,13 +298,45 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
                 rejectedId=entry.first;
                 break;
             }
-            ssdv_packet_info_t info{};
-            ssdv_dec_header(&info,bytes,mode);
-            decoded.complete=decoded.complete||info.eoi!=0;
+            if(!(syntheticBootstrap&&entry.first==0)){
+                ssdv_packet_info_t info{};
+                ssdv_dec_header(&info,bytes,mode);
+                decoded.complete=decoded.complete||info.eoi!=0;
+            }
             if(result==SSDV_OK)break;
         }
         if(rejectedId>=0){
+            if(rejectedId==0&&syntheticBootstrap){
+                decoded.error=QStringLiteral("无法从候选分片建立 SSDV JPEG 图像头，无法生成部分预览。");
+                return decoded;
+            }
+            if(rejectedId==0&&!syntheticBootstrap&&!replacedPacketZero){
+                const auto zero=feedOrdered.find(0);
+                const ImagePacket *source=zero==feedOrdered.end()?metadataSource:&zero->second;
+                ImagePacket bootstrap=makeHeaderOnlyPacket(*source);
+                if(!bootstrap.bytes.isEmpty()){
+                    if(!decoded.badPacketIds.contains(0))decoded.badPacketIds.push_back(0);
+                    const auto acceptedZero=ordered.find(0);
+                    if(acceptedZero!=ordered.end()&&
+                       (acceptedZero->second.status==QStringLiteral("ssdv_crc32_pass")||
+                        acceptedZero->second.status==QStringLiteral("ssdv_crc_pass")))
+                        decoded.crcPassedPackets=qMax(0,decoded.crcPassedPackets-1);
+                    feedOrdered[0]=std::move(bootstrap);
+                    ordered.erase(0);
+                    decoded.receivedPackets=int(ordered.size());
+                    syntheticBootstrap=true;
+                    replacedPacketZero=true;
+                    decoded.complete=false;
+                    continue;
+                }
+            }
             if(!decoded.badPacketIds.contains(rejectedId))decoded.badPacketIds.push_back(rejectedId);
+            feedOrdered.erase(rejectedId);
+            const auto accepted=ordered.find(rejectedId);
+            if(accepted!=ordered.end()&&
+               (accepted->second.status==QStringLiteral("ssdv_crc32_pass")||
+                accepted->second.status==QStringLiteral("ssdv_crc_pass")))
+                decoded.crcPassedPackets=qMax(0,decoded.crcPassedPackets-1);
             ordered.erase(rejectedId);
             decoded.receivedPackets=int(ordered.size());
             decoded.complete=false;
@@ -269,15 +347,16 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
         if(ssdv_dec_get_jpeg(&decoder,&jpeg,&jpegLength)!=SSDV_OK||
            jpeg==nullptr||jpegLength==0||
            jpegLength>std::size_t(std::numeric_limits<int>::max())){
-            decoded.error=QStringLiteral("已接收 %1 个分片，但当前数据不足以生成 JPEG。")
+            decoded.error=QStringLiteral("已接收 %1 个有效分片，正在使用缺块填充策略，但当前数据仍不足以生成 JPEG。")
                 .arg(qulonglong(ordered.size()));
             return decoded;
         }
         decoded.jpeg=QByteArray(reinterpret_cast<const char*>(jpeg),int(jpegLength));
         decoded.receivedPackets=int(ordered.size());
+        std::sort(decoded.badPacketIds.begin(),decoded.badPacketIds.end());
         return decoded;
     }
-    decoded.error=QStringLiteral("有效分片不足，无法重建 JPEG。");
+    decoded.error=QStringLiteral("有效图像头或分片不足，无法重建 JPEG。");
     std::sort(decoded.badPacketIds.begin(),decoded.badPacketIds.end());
     return decoded;
 }

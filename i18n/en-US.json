@@ -792,5 +792,9 @@
     "BY04 的姿态工程遥测位置和换算尚未确认，不能套用 ASRTU-1 的 SAT-S3 字段定义导出四元数。": "The engineering telemetry offsets and conversions for BY04 attitude data are not yet confirmed. Do not apply the ASRTU-1 SAT-S3 field definitions to export quaternions.",
     "缺失序号：%1。": "Missing packet IDs: %1.",
     "CRC 坏块序号：%1。": "CRC-failed packet IDs: %1."
-  }
+  },
+  "无法从候选分片读取 SSDV 图像头，不能生成部分预览。": "Could not read an SSDV image header from the candidate fragments; a partial preview cannot be generated.",
+  "已接收 %1 个有效分片，正在使用缺块填充策略，但当前数据仍不足以生成 JPEG。": "Received %1 valid fragments. Missing-block padding was attempted, but the current data is still insufficient to generate a JPEG.",
+  "有效图像头或分片不足，无法重建 JPEG。": "There is not enough valid image-header or fragment data to reconstruct a JPEG.",
+  "无法从候选分片建立 SSDV JPEG 图像头，无法生成部分预览。": "Could not build an SSDV JPEG image header from the candidate fragments; a partial preview cannot be generated."
 }
