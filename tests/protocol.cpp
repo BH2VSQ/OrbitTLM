@@ -541,6 +541,47 @@ private slots:
         QCOMPARE(output[0].fields[0].unit,QString("s"));
         QCOMPARE(output[0].fields[0].status,QString("table_formula"));
     }
+    void by04SsdvReferenceFrameIsRecognizedFromRawTm(){
+        const QByteArray frame=QByteArray::fromHex(
+            "2052EC25FF3300111E1600160155A467E79B96F65FFEBD7255CF565D0F5F2FA3"
+            "65ED1F53A7494515C27D505145140051451401AFA668A6FEC679CB1565E2203A"
+            "123AE7F95749A17FC816DB3C1DA7F99A7E8F088748B651DD031FA9E6AD4108B7"
+            "87CB5E80923F139AEA8412D4F031188751B8BEFA15758FF903DDFFD7235CCDF6"
+            "8A6D34986EF73190E3CD53D067A57613C2B7103C4DF75B8350EA30ACDA6DC46D"
+            "D0C669CE0A44E1EBCA934977D4F3EAE93C25F7AEFFE03FD6B9A1C8AE97C25F7A"
+            "EBFE03FD6B0A7F11EAE37FDDD9D3D2D2515D47822D251450067EB74167F72B"
+        );
+        QCOMPARE(frame.size(),223);
+        const Frame parsed=Protocol::parse(frame,QStringLiteral("BY04"));
+        QVERIFY(parsed.complete);
+        QCOMPARE(parsed.vcid,1);
+        QCOMPARE(By04Decoder::spacecraftId(parsed.bytes),0x205);
+        const auto packets=By04Decoder::images({parsed});
+        QCOMPARE(packets.size(),1);
+        QCOMPARE(packets[0].imageId,0x33);
+        QCOMPARE(packets[0].packetId,0x0011);
+        QCOMPARE(packets[0].width,480);
+        QCOMPARE(packets[0].height,352);
+        QCOMPARE(packets[0].bytes.size(),218);
+        QCOMPARE(packets[0].status,QString("ssdv_crc32_pass"));
+        const auto genericBy04=ImageTools::candidatesFromFrames({parsed});
+        QCOMPARE(genericBy04.size(),1);
+        QCOMPARE(genericBy04[0].imageId,0x33);
+        QByteArray asrtuRaw=frame;
+        asrtuRaw[0]=char(0x03);
+        asrtuRaw[1]=char(0x22);
+        const Frame asrtuFrame=Protocol::parse(asrtuRaw,QStringLiteral("ASRTU-1"));
+        const auto genericAsrtu=ImageTools::candidatesFromFrames({asrtuFrame});
+        QCOMPARE(genericAsrtu.size(),1);
+        QCOMPARE(genericAsrtu[0].imageId,0x33);
+        QString parseError;
+        const auto imported=ImageTools::parseBinaryPackets(packets[0].bytes,240,true,&parseError);
+        QVERIFY2(parseError.isEmpty(),qPrintable(parseError));
+        QCOMPARE(imported.size(),1);
+        QCOMPARE(imported[0].imageId,0x33);
+        QCOMPARE(imported[0].packetId,0x0011);
+        QCOMPARE(imported[0].status,QString("ssdv_crc32_pass"));
+    }
     void by04DslwpNativeVcidOneImageWithSourceVerifiedCrc(){
         QByteArray frame(223,char(0));
         frame[0]=char(0x20);frame[1]=char(0x52);
@@ -560,11 +601,11 @@ private slots:
         QCOMPARE(recovered[0].width,320);
         QCOMPARE(recovered[0].height,240);
         QCOMPARE(recovered[0].bytes.size(),218);
-        QCOMPARE(recovered[0].status,QString("dslwp_crc32_pass"));
+        QCOMPARE(recovered[0].status,QString("ssdv_crc32_pass"));
         auto altered=frame;altered[5+40]=char(0x77);
         const auto damaged=By04Decoder::images({Protocol::parse(altered,"BY04")});
         QCOMPARE(damaged.size(),1);
-        QCOMPARE(damaged[0].status,QString("dslwp_crc32_failed"));
+        QCOMPARE(damaged[0].status,QString("ssdv_crc32_failed"));
     }
     void by04MixedVcAndWrongSpacecraftIdAreNotParsedAsKiss(){
         QByteArray payload(192,char(0));
@@ -603,8 +644,8 @@ private slots:
         int crcPass=0,crcFail=0;
         for(const auto &packet:images){
             QCOMPARE(packet.bytes.size(),218);
-            if(packet.status=="dslwp_crc32_pass")++crcPass;
-            if(packet.status=="dslwp_crc32_failed")++crcFail;
+            if(packet.status=="ssdv_crc32_pass")++crcPass;
+            if(packet.status=="ssdv_crc32_failed")++crcFail;
             QCOMPARE(packet.width,640);
             QCOMPARE(packet.height,480);
         }
@@ -621,7 +662,7 @@ private slots:
         ImagePacket packet;
         packet.imageId=7;packet.packetId=0;packet.width=640;packet.height=480;
         packet.bytes=QByteArray(217,char(0));
-        packet.status="dslwp_crc32_failed";
+        packet.status="ssdv_crc32_failed";
         const auto decoded=ImageTools::decodeImage({packet},7,true);
         QVERIFY(decoded.jpeg.isEmpty());
         QVERIFY(!decoded.error.isEmpty());

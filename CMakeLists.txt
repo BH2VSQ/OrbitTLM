@@ -81,6 +81,13 @@ qt_add_resources(orbittlm_core by04_catalog
 add_executable(OrbitTLM-cli src/cli.cpp)
 target_link_libraries(OrbitTLM-cli PRIVATE orbittlm_core)
 add_library(orbittlm_ui STATIC src/mainwindow.h src/mainwindow_widgets.h src/mainwindow_build.cpp src/mainwindow_data.cpp)
+qt_add_resources(orbittlm_ui orbittlm_i18n
+  PREFIX "/i18n"
+  BASE "${CMAKE_CURRENT_SOURCE_DIR}/i18n"
+  FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/i18n/zh-CN.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/i18n/en-US.json"
+)
 target_include_directories(orbittlm_ui PUBLIC src)
 target_link_libraries(orbittlm_ui PUBLIC orbittlm_core Qt6::Widgets Qt6::Charts)
 add_executable(OrbitTLM src/main.cpp)

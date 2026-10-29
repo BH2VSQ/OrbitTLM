@@ -21,10 +21,12 @@ struct DecodedImage {
 class ImageTools {
 public:
     static QVector<ImagePacket> candidates(const QVector<Frame> &frames,int apid);
+    static QVector<ImagePacket> candidatesFromFrames(const QVector<Frame> &frames);
     static QVector<ImagePacket> candidatesFromKiss(const QVector<ApplicationPacket> &packets,int apid);
     static bool savePackets(const QVector<ImagePacket> &packets,const QString &filename,QString *error=nullptr);
+    static QVector<ImagePacket> parseBinaryPackets(const QByteArray &data,int apid,bool prefer218,QString *error=nullptr);
     // Rebuild one image from sorted or unsorted 256-byte SSDV or 218-byte
     // DSLWP packets. The decoder is linked into OrbitTLM, so no subprocess is used.
-    static DecodedImage decodeImage(const QVector<ImagePacket> &packets,int imageId,bool dslwp);
+    static DecodedImage decodeImage(const QVector<ImagePacket> &packets,int imageId,bool shortPacketFormat);
 };
 }

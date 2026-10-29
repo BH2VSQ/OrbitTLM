@@ -5,6 +5,9 @@
 #include <QTableWidget>
 #include <QTabWidget>
 #include <QLineEdit>
+#include <QMenu>
+#include <QAction>
+#include <QPushButton>
 #include <QStandardPaths>
 
 class UiSmoke:public QObject {
@@ -29,6 +32,22 @@ private slots:
         QCOMPARE(tabs->tabText(4),QStringLiteral("图像数据"));
         QCOMPARE(tabs->tabText(5),QStringLiteral("原始数据"));
         QVERIFY(!tabs->isTabVisible(tabs->count()-1));
+        auto *languageMenu=window.findChild<QMenu*>("languageMenu");
+        QVERIFY(languageMenu!=nullptr);
+        QCOMPARE(languageMenu->actions().size(),2);
+        auto *zhAction=window.findChild<QAction*>("languageAction_zh-CN");
+        auto *enAction=window.findChild<QAction*>("languageAction_en-US");
+        QVERIFY(zhAction!=nullptr);
+        QVERIFY(enAction!=nullptr);
+        enAction->trigger();
+        QApplication::processEvents();
+        QVERIFY(enAction->isChecked());
+        QVERIFY(!zhAction->isChecked());
+        zhAction->trigger();
+        QApplication::processEvents();
+        QVERIFY(zhAction->isChecked());
+        QVERIFY(window.findChild<QPushButton*>("exportSelectedImageBin")!=nullptr);
+        QVERIFY(window.findChild<QPushButton*>("importImageBin")!=nullptr);
         const auto *event=window.findChild<QTableWidget*>("eventTimeline");
         QVERIFY(event!=nullptr);
         QCOMPARE(event->columnCount(),4);

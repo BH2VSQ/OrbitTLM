@@ -1,6 +1,7 @@
 #include "ssdv.h"
 #include <QFile>
 #include <QSaveFile>
+#include <QSet>
 #include <algorithm>
 #include <cstdint>
 #include <map>
@@ -12,6 +13,42 @@ extern "C" {
 namespace orbit {
 QVector<ImagePacket> ImageTools::candidates(const QVector<Frame> &frames,int apid){
     return candidatesFromKiss(Transport::reassemble(frames),apid);
+}
+QVector<ImagePacket> ImageTools::candidatesFromFrames(const QVector<Frame> &frames){
+    QVector<ImagePacket> out;
+    QSet<QByteArray> seen;
+    for(const Frame &frame:frames){
+        // Both ASRTU-1 and BY04 VC1 carry the 218-byte SSDV core payload
+        // after the five-byte TM header. Spacecraft ID is not an SSDV format
+        // discriminator, so validate the payload itself instead of hard-coding
+        // the BY04 SCID.
+        if(frame.bytes.size()!=223||frame.vcid!=1)continue;
+        const QByteArray payload=frame.bytes.mid(5,218);
+        if(seen.contains(payload))continue;
+        QByteArray checked=payload;
+        int correctedSymbols=0;
+        const int status=ssdv_dec_is_packet(
+            reinterpret_cast<std::uint8_t*>(checked.data()),&correctedSymbols,ssdv_dslwp_mode);
+        QByteArray header=status==SSDV_OK?checked:payload;
+        ssdv_packet_info_t info{};
+        ssdv_dec_header(&info,reinterpret_cast<std::uint8_t*>(header.data()),ssdv_dslwp_mode);
+        if(info.width<=0||info.height<=0||info.width>8192||info.height>8192||
+           info.mcu_count==0||info.mcu_count>65535||
+           (info.mcu_id!=0xffff&&(info.mcu_id>=info.mcu_count||info.mcu_offset>=205)))continue;
+        seen.insert(payload);
+        ImagePacket packet;
+        packet.bytes=status==SSDV_OK?checked:payload;
+        packet.apid=-1;packet.imageId=info.image_id;packet.packetId=info.packet_id;
+        packet.width=info.width;packet.height=info.height;
+        packet.status=status==SSDV_OK?QStringLiteral("ssdv_crc32_pass"):
+                                       QStringLiteral("ssdv_crc32_failed");
+        out.push_back(packet);
+    }
+    std::stable_sort(out.begin(),out.end(),[](const ImagePacket &a,const ImagePacket &b){
+        if(a.imageId!=b.imageId)return a.imageId<b.imageId;
+        return a.packetId<b.packetId;
+    });
+    return out;
 }
 QVector<ImagePacket> ImageTools::candidatesFromKiss(
         const QVector<ApplicationPacket> &packets,int apid){
@@ -69,30 +106,93 @@ bool ImageTools::savePackets(const QVector<ImagePacket> &packets,const QString &
     return true;
 }
 
-DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int imageId,bool dslwp){
+
+QVector<ImagePacket> ImageTools::parseBinaryPackets(
+        const QByteArray &data,int apid,bool prefer218,QString *error){
+    QVector<ImagePacket> out;
+    if(data.isEmpty()){
+        if(error)*error=QStringLiteral("BIN 文件为空。");
+        return out;
+    }
+    const bool packets218=(data.size()%218==0) &&
+        ((data.size()%256)!=0 || prefer218);
+    if(packets218){
+        for(int offset=0;offset+218<=data.size();offset+=218){
+            QByteArray bytes=data.mid(offset,218);
+            auto *raw=reinterpret_cast<std::uint8_t*>(bytes.data());
+            ssdv_packet_info_t info{};
+            ssdv_dec_header(&info,raw,ssdv_dslwp_mode);
+            if(info.width<=0||info.height<=0||info.width>8192||info.height>8192||
+               info.mcu_count==0||info.mcu_count>65535)continue;
+            int correctedSymbols=0;
+            QByteArray checked=bytes;
+            const int status=ssdv_dec_is_packet(
+                reinterpret_cast<std::uint8_t*>(checked.data()),&correctedSymbols,ssdv_dslwp_mode);
+            ImagePacket packet;
+            packet.bytes=status==SSDV_OK?checked:bytes;
+            packet.apid=apid;packet.imageId=info.image_id;packet.packetId=info.packet_id;
+            packet.width=info.width;packet.height=info.height;
+            packet.status=status==SSDV_OK?QStringLiteral("ssdv_crc32_pass"):
+                                           QStringLiteral("ssdv_crc32_failed");
+            out.push_back(packet);
+        }
+    }else if(data.size()%256==0){
+        for(int offset=0;offset+256<=data.size();offset+=256){
+            QByteArray bytes=data.mid(offset,256);
+            if(quint8(bytes[0])!=0x55)continue;
+            const int type=quint8(bytes[1]);
+            if(type!=0x66&&type!=0x67)continue;
+            QByteArray checked=bytes;
+            int correctedSymbols=0;
+            const int status=ssdv_dec_is_packet(
+                reinterpret_cast<std::uint8_t*>(checked.data()),&correctedSymbols,ssdv_normal_mode);
+            const QByteArray &header=status==SSDV_OK?checked:bytes;
+            const int width=quint8(header[9])*16;
+            const int height=quint8(header[10])*16;
+            if(width<=0||height<=0||width>4080||height>4080)continue;
+            ImagePacket packet;
+            packet.bytes=status==SSDV_OK?checked:bytes;packet.apid=apid;
+            packet.imageId=quint8(header[6]);
+            packet.packetId=(quint8(header[7])<<8)|quint8(header[8]);
+            packet.width=width;packet.height=height;
+            packet.status=status==SSDV_OK?QStringLiteral("ssdv_crc_pass"):
+                                           QStringLiteral("bin_only_unverified");
+            out.push_back(packet);
+        }
+    }else{
+        if(error)*error=QStringLiteral(
+            "BIN 长度不符合已支持的分片格式（218 字节 SSDV 分片或 256 字节标准 SSDV 包）。");
+        return out;
+    }
+    if(out.isEmpty()&&error)*error=QStringLiteral(
+        "文件中没有识别到有效 SSDV 分片；请确认导入的是图像 BIN，而不是遥测原始帧。");
+    return out;
+}
+
+DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int imageId,bool shortPacketFormat){
     DecodedImage decoded;
     decoded.imageId=imageId;
-    const int expectedSize=dslwp?SSDV_PKT_SIZE_DSLWP:SSDV_PKT_SIZE;
-    const ssdv_mode_t mode=dslwp?ssdv_dslwp_mode:ssdv_normal_mode;
+    const int expectedSize=shortPacketFormat?SSDV_PKT_SIZE_DSLWP:SSDV_PKT_SIZE;
+    const ssdv_mode_t mode=shortPacketFormat?ssdv_dslwp_mode:ssdv_normal_mode;
     std::map<int,ImagePacket> ordered;
     for(const auto &packet:packets){
         if(packet.imageId!=imageId||packet.bytes.size()!=expectedSize)continue;
-        // Mirror the reference receiver: validate/correct each packet before
-        // handing it to the JPEG state machine. Normal SSDV mode performs RS
-        // correction; DSLWP mode validates its 218-byte packet CRC.
+        // Validate/correct each packet before handing it to the JPEG state
+        // machine. The 218-byte TM payload and 256-byte standard packet share
+        // the same image metadata and JPEG reconstruction state machine.
         QByteArray correctedBytes=packet.bytes;
         int correctedSymbols=0;
         if(ssdv_dec_is_packet(reinterpret_cast<std::uint8_t*>(correctedBytes.data()),
                               &correctedSymbols,mode)!=SSDV_OK)continue;
         ImagePacket validated=packet;
         validated.bytes=correctedBytes;
-        if(dslwp)validated.status=QStringLiteral("dslwp_crc32_pass");
+        if(shortPacketFormat)validated.status=QStringLiteral("ssdv_crc32_pass");
         else validated.status=QStringLiteral("ssdv_crc_pass");
         auto found=ordered.find(validated.packetId);
         if(found==ordered.end()){
             ordered.emplace(validated.packetId,validated);
-        }else if(found->second.status!="dslwp_crc32_pass"&&
-                 validated.status=="dslwp_crc32_pass"){
+        }else if(found->second.status!="ssdv_crc32_pass"&&
+                 validated.status=="ssdv_crc32_pass"){
             found->second=validated;
         }
     }
@@ -109,7 +209,7 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
         const auto &packet=entry.second;
         decoded.width=packet.width;
         decoded.height=packet.height;
-        if(packet.status=="dslwp_crc32_pass")++decoded.crcPassedPackets;
+        if(packet.status=="ssdv_crc32_pass")++decoded.crcPassedPackets;
     }
 
     std::vector<std::uint8_t> jpegBuffer(32U*1024U*1024U);

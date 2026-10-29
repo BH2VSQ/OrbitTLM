@@ -26,7 +26,8 @@ EngineeringField field(const QString &code,const QString &name,
             QString::number(value),"",status};
 }
 quint32 crc32Ssdv(const QByteArray &frame,quint32 initial) {
-    // DSLWP and JAMX use the same 218-byte image packet format with different CRC seeds.
+    // The 218-byte SSDV payload has a four-byte CRC32 trailer. The upstream
+    // decoder's short-packet mode validates this payload without a 256-byte FEC wrapper.
     if(frame.size()!=218)return 0;
     quint32 crc=initial;
     for(int i=0;i<214;++i){
@@ -199,8 +200,8 @@ QVector<ImagePacket> By04Decoder::images(const QVector<Frame> &frames){
            spacecraftId(f.bytes)!=SpacecraftId)continue;
         const QByteArray data=f.bytes.mid(5,218);
         if(seen.contains(data))continue;
-        // Match metadata validation to the upstream SSDV implementation used to
-        // reconstruct the JPEG, rather than duplicating its header interpretation.
+        // Use the same 218-byte SSDV payload parser as the shared image decoder;
+        // spacecraft ID selects the TM stream, not the image encoding format.
         const auto *bytes=reinterpret_cast<const std::uint8_t*>(data.constData());
         ssdv_packet_info_t info{};
         ssdv_dec_header(&info,bytes,ssdv_dslwp_mode);
@@ -219,7 +220,7 @@ QVector<ImagePacket> By04Decoder::images(const QVector<Frame> &frames){
                                (quint32(u8(data,215))<<16)|
                                (quint32(u8(data,216))<<8)|quint32(u8(data,217));
         image.status=crc32Ssdv(data,0x4EE4FDE1u)==expected?
-                        "dslwp_crc32_pass":"dslwp_crc32_failed";
+                        "ssdv_crc32_pass":"ssdv_crc32_failed";
         packets.push_back(image);
     }
     std::stable_sort(packets.begin(),packets.end(),[](const ImagePacket &a,const ImagePacket &b){

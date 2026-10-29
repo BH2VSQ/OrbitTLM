@@ -17,6 +17,7 @@
 #include <QJsonArray>
 #include <QFile>
 #include <QFileInfo>
+#include <QResource>
 #include <QDir>
 #include <QDesktopServices>
 #include <QCoreApplication>
@@ -54,6 +55,10 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QWidget>
+
+static void registerOrbitTlmI18nResources(){
+    Q_INIT_RESOURCE(orbittlm_i18n);
+}
 
 namespace {
 QLabel *subtitle(const QString &text,QWidget *parent=nullptr){
@@ -322,14 +327,17 @@ void MainWindow::buildMenus(){
     auto *tools=menuBar()->addMenu(QStringLiteral("工具(&T)"));
     tools->addAction(QStringLiteral("TCP 服务器设置…"),[this]{configureTcpServer();});
     languageMenu_=tools->addMenu(QStringLiteral("界面语言"));
-    const QDir languageDirectory(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("i18n")));
-    for(const QString &fileName:languageDirectory.entryList({QStringLiteral("*.json")},QDir::Files,QDir::Name)){
-        QFile languageFile(languageDirectory.filePath(fileName));
-        if(!languageFile.open(QIODevice::ReadOnly))continue;
-        const QJsonObject languageObject=QJsonDocument::fromJson(languageFile.readAll()).object();
-        const QString code=languageObject.value(QStringLiteral("code")).toString(QFileInfo(fileName).completeBaseName());
-        const QString label=languageObject.value(QStringLiteral("displayName")).toString(code);
-        auto *languageAction=languageMenu_->addAction(label);
+    languageMenu_->setObjectName(QStringLiteral("languageMenu"));
+    // Always expose supported languages even when the executable is launched
+    // from a folder that does not contain the external i18n directory.
+    const QList<QPair<QString,QString>> supportedLanguages={
+        {QStringLiteral("zh-CN"),QStringLiteral("简体中文")},
+        {QStringLiteral("en-US"),QStringLiteral("English")}
+    };
+    for(const auto &language:supportedLanguages){
+        const QString code=language.first;
+        auto *languageAction=languageMenu_->addAction(language.second);
+        languageAction->setObjectName(QStringLiteral("languageAction_")+code);
         languageAction->setCheckable(true);
         languageAction->setData(code);
         languageAction->setChecked(code==languageCode_);
@@ -432,16 +440,35 @@ void MainWindow::configureTcpServer(){
 }
 
 bool MainWindow::loadLanguageFile(){
-    QString path=QDir(QCoreApplication::applicationDirPath()).filePath(
-        QStringLiteral("i18n/")+languageCode_+QStringLiteral(".json"));
-    QFile file(path);
-    if(!file.open(QIODevice::ReadOnly)&&languageCode_!=QStringLiteral("zh-CN")){
+    static const bool resourcesRegistered=[](){
+        registerOrbitTlmI18nResources();
+        return true;
+    }();
+    Q_UNUSED(resourcesRegistered);
+    const QString code=languageCode_.isEmpty()?QStringLiteral("zh-CN"):languageCode_;
+    QStringList paths={
+        QDir(QCoreApplication::applicationDirPath()).filePath(
+            QStringLiteral("i18n/")+code+QStringLiteral(".json")),
+        QStringLiteral(":/i18n/")+code+QStringLiteral(".json")
+    };
+    QByteArray contents;
+    for(const QString &path:paths){
+        QFile file(path);
+        if(file.open(QIODevice::ReadOnly)){contents=file.readAll();break;}
+    }
+    if(contents.isEmpty()&&code!=QStringLiteral("zh-CN")){
         languageCode_=QStringLiteral("zh-CN");
-        path=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("i18n/zh-CN.json"));
-        file.setFileName(path);
-        if(!file.open(QIODevice::ReadOnly))return false;
-    }else if(!file.isOpen()&&!file.open(QIODevice::ReadOnly))return false;
-    const QJsonObject root=QJsonDocument::fromJson(file.readAll()).object();
+        QStringList fallbackPaths={
+            QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("i18n/zh-CN.json")),
+            QStringLiteral(":/i18n/zh-CN.json")
+        };
+        for(const QString &path:fallbackPaths){
+            QFile file(path);
+            if(file.open(QIODevice::ReadOnly)){contents=file.readAll();break;}
+        }
+    }
+    if(contents.isEmpty())return false;
+    const QJsonObject root=QJsonDocument::fromJson(contents).object();
     const QJsonObject map=root.value(QStringLiteral("translations")).toObject();
     if(map.isEmpty())return false;
     translations_=map;
@@ -1025,6 +1052,12 @@ void MainWindow::buildImages(QTabWidget *tabs){
     row->addWidget(scan);
     auto *save=new QPushButton(QStringLiteral("统一导出…"));
     row->addWidget(save);
+    auto *exportImageBin=new QPushButton(QStringLiteral("导出所选图像 BIN"));
+    exportImageBin->setObjectName(QStringLiteral("exportSelectedImageBin"));
+    row->addWidget(exportImageBin);
+    auto *importImageBin=new QPushButton(QStringLiteral("导入 BIN 并解码"));
+    importImageBin->setObjectName(QStringLiteral("importImageBin"));
+    row->addWidget(importImageBin);
     auto *decode=new QPushButton(QStringLiteral("重建 JPEG 预览"));
     row->addWidget(decode);
     row->addStretch(1);
@@ -1050,9 +1083,14 @@ void MainWindow::buildImages(QTabWidget *tabs){
     connect(scan,&QPushButton::clicked,this,[this]{scanSsdv();});
     connect(imageTable_,&QTableWidget::itemSelectionChanged,this,[this]{
         const int idx=imageTable_->currentRow();
-        if(idx>=0&&idx<images_.size())updateImageProgress(images_[idx].imageId);
+        if(idx>=0&&idx<images_.size()){
+            updateImageProgress(images_[idx].imageId);
+            decodeSsdvImage(images_[idx].imageId,false);
+        }
     });
     connect(save,&QPushButton::clicked,this,[this]{showExportDialog();});
+    connect(exportImageBin,&QPushButton::clicked,this,[this]{exportSelectedImageBin();});
+    connect(importImageBin,&QPushButton::clicked,this,[this]{importImageBin();});
     connect(decode,&QPushButton::clicked,this,[this]{decodeSsdv();});
     tabs->addTab(page,QStringLiteral("图像数据"));
 }

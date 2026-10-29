@@ -1378,35 +1378,76 @@ void MainWindow::setDiagnosticsVisible(bool visible){
 }
 void MainWindow::scanSsdv(){
     if(!imageApid_)return;
-    const bool by04=resolvedSatellite()==QStringLiteral("BY04");
-    images_=by04?orbit::By04Decoder::images(frames_):
-                 orbit::ImageTools::candidatesFromKiss(packets_,imageApid_->value());
-    imageApid_->setEnabled(!by04);
-    imageTable_->setRowCount(images_.size());
-    for(int i=0;i<images_.size();++i){
-        const auto &p=images_[i];
-        const QStringList row={QString::number(p.imageId),
-            QString::number(p.packetId),
-            QString("%1 × %2").arg(p.width).arg(p.height),
-            p.status=="dslwp_crc32_pass"?QStringLiteral("DSLWP CRC32 通过"):
-            (p.status=="dslwp_crc32_failed"?QStringLiteral("DSLWP CRC32 失败"):
-                                               QStringLiteral("候选，CRC 未校验"))};
-        for(int j=0;j<row.size();++j)imageTable_->setItem(i,j,item(row[j]));
+    QVector<orbit::ImagePacket> found=orbit::ImageTools::candidatesFromFrames(frames_);
+    found+=orbit::ImageTools::candidatesFromKiss(packets_,imageApid_->value());
+    const bool hasShortSsdv=std::any_of(found.cbegin(),found.cend(),[](const orbit::ImagePacket &packet){
+        return packet.bytes.size()==218;
+    });
+    std::stable_sort(found.begin(),found.end(),[](const orbit::ImagePacket &a,const orbit::ImagePacket &b){
+        if(a.imageId!=b.imageId)return a.imageId<b.imageId;
+        if(a.packetId!=b.packetId)return a.packetId<b.packetId;
+        return a.bytes.size()<b.bytes.size();
+    });
+    QSet<QString> unique;
+    images_.clear();
+    for(const auto &packet:found){
+        const QString key=QStringLiteral("%1:%2:%3")
+            .arg(packet.imageId).arg(packet.packetId).arg(packet.bytes.size());
+        if(unique.contains(key))continue;
+        unique.insert(key);
+        images_.push_back(packet);
     }
-    imageInfo_->setText(by04?
-        QStringLiteral("BY70-4（BY04）· VC1 218 字节 DSLWP SSDV · %1 个有效结构分片；仅通过 DSLWP CRC 的分片标记为已校验。")
-            .arg(images_.size()):
-        QStringLiteral("APID %1：发现 %2 个 SSDV 候选分片；选择图像 ID 后可在软件内重建 JPEG。")
-            .arg(imageApid_->value()).arg(images_.size()));
+    {
+        QSignalBlocker blocker(imageTable_);
+        imageTable_->setRowCount(images_.size());
+        for(int i=0;i<images_.size();++i){
+            const auto &packet=images_[i];
+            const QStringList row={QString::number(packet.imageId),
+                QString::number(packet.packetId),
+                QString("%1 × %2").arg(packet.width).arg(packet.height),
+                packet.status=="ssdv_crc32_pass"?QStringLiteral("SSDV CRC 通过"):
+                packet.status=="ssdv_crc32_failed"?QStringLiteral("SSDV CRC 失败"):
+                packet.status=="ssdv_crc_pass"?QStringLiteral("SSDV FEC/CRC 通过"):
+                                                   QStringLiteral("候选，尚未校验")};
+            for(int col=0;col<row.size();++col)imageTable_->setItem(i,col,item(row[col]));
+        }
+        imageTable_->clearSelection();
+        if(!images_.isEmpty())imageTable_->setCurrentCell(0,0);
+    }
+    imageApid_->setEnabled(!hasShortSsdv&&resolvedSatellite()!=QStringLiteral("BY04"));
+    imageInfo_->setText(QStringLiteral("%1 · 已自动扫描 %2 个图像分片，按图像 ID / 包序号排序；进入本页即可查看并自动尝试重建。")
+        .arg(hasShortSsdv?QStringLiteral("VC1 218 字节 SSDV（ASRTU-1 / BY04 兼容格式）"):
+             QStringLiteral("APID %1 标准 SSDV").arg(imageApid_->value()))
+        .arg(images_.size()));
     if(imageMetric_)imageMetric_->setText(QString::number(images_.size()));
-    if(!images_.isEmpty())updateImageProgress(images_.first().imageId);
-    else{
+    decodedImage_=QPixmap();
+    if(imagePreview_)imagePreview_->setImage(decodedImage_);
+    if(!images_.isEmpty()){
+        QSet<int> triedIds;
+        int previewRow=-1;
+        for(int row=0;row<images_.size();++row){
+            const int imageId=images_[row].imageId;
+            if(triedIds.contains(imageId))continue;
+            triedIds.insert(imageId);
+            if(decodeSsdvImage(imageId,false)){previewRow=row;break;}
+        }
+        if(previewRow>=0){
+            QSignalBlocker blocker(imageTable_);
+            imageTable_->setCurrentCell(previewRow,0);
+            updateImageProgress(images_[previewRow].imageId);
+        }else{
+            updateImageProgress(images_.first().imageId);
+            imageInfo_->setText(QStringLiteral("已扫描 %1 个 SSDV 分片、%2 个图像 ID；尚无图像可独立重建，仍已显示全部候选分片。")
+                .arg(images_.size()).arg(triedIds.size()));
+        }
+    }else{
         imageCoverage_->setRange(0,1);
         imageCoverage_->setValue(0);
         imageCoverage_->setFormat(QStringLiteral("尚无观测序号"));
-        imageCoverageNote_->setText(QStringLiteral("尚无候选分片 · 总包数未知"));
+        imageCoverageNote_->setText(QStringLiteral("未识别到 SSDV 分片。请检查卫星、VCID/APID 和导入数据格式。"));
     }
 }
+
 void MainWindow::updateImageProgress(int imageId){
     QSet<int> unique;
     int lo=std::numeric_limits<int>::max(),hi=-1;
@@ -1440,54 +1481,162 @@ void MainWindow::exportSsdv(){
         QMessageBox::warning(this,QStringLiteral("保存失败"),error);
     else statusBar()->showMessage(QStringLiteral("已保存候选分片；未独立完成图像 CRC 验证"),9500);
 }
+bool MainWindow::decodeSsdvImage(int imageId,bool showErrors){
+    if(images_.isEmpty())return false;
+    bool shortPacket=false;
+    for(const auto &packet:images_)if(packet.imageId==imageId){
+        shortPacket=packet.bytes.size()==218;
+        break;
+    }
+    const auto rebuilt=orbit::ImageTools::decodeImage(images_,imageId,shortPacket);
+    if(rebuilt.jpeg.isEmpty()){
+        if(showErrors)QMessageBox::warning(this,QStringLiteral("SSDV 图片重建失败"),
+            rebuilt.error.isEmpty()?QStringLiteral("当前分片无法重建 JPEG。"):rebuilt.error);
+        return false;
+    }
+    const QImage image=QImage::fromData(rebuilt.jpeg,"JPEG");
+    if(image.isNull()){
+        if(showErrors)QMessageBox::warning(this,QStringLiteral("SSDV 图片重建失败"),
+            QStringLiteral("解码器返回的数据不是可读取的 JPEG 图像。"));
+        return false;
+    }
+    decodedImage_=QPixmap::fromImage(image);
+    if(imagePreview_)imagePreview_->setImage(decodedImage_);
+    if(imageInfo_)imageInfo_->setText(QStringLiteral(
+        "图像 ID %1 · %2 × %3 · 已使用 %4 个分片 · %5。切换到其他图像 ID 可查看其他图片。")
+        .arg(imageId).arg(image.width()).arg(image.height()).arg(rebuilt.receivedPackets)
+        .arg(rebuilt.complete?QStringLiteral("检测到图像结束标志"):QStringLiteral("当前为可恢复预览")));
+    return true;
+}
 void MainWindow::decodeSsdv(){
     if(images_.isEmpty())scanSsdv();
     if(images_.isEmpty()){
         QMessageBox::information(this,QStringLiteral("SSDV 图片重建"),
-            QStringLiteral("没有可解码的 SSDV 分片，请先扫描数据。"));
+            QStringLiteral("没有识别到 SSDV 分片。请先导入 LOG/BIN 或检查卫星、VCID/APID 设置。"));
         return;
     }
     int row=imageTable_->currentRow();
     if(row<0||row>=images_.size())row=0;
     const int imageId=images_[row].imageId;
-    const bool by04=resolvedSatellite()==QStringLiteral("BY04");
-    const auto rebuilt=orbit::ImageTools::decodeImage(images_,imageId,by04);
-    if(rebuilt.jpeg.isEmpty()){
-        QMessageBox::warning(this,QStringLiteral("SSDV 图片重建失败"),
-            rebuilt.error.isEmpty()?QStringLiteral("当前分片无法重建 JPEG。"):rebuilt.error);
-        return;
-    }
-    const QImage image=QImage::fromData(rebuilt.jpeg,"JPEG");
-    if(image.isNull()){
-        QMessageBox::warning(this,QStringLiteral("SSDV 图片重建失败"),
-            QStringLiteral("解码器返回的数据不是可读取的 JPEG 图像。"));
-        return;
-    }
-    decodedImage_=QPixmap::fromImage(image);
-    imagePreview_->setImage(decodedImage_);
-    imageInfo_->setText(QStringLiteral("图像 ID %1 · %2 × %3 · 已送入解码器 %4 个分片 · %5。CRC 通过数量仅表示已通过对应格式校验的分片，不代表整幅图像完整。")
-        .arg(imageId).arg(image.width()).arg(image.height()).arg(rebuilt.receivedPackets)
-        .arg(rebuilt.complete?QStringLiteral("检测到图像结束标志"):QStringLiteral("当前为可恢复预览")));
-
-    // The image-tab action only rebuilds and previews. File writing is done by the unified export dialog.
+    if(!decodeSsdvImage(imageId,true))return;
     if(exportDirectoryOverride_.isEmpty()){
-        statusBar()->showMessage(uiText(QStringLiteral("JPEG 已在软件内重建并显示；如需保存，请使用统一导出界面。")),9000);
+        statusBar()->showMessage(QStringLiteral("JPEG 已在软件内重建并显示；如需保存，请使用统一导出界面。"),9000);
         return;
     }
     const QString jpegName=QStringLiteral("BY70-4_ID%1.jpg").arg(imageId);
     const QString outputPath=QDir(exportDirectoryOverride_).filePath(jpegName);
-    if(outputPath.isEmpty()){
-        statusBar()->showMessage(QStringLiteral("JPEG 已在软件内重建并显示，尚未保存到磁盘"),9000);
-        return;
-    }
     QSaveFile output(outputPath);
-    if(!output.open(QIODevice::WriteOnly)||output.write(rebuilt.jpeg)!=rebuilt.jpeg.size()||!output.commit()){
+    if(!output.open(QIODevice::WriteOnly)){
         QMessageBox::warning(this,QStringLiteral("JPEG 保存失败"),output.errorString());
         return;
     }
-    imagePath_=outputPath;
+    // Save the original decoded JPEG bytes rather than re-encoding the preview.
+    bool shortPacket=false;
+    for(const auto &packet:images_)if(packet.imageId==imageId){shortPacket=packet.bytes.size()==218;break;}
+    const auto rebuilt=orbit::ImageTools::decodeImage(images_,imageId,shortPacket);
+    if(rebuilt.jpeg.isEmpty()||output.write(rebuilt.jpeg)!=rebuilt.jpeg.size()||!output.commit()){
+        QMessageBox::warning(this,QStringLiteral("JPEG 保存失败"),output.errorString());
+        return;
+    }
     statusBar()->showMessage(QStringLiteral("JPEG 重建完成并已保存：")+outputPath,9000);
 }
+void MainWindow::exportSelectedImageBin(){
+    if(images_.isEmpty()){
+        QMessageBox::information(this,QStringLiteral("导出图像 BIN"),QStringLiteral("当前没有可导出的 SSDV 分片。"));
+        return;
+    }
+    int row=imageTable_->currentRow();
+    if(row<0||row>=images_.size())row=0;
+    const int imageId=images_[row].imageId;
+    QVector<orbit::ImagePacket> selected;
+    for(const auto &packet:images_)if(packet.imageId==imageId)selected.push_back(packet);
+    if(selected.isEmpty())return;
+    const QString path=QFileDialog::getSaveFileName(this,QStringLiteral("导出所选图像 BIN"),
+        QStringLiteral("image_%1.bin").arg(imageId),QStringLiteral("BIN 文件 (*.bin);;所有文件 (*.*)"));
+    if(path.isEmpty())return;
+    QString error;
+    if(!orbit::ImageTools::savePackets(selected,path,&error)){
+        QMessageBox::warning(this,QStringLiteral("导出图像 BIN 失败"),error);
+        return;
+    }
+    statusBar()->showMessage(QStringLiteral("已导出图像 ID %1 的 %2 个 SSDV 分片：%3")
+        .arg(imageId).arg(selected.size()).arg(path),10000);
+}
+void MainWindow::importImageBin(){
+    const QString path=QFileDialog::getOpenFileName(this,QStringLiteral("导入修改后的图像 BIN"),{},
+        QStringLiteral("BIN / SSDV 数据 (*.bin *.ssdv);;所有文件 (*.*)"));
+    if(path.isEmpty())return;
+    QFile file(path);
+    if(!file.open(QIODevice::ReadOnly)){
+        QMessageBox::warning(this,QStringLiteral("导入图像 BIN 失败"),file.errorString());
+        return;
+    }
+    const QByteArray data=file.readAll();
+    QVector<orbit::ImagePacket> imported;
+    QString error;
+    const bool prefer218=resolvedSatellite()==QStringLiteral("BY04");
+    const bool likelyFrameStream=(data.size()%223==0&&data.size()%218!=0&&data.size()%256!=0);
+    if(likelyFrameStream){
+        QVector<orbit::Frame> rawFrames;
+        for(int offset=0;offset+223<=data.size();offset+=223)
+            rawFrames.push_back(orbit::Protocol::parse(data.mid(offset,223),resolvedSatellite()));
+        imported=orbit::ImageTools::candidatesFromFrames(rawFrames);
+        imported+=orbit::ImageTools::candidatesFromKiss(
+            orbit::Transport::reassemble(rawFrames),imageApid_->value());
+    }else{
+        imported=orbit::ImageTools::parseBinaryPackets(data,imageApid_->value(),prefer218,&error);
+    }
+    if(imported.isEmpty()){
+        QMessageBox::warning(this,QStringLiteral("导入图像 BIN 失败"),
+            error.isEmpty()?QStringLiteral("文件中没有可用的 SSDV 分片。"):error);
+        return;
+    }
+    std::stable_sort(imported.begin(),imported.end(),[](const orbit::ImagePacket &a,const orbit::ImagePacket &b){
+        if(a.imageId!=b.imageId)return a.imageId<b.imageId;
+        return a.packetId<b.packetId;
+    });
+    images_=imported;
+    {
+        QSignalBlocker blocker(imageTable_);
+        imageTable_->setRowCount(images_.size());
+        for(int i=0;i<images_.size();++i){
+            const auto &packet=images_[i];
+            const QStringList row={QString::number(packet.imageId),QString::number(packet.packetId),
+                QString("%1 × %2").arg(packet.width).arg(packet.height),
+                packet.status=="ssdv_crc32_pass"?QStringLiteral("SSDV CRC 通过"):
+                packet.status=="ssdv_crc32_failed"?QStringLiteral("SSDV CRC 失败"):
+                packet.status=="ssdv_crc_pass"?QStringLiteral("SSDV FEC/CRC 通过"):
+                                                   QStringLiteral("候选，尚未校验")};
+            for(int col=0;col<row.size();++col)imageTable_->setItem(i,col,item(row[col]));
+        }
+        imageTable_->clearSelection();
+        imageTable_->setCurrentCell(0,0);
+    }
+    decodedImage_=QPixmap();
+    imagePreview_->setImage(decodedImage_);
+    imageInfo_->setText(QStringLiteral("已导入 %1 · %2 个 SSDV 分片；当前列表来自导入 BIN，选择图像 ID 将自动重建预览。")
+        .arg(QFileInfo(path).fileName()).arg(images_.size()));
+    if(imageMetric_)imageMetric_->setText(QString::number(images_.size()));
+    QSet<int> triedIds;
+    bool decodedAny=false;
+    int previewRow=0;
+    for(int row=0;row<images_.size();++row){
+        const int imageId=images_[row].imageId;
+        if(triedIds.contains(imageId))continue;
+        triedIds.insert(imageId);
+        if(decodeSsdvImage(imageId,false)){decodedAny=true;previewRow=row;break;}
+    }
+    {
+        QSignalBlocker blocker(imageTable_);
+        imageTable_->setCurrentCell(previewRow,0);
+    }
+    updateImageProgress(images_[previewRow].imageId);
+    if(!decodedAny)
+        statusBar()->showMessage(QStringLiteral("已载入 BIN 分片，但当前图像 ID 尚不能完整重建；全部候选已保留，可继续导入更多分片或检查 CRC。"),10000);
+    else
+        statusBar()->showMessage(QStringLiteral("图像 BIN 已载入并自动解码：")+path,9000);
+}
+
 void MainWindow::inspectRawFrame(int index){
     if(!rawFrameHex_)return;
     if(index<0||index>=frames_.size()){rawFrameHex_->clear();return;}

@@ -80,7 +80,10 @@ private:
     void exportQuaternions(bool experimental=false);
     void exportKiss();
     void exportSsdv();
+    void exportSelectedImageBin();
+    void importImageBin();
     void decodeSsdv();
+    bool decodeSsdvImage(int imageId,bool showErrors);
     void scanSsdv();
     void updateImageProgress(int imageId);
     QString satellite() const;
