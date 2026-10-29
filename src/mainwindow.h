@@ -159,6 +159,7 @@ private:
     ReplayTimelineWidget *timeline_=nullptr;
     QTimer *timer_=nullptr;
     QTabWidget *pages_=nullptr,*rawPage_=nullptr;
+    QWidget *rawHexPage_=nullptr;
     int diagnosticTab_=-1;
     QGroupBox *powerCard_=nullptr,*attitudeCard_=nullptr,*thermalCard_=nullptr,*payloadCard_=nullptr;
     QHash<QGroupBox*,QTableWidget*> overviewTables_;

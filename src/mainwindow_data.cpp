@@ -1462,12 +1462,14 @@ void MainWindow::updateRawPacket(int index){
     // its own nested tab are selected. This prevents raw-packet diagnostic text
     // from leaking into (or visually obscuring) the overview on Windows.
     if(!rawHex_)return;
-    if(!pages_||!rawPage_||pages_->currentWidget()!=rawPage_||rawPage_->currentWidget()!=rawHex_){
+    if(!pages_||!rawPage_||!rawHexPage_||
+       pages_->currentWidget()!=rawPage_||rawPage_->currentWidget()!=rawHexPage_){
         rawHex_->clear();
-        rawHex_->hide();
         return;
     }
-    rawHex_->show();
+    // Do not call show()/hide() on a child of QTabWidget. The stacked-page
+    // containers exclusively control visibility; explicit show() here caused
+    // raw KISS text to leak visually over unrelated pages on some Qt builds.
     if(index<0||index>=business_.size()){
         rawHex_->setPlainText(uiText(QStringLiteral("当前没有可检查的 KISS 应用包。")));
         return;

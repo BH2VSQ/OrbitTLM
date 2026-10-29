@@ -854,15 +854,16 @@ void MainWindow::buildWorkspace(){
     // a large raw-payload widget painting over the overview cards.
     const auto syncRawView=[this](){
         if(!rawHex_)return;
-        const bool active=pages_&&rawPage_&&pages_->currentWidget()==rawPage_&&
-                          rawPage_->currentWidget()==rawHex_;
-        if(active){
-            rawHex_->show();
-            updateRawPacket(currentIndex_);
-        }else{
-            rawHex_->clear();
-            rawHex_->hide();
-        }
+        // A QPlainTextEdit used directly as a QTabWidget page can become
+        // explicitly visible when show() is called during a currentChanged
+        // transition. If that transition is nested, platform-specific Qt event
+        // ordering may leave it painting over sibling pages. Keep it inside an
+        // ordinary page container and let the two QTabWidgets own visibility.
+        const bool active=pages_&&rawPage_&&rawHexPage_&&
+                          pages_->currentWidget()==rawPage_&&
+                          rawPage_->currentWidget()==rawHexPage_;
+        if(active) updateRawPacket(currentIndex_);
+        else rawHex_->clear();
     };
     connect(pages_,&QTabWidget::currentChanged,this,[syncRawView](int){syncRawView();});
     if(rawPage_)
@@ -1355,12 +1356,21 @@ void MainWindow::buildRaw(QTabWidget *tabs){
     rawPage_=new QTabWidget;
     rawPage_->setObjectName(QStringLiteral("rawDataTabs"));
     auto *page=rawPage_;
-    rawHex_=new QPlainTextEdit;
+    // Keep the large raw payload editor in a dedicated page container. Never
+    // manually show()/hide() the editor itself: visibility belongs to the outer
+    // and nested tab stacks, which prevents it from overlaying Overview/SSDV.
+    rawHexPage_=new QWidget;
+    rawHexPage_->setObjectName(QStringLiteral("rawHexPage"));
+    auto *rawHexLayout=new QVBoxLayout(rawHexPage_);
+    rawHexLayout->setContentsMargins(0,0,0,0);
+    rawHexLayout->setSpacing(0);
+    rawHex_=new QPlainTextEdit(rawHexPage_);
     rawHex_->setObjectName(QStringLiteral("rawPacketHexView"));
     rawHex_->setReadOnly(true);
     rawHex_->setLineWrapMode(QPlainTextEdit::NoWrap);
     rawHex_->setPlainText(uiText(QStringLiteral("选择业务包后显示 KISS / HEX 数据。")));
-    page->addTab(rawHex_,QStringLiteral("KISS / HEX"));
+    rawHexLayout->addWidget(rawHex_);
+    page->addTab(rawHexPage_,QStringLiteral("KISS / HEX"));
 
     packetTable_=new QTableWidget(0,6);
     packetTable_->setHorizontalHeaderLabels({QStringLiteral("VCID"),
