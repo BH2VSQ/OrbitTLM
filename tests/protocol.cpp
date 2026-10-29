@@ -193,6 +193,39 @@ private slots:
         QCOMPARE(ImageTools::candidatesFromKiss({pa,pb},0x321).size(),0);
     }
 
+    void ssdvMissingAndBadPacketsReturnDiagnosticsWithoutWaiting(){
+        QVector<ImagePacket> packets;
+        for(const int packetId : {0,2}){
+            ImagePacket packet;
+            packet.bytes=QByteArray(256,char(0)); // Deliberately corrupt SSDV data.
+            packet.imageId=42;
+            packet.packetId=packetId;
+            packet.status=QStringLiteral("candidate_unverified");
+            packets.push_back(packet);
+        }
+        const DecodedImage decoded=ImageTools::decodeImage(packets,42,false);
+        QVERIFY(decoded.jpeg.isEmpty());
+        QVERIFY(!decoded.error.isEmpty());
+        QVERIFY(decoded.missingPacketIds.contains(1));
+        QVERIFY(decoded.badPacketIds.contains(0));
+        QVERIFY(decoded.badPacketIds.contains(2));
+    }
+    void ssdvBinaryExportKeepsEveryFrameByte(){
+        QTemporaryDir temp;QVERIFY(temp.isValid());
+        QVector<ImagePacket> packets;
+        ImagePacket first,second;
+        first.imageId=7;first.packetId=0;first.bytes=QByteArray(256,char(0x11));
+        second.imageId=7;second.packetId=1;second.bytes=QByteArray(256,char(0x22));
+        packets<<first<<second;
+        QString error;
+        const QString path=temp.filePath(QStringLiteral("image_7.bin"));
+        QVERIFY2(ImageTools::savePackets(packets,path,&error),qPrintable(error));
+        QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));
+        const QByteArray exported=file.readAll();
+        QCOMPARE(exported.size(),512);
+        QCOMPARE(exported.left(256),first.bytes);
+        QCOMPARE(exported.mid(256),second.bytes);
+    }
     void physicalHeaderIsFiveBytes(){
         const QByteArray info=syntheticFrame();
         const auto data=Transport::frameData(info);

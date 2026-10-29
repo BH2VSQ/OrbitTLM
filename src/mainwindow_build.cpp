@@ -116,11 +116,14 @@ void setupTable(QTableWidget *table){
 }
 }
 MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
-    setWindowTitle(QStringLiteral("OrbitTLM · 卫星遥测回放工作台"));
+    setWindowTitle(uiText(QStringLiteral("OrbitTLM · 卫星遥测回放工作台")));
     setMinimumSize(800,690);
     resize(1480,910);
     live_=new orbit::LiveTcp(this);
     loadApplicationSettings();
+    // Load translation data before building widgets so dynamically populated
+    // catalog tabs can choose their proper English labels on first creation.
+    loadLanguageFile();
     applyStyles();
     buildToolbar();
     buildWorkspace();
@@ -128,25 +131,37 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
     applyLanguage();
     timer_=new QTimer(this);timer_->setInterval(500);
     connect(timer_,&QTimer::timeout,this,[this]{
-        if(business_.isEmpty()){timer_->stop();return;}
-        seekVisible(1);
+        if(business_.isEmpty()){timer_->stop();}
+        else seekVisible(1);
+        if(timer_&&!timer_->isActive()&&playPauseButton_){
+            QSignalBlocker blocker(playPauseButton_);
+            playPauseButton_->setChecked(false);
+            playPauseButton_->setText(uiText(QStringLiteral("播放")));
+        }
     });
     connect(live_,&orbit::LiveTcp::status,this,[this](const QString &message){
-        statusBar()->showMessage(QStringLiteral("TCP 状态：")+message,7500);
-        if(!tcpStatusLabel_)return;
+        statusBar()->showMessage(uiText(QStringLiteral("TCP 状态："))+uiText(message),7500);
         if(message==QStringLiteral("Connected")){
-            tcpStatusLabel_->setText(QStringLiteral("TCP：已连接"));
-            tcpStatusLabel_->setStyleSheet(QStringLiteral("color:#15803d;font-weight:600;"));
+            tcpConnected_=true;tcpConnecting_=false;
+            if(tcpToggleButton_)tcpToggleButton_->setText(uiText(QStringLiteral("断开 TCP")));
+            if(tcpStatusLabel_){tcpStatusLabel_->setText(uiText(QStringLiteral("TCP：已连接")));
+                tcpStatusLabel_->setStyleSheet(QStringLiteral("color:#15803d;font-weight:600;"));}
         }else if(message.startsWith(QStringLiteral("正在连接"))){
-            tcpStatusLabel_->setText(QStringLiteral("TCP：连接中"));
-            tcpStatusLabel_->setStyleSheet(QStringLiteral("color:#b45309;font-weight:600;"));
+            tcpConnected_=false;tcpConnecting_=true;
+            if(tcpToggleButton_)tcpToggleButton_->setText(uiText(QStringLiteral("取消连接")));
+            if(tcpStatusLabel_){tcpStatusLabel_->setText(uiText(QStringLiteral("TCP：连接中")));
+                tcpStatusLabel_->setStyleSheet(QStringLiteral("color:#b45309;font-weight:600;"));}
         }else if(message.startsWith(QStringLiteral("连接失败"))){
-            tcpStatusLabel_->setText(QStringLiteral("TCP：连接失败"));
-            tcpStatusLabel_->setToolTip(message);
-            tcpStatusLabel_->setStyleSheet(QStringLiteral("color:#b91c1c;font-weight:600;"));
+            tcpConnected_=false;tcpConnecting_=false;
+            if(tcpToggleButton_)tcpToggleButton_->setText(uiText(QStringLiteral("连接 TCP")));
+            if(tcpStatusLabel_){tcpStatusLabel_->setText(uiText(QStringLiteral("TCP：连接失败")));
+                tcpStatusLabel_->setToolTip(message);
+                tcpStatusLabel_->setStyleSheet(QStringLiteral("color:#b91c1c;font-weight:600;"));}
         }else if(message==QStringLiteral("Disconnected")){
-            if(tcpStatusLabel_->text()!=QStringLiteral("TCP：连接失败")){
-                tcpStatusLabel_->setText(QStringLiteral("TCP：未连接"));
+            tcpConnected_=false;tcpConnecting_=false;
+            if(tcpToggleButton_)tcpToggleButton_->setText(uiText(QStringLiteral("连接 TCP")));
+            if(tcpStatusLabel_){
+                tcpStatusLabel_->setText(uiText(QStringLiteral("TCP：未连接")));
                 tcpStatusLabel_->setStyleSheet(QString());
                 tcpStatusLabel_->setToolTip(QString());
             }
@@ -157,9 +172,9 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
         QString storageError;
         const bool stored=satelliteStore_.append(frame,&inserted,&storageError);
         if(!stored){
-            statusBar()->showMessage(QStringLiteral("SQLite 写入失败：%1").arg(storageError),10000);
+            statusBar()->showMessage(uiText(QStringLiteral("SQLite 写入失败：%1")).arg(storageError),10000);
         }else if(!inserted){
-            statusBar()->showMessage(QStringLiteral("重复帧已去重：%1").arg(frame.satellite),3000);
+            statusBar()->showMessage(uiText(QStringLiteral("重复帧已去重：%1")).arg(frame.satellite),3000);
             return;
         }
         for(const auto &existing:frames_){
@@ -175,7 +190,7 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
         });
         rebuildSession(true);
         if(stored){
-            statusBar()->showMessage(QStringLiteral("已保存至 %1.db（按时间排序，重复帧自动忽略）").arg(frame.satellite),5000);
+            statusBar()->showMessage(uiText(QStringLiteral("已保存至 %1.db（按时间排序，重复帧自动忽略）")).arg(frame.satellite),5000);
         }
     });
     const QString dataDir=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
@@ -187,12 +202,12 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
     if(!QFileInfo::exists(dbFile)&&QFileInfo::exists(legacyDbFile))QFile::copy(legacyDbFile,dbFile);
     QString error;
     if(!db_.open(dbFile,&error))
-        statusBar()->showMessage(QStringLiteral("SQLite 数据库无法打开：")+error,18000);
+        statusBar()->showMessage(uiText(QStringLiteral("SQLite 数据库无法打开："))+error,18000);
     error.clear();
     if(catalog_.loadDirectory(QApplication::applicationDirPath()+"/protocols/asrtu1",&error)){
         catalogReady_=true;
     }else{
-        statusBar()->showMessage(QStringLiteral("缺少 ASRTU-1 遥测字段库：")+error,18000);
+        statusBar()->showMessage(uiText(QStringLiteral("缺少 ASRTU-1 遥测字段库："))+error,18000);
     }
     updatePaths();
     updateMetrics();
@@ -262,28 +277,22 @@ void MainWindow::applyStyles(){
 void MainWindow::buildToolbar(){
     auto *bar=addToolBar(QStringLiteral("遥测工作台"));
     bar->setMovable(false);
-    replayListAction_=bar->addAction(QStringLiteral("数据回放列表"));
-    replayListAction_->setCheckable(true);
-    replayListAction_->setChecked(true);
-    connect(replayListAction_,&QAction::toggled,this,[this](bool visible){
-        setReplayListCollapsed(!visible);
-    });
-    bar->addSeparator();
     auto *log=bar->addAction(QStringLiteral("导入 LOG"));
     connect(log,&QAction::triggered,this,[this]{
-        const QString p=QFileDialog::getOpenFileName(this,QStringLiteral("选择解码日志"),{},
-                                                     QStringLiteral("日志 (*.log *.txt);;全部文件 (*)"));
+        const QString p=QFileDialog::getOpenFileName(this,uiText(QStringLiteral("选择解码日志")),{},
+                                                     uiText(QStringLiteral("日志 (*.log *.txt);;全部文件 (*)")));
         if(!p.isEmpty()){logPath_=p;updatePaths();}
     });
     auto *bin=bar->addAction(QStringLiteral("导入 BIN"));
     connect(bin,&QAction::triggered,this,[this]{
-        const QString p=QFileDialog::getOpenFileName(this,QStringLiteral("选择 223 字节帧文件"),{},
-                                                     QStringLiteral("数据帧 (*.bin);;全部文件 (*)"));
+        const QString p=QFileDialog::getOpenFileName(this,uiText(QStringLiteral("选择 223 字节帧文件")),{},
+                                                     uiText(QStringLiteral("数据帧 (*.bin);;全部文件 (*)")));
         if(!p.isEmpty()){binPath_=p;updatePaths();}
     });
     bar->addSeparator();
-    bar->addWidget(new QLabel(QStringLiteral("卫星  ")));
-    satelliteSelect_=new QComboBox;
+    auto *satelliteLabel=new QLabel(QStringLiteral("卫星  "),bar);
+    bar->addWidget(satelliteLabel);
+    satelliteSelect_=new QComboBox(bar);
     satelliteSelect_->addItem(QStringLiteral("自动识别"),QStringLiteral("AUTO"));
     satelliteSelect_->addItem(QStringLiteral("阿斯图系列 · ASRTU-1"),QStringLiteral("ASRTU-1"));
     satelliteSelect_->addItem(QStringLiteral("BY70-4（BY04）"),QStringLiteral("BY04"));
@@ -291,27 +300,22 @@ void MainWindow::buildToolbar(){
     auto *import=bar->addAction(QStringLiteral("开始导入"));
     connect(import,&QAction::triggered,this,[this]{importSession();});
     bar->addSeparator();
-    auto *exportData=bar->addAction(QStringLiteral("统一导出"));
-    connect(exportData,&QAction::triggered,this,[this]{showExportDialog();});
-    bar->addSeparator();
-    auto *connectTcp=bar->addAction(QStringLiteral("连接 TCP"));
+    tcpToggleButton_=new QPushButton(QStringLiteral("连接 TCP"),bar);
+    tcpToggleButton_->setObjectName(QStringLiteral("tcpToggleButton"));
+    bar->addWidget(tcpToggleButton_);
     tcpStatusLabel_=new QLabel(QStringLiteral("TCP：未连接"),bar);
     tcpStatusLabel_->setObjectName(QStringLiteral("tcpStatusLabel"));
     tcpStatusLabel_->setMinimumWidth(112);
     bar->addWidget(tcpStatusLabel_);
-    connect(connectTcp,&QAction::triggered,this,[this]{
-        if(tcpHost_.trimmed().isEmpty()||tcpPort_<1||tcpPort_>65535){configureTcpServer();return;}
-        live_->start(tcpHost_.trimmed(),quint16(tcpPort_),QStringLiteral("AUTO"));
-    });
-    auto *stop=bar->addAction(QStringLiteral("断开"));
-    connect(stop,&QAction::triggered,live_,&orbit::LiveTcp::stop);
-    bar->addSeparator();
-    auto *openWeb=bar->addAction(QStringLiteral("HTML 历史"));
-    connect(openWeb,&QAction::triggered,this,[this]{
-        updateWebHistory();
-        const QString path=QDir(satelliteStore_.rootDirectory()).filePath(QStringLiteral("index.html"));
-        if(!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
-            QMessageBox::warning(this,QStringLiteral("打开 HTML 历史失败"),path);
+    connect(tcpToggleButton_,&QPushButton::clicked,this,[this]{
+        if(tcpConnected_||tcpConnecting_){
+            live_->stop();
+            tcpConnected_=false;tcpConnecting_=false;
+            tcpToggleButton_->setText(uiText(QStringLiteral("连接 TCP")));
+        }else{
+            if(tcpHost_.trimmed().isEmpty()||tcpPort_<1||tcpPort_>65535){configureTcpServer();return;}
+            live_->start(tcpHost_.trimmed(),quint16(tcpPort_),QStringLiteral("AUTO"));
+        }
     });
 }
 void MainWindow::buildMenus(){
@@ -320,7 +324,7 @@ void MainWindow::buildMenus(){
         updateWebHistory();
         const QString path=QDir(satelliteStore_.rootDirectory()).filePath(QStringLiteral("index.html"));
         if(!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
-            QMessageBox::warning(this,QStringLiteral("打开 HTML 历史失败"),path);
+            QMessageBox::warning(this,uiText(QStringLiteral("打开 HTML 历史失败")),path);
     });
     file->addSeparator();
     file->addAction(QStringLiteral("统一导出…"),[this]{showExportDialog();});
@@ -344,43 +348,60 @@ void MainWindow::buildMenus(){
         connect(languageAction,&QAction::triggered,this,[this,code]{
             languageCode_=code;
             applyLanguage();
+            if(sourceLabel_){
+                const QString source=sourceLabel_->property("orbitDynamicSource").toString();
+                if(!source.isEmpty())sourceLabel_->setText(uiText(source));
+            }
+            updateFrameList();
+            showEvent(currentIndex_);
+            updateMetrics();
+            if(tcpStatusLabel_){
+                const QString status=tcpConnected_?QStringLiteral("TCP：已连接"):
+                    (tcpConnecting_?QStringLiteral("TCP：连接中"):QStringLiteral("TCP：未连接"));
+                tcpStatusLabel_->setText(uiText(status));
+            }
+            if(tcpToggleButton_)
+                tcpToggleButton_->setText(uiText(tcpConnected_?QStringLiteral("断开 TCP"):
+                    (tcpConnecting_?QStringLiteral("取消连接"):QStringLiteral("连接 TCP"))));
+            if(playPauseButton_)
+                playPauseButton_->setText(uiText(playPauseButton_->isChecked()?QStringLiteral("暂停"):QStringLiteral("播放")));
+            if(replayCollapseButton_)
+                replayCollapseButton_->setText(uiText(replayListCollapsed_?QStringLiteral("展开时间轴"):QStringLiteral("收起时间轴")));
+            const int imageId=selectedImageId();
+            if(imageId>=0){updateImageProgress(imageId);decodeSsdvImage(imageId,false);}
             saveApplicationSettings();
         });
     }
     tools->addAction(QStringLiteral("载入自定义字段规则 JSON"),[this]{
-        const QString p=QFileDialog::getOpenFileName(this,QStringLiteral("选择字段规则"),{},
-                                                       QStringLiteral("JSON 文件 (*.json)"));
+        const QString p=QFileDialog::getOpenFileName(this,uiText(QStringLiteral("选择字段规则")),{},
+                                                       uiText(QStringLiteral("JSON 文件 (*.json)")));
         if(p.isEmpty())return;
         orbit::Schema candidate;QString error;
-        if(!candidate.load(p,&error)){QMessageBox::warning(this,QStringLiteral("字段规则错误"),error);return;}
+        if(!candidate.load(p,&error)){QMessageBox::warning(this,uiText(QStringLiteral("字段规则错误")),error);return;}
         if(candidate.satellite()!=resolvedSatellite()){
-            QMessageBox::warning(this,QStringLiteral("卫星不匹配"),QStringLiteral("该规则属于另一颗卫星"));return;
+            QMessageBox::warning(this,uiText(QStringLiteral("卫星不匹配")),uiText(QStringLiteral("该规则属于另一颗卫星")));return;
         }
         customSchema_=candidate;hasCustomSchema_=true;
         for(auto &f:frames_)customSchema_.apply(f);
         inspectFrame(0);
-        statusBar()->showMessage(QStringLiteral("已载入独立字段规则，尚需验证字段物理含义"),9000);
+        statusBar()->showMessage(uiText(QStringLiteral("已载入独立字段规则，尚需验证字段物理含义")),9000);
     });
     auto *debug=tools->addAction(QStringLiteral("显示调试信息"));
     debug->setCheckable(true);
     connect(debug,&QAction::toggled,this,[this](bool active){setDiagnosticsVisible(active);});
 }
 void MainWindow::setReplayListCollapsed(bool collapsed){
-    if(!workspaceSplitter_||replayListCollapsed_==collapsed)return;
-    if(collapsed){
-        const QList<int> sizes=workspaceSplitter_->sizes();
-        if(!sizes.isEmpty()&&sizes.first()>0)replayPanelWidth_=sizes.first();
-        replayListCollapsed_=true;
-        workspaceSplitter_->setSizes({0,std::max(1,workspaceSplitter_->width())});
-        resize(std::max(800,width()-replayPanelWidth_),height());
-    }else{
-        replayListCollapsed_=false;
-        resize(width()+replayPanelWidth_,height());
-        workspaceSplitter_->setSizes({replayPanelWidth_,std::max(1,workspaceSplitter_->width()-replayPanelWidth_)});
-    }
-    if(replayListAction_){
-        QSignalBlocker blocker(replayListAction_);
-        replayListAction_->setChecked(!collapsed);
+    if(!replayPanel_||replayListCollapsed_==collapsed)return;
+    replayListCollapsed_=collapsed;
+    if(replayContent_)replayContent_->setVisible(!collapsed);
+    replayPanel_->setMaximumHeight(collapsed?48:QWIDGETSIZE_MAX);
+    replayPanel_->setMinimumHeight(collapsed?0:145);
+    if(replayCollapseButton_)
+        replayCollapseButton_->setText(uiText(collapsed?QStringLiteral("展开时间轴"):QStringLiteral("收起时间轴")));
+    if(workspaceSplitter_){
+        const int total=qMax(220,workspaceSplitter_->height());
+        const int panelHeight=collapsed?48:178;
+        workspaceSplitter_->setSizes({qMax(1,total-panelHeight),panelHeight});
     }
 }
 
@@ -472,6 +493,10 @@ bool MainWindow::loadLanguageFile(){
     const QJsonObject map=root.value(QStringLiteral("translations")).toObject();
     if(map.isEmpty())return false;
     translations_=map;
+    if(QCoreApplication::instance()){
+        QCoreApplication::instance()->setProperty("orbitTlmTranslations",QVariant::fromValue(map));
+        QCoreApplication::instance()->setProperty("orbitTlmLanguage",languageCode_);
+    }
     return true;
 }
 
@@ -482,11 +507,10 @@ void MainWindow::applyLanguage(){
         QString source;
         if(saved.isValid())source=saved.toString();
         else{
-            if(!translations_.contains(current))return current;
             source=current;
             object->setProperty(propertyName,source);
         }
-        return translations_.value(source).toString(source);
+        return uiText(source);
     };
     setWindowTitle(translated(this,windowTitle(),"orbitSourceWindowTitle"));
     const auto dynamicLabel=[this](const QLabel *label){
@@ -509,6 +533,12 @@ void MainWindow::applyLanguage(){
             line->setPlaceholderText(translated(line,line->placeholderText(),"orbitSourcePlaceholder"));
         if(auto *plain=qobject_cast<QPlainTextEdit*>(widget))
             plain->setPlaceholderText(translated(plain,plain->placeholderText(),"orbitSourcePlaceholder"));
+        if(!widget->toolTip().isEmpty()){
+            const QString tipSource=widget->property("orbitSourceToolTip").isValid()
+                ?widget->property("orbitSourceToolTip").toString():widget->toolTip();
+            if(!widget->property("orbitSourceToolTip").isValid())widget->setProperty("orbitSourceToolTip",tipSource);
+            widget->setToolTip(uiText(tipSource));
+        }
         if(auto *combo=qobject_cast<QComboBox*>(widget)){
             constexpr int role=Qt::UserRole+121;
             for(int i=0;i<combo->count();++i){
@@ -516,7 +546,7 @@ void MainWindow::applyLanguage(){
                 QString source;
                 if(saved.isValid())source=saved.toString();
                 else{source=combo->itemText(i);combo->setItemData(i,source,role);}
-                combo->setItemText(i,translations_.value(source).toString(source));
+                combo->setItemText(i,uiText(source));
             }
         }
         if(auto *tabs=qobject_cast<QTabWidget*>(widget)){
@@ -524,15 +554,34 @@ void MainWindow::applyLanguage(){
             while(sources.size()<tabs->count())sources.push_back(tabs->tabText(sources.size()));
             if(sources.size()>tabs->count())sources=sources.mid(0,tabs->count());
             tabs->setProperty("orbitSourceTabTexts",sources);
-            for(int i=0;i<tabs->count();++i)tabs->setTabText(i,translations_.value(sources[i]).toString(sources[i]));
+            for(int i=0;i<tabs->count();++i)tabs->setTabText(i,uiText(sources[i]));
         }
+        if(auto *menu=qobject_cast<QMenu*>(widget)){
+            const QString source=translated(menu,menu->title(),"orbitSourceText");
+            if(menu->menuAction())menu->menuAction()->setProperty("orbitSourceText",menu->property("orbitSourceText"));
+            menu->setTitle(source);
+        }
+        if(auto *toolbar=qobject_cast<QToolBar*>(widget))
+            toolbar->setWindowTitle(translated(toolbar,toolbar->windowTitle(),"orbitSourceWindowTitle"));
         if(auto *table=qobject_cast<QTableWidget*>(widget)){
-            constexpr int role=Qt::UserRole+122;
+            constexpr int headerRole=Qt::UserRole+122;
+            constexpr int cellRole=Qt::UserRole+123;
             for(int i=0;i<table->columnCount();++i){
-                if(auto *item=table->horizontalHeaderItem(i)){
-                    QVariant saved=item->data(role);QString source;
-                    if(saved.isValid())source=saved.toString();else{source=item->text();item->setData(role,source);}
-                    item->setText(translations_.value(source).toString(source));
+                if(auto *headerItem=table->horizontalHeaderItem(i)){
+                    QVariant saved=headerItem->data(headerRole);QString source;
+                    if(saved.isValid())source=saved.toString();else{source=headerItem->text();headerItem->setData(headerRole,source);}
+                    headerItem->setText(uiText(source));
+                }
+            }
+            for(int row=0;row<table->rowCount();++row)for(int col=0;col<table->columnCount();++col){
+                if(auto *cell=table->item(row,col)){
+                    QVariant saved=cell->data(cellRole);QString source;
+                    if(saved.isValid())source=saved.toString();else{source=cell->text();cell->setData(cellRole,source);}
+                    const QString explicitEnglish=cell->data(Qt::UserRole+125).toString();
+                    cell->setText(languageCode_==QStringLiteral("en-US")&&!explicitEnglish.isEmpty()
+                                      ?explicitEnglish:uiText(source));
+                    const QVariant tipSource=cell->data(Qt::UserRole+124);
+                    if(tipSource.isValid())cell->setToolTip(uiText(tipSource.toString()));
                 }
             }
         }
@@ -541,7 +590,31 @@ void MainWindow::applyLanguage(){
             if(auto *header=tree->headerItem())for(int i=0;i<tree->columnCount();++i){
                 QVariant saved=header->data(i,role);QString source;
                 if(saved.isValid())source=saved.toString();else{source=header->text(i);header->setData(i,role,source);}
-                header->setText(i,translations_.value(source).toString(source));
+                header->setText(i,uiText(source));
+            }
+            std::function<void(QTreeWidgetItem*)> translateNode=[&](QTreeWidgetItem *node){
+                if(!node)return;
+                for(int column=0;column<tree->columnCount();++column){
+                    QVariant saved=node->data(column,Qt::UserRole+124);QString source;
+                    if(saved.isValid())source=saved.toString();
+                    else{source=node->text(column);node->setData(column,Qt::UserRole+124,source);}
+                    const QString explicitEnglish=column==0?node->data(0,Qt::UserRole+125).toString():QString();
+                    node->setText(column,languageCode_==QStringLiteral("en-US")&&!explicitEnglish.isEmpty()
+                                           ?explicitEnglish:uiText(source));
+                    const QVariant tooltipSource=node->data(column,Qt::UserRole+126);
+                    if(tooltipSource.isValid())node->setToolTip(column,uiText(tooltipSource.toString()));
+                }
+                for(int child=0;child<node->childCount();++child)translateNode(node->child(child));
+            };
+            for(int row=0;row<tree->topLevelItemCount();++row)translateNode(tree->topLevelItem(row));
+        }
+        if(auto *wrapped=qobject_cast<AutoWrapTabWidget*>(widget)){
+            for(int i=0;i<wrapped->count();++i){
+                QWidget *page=wrapped->widget(i);
+                if(!page)continue;
+                const QString source=page->property("orbitSourceTabText").toString();
+                if(!source.isEmpty())wrapped->setTabText(i,uiText(source));
+                wrapped->setTabToolTip(i,uiText(page->toolTip().isEmpty()?source:page->toolTip()));
             }
         }
     }
@@ -555,7 +628,18 @@ void MainWindow::applyLanguage(){
 }
 
 QString MainWindow::uiText(const QString &source) const{
-    return translations_.value(source).toString(source);
+    const auto exact=translations_.constFind(source);
+    if(exact!=translations_.cend())return exact.value().toString(source);
+    if(languageCode_!=QStringLiteral("en-US"))return source;
+    QString translated=source;
+    QStringList keys=translations_.keys();
+    std::sort(keys.begin(),keys.end(),[](const QString &a,const QString &b){return a.size()>b.size();});
+    for(const QString &key:keys){
+        if(key.isEmpty()||key==translations_.value(key).toString())continue;
+        if(!translated.contains(key))continue;
+        translated.replace(key,translations_.value(key).toString());
+    }
+    return translated;
 }
 
 void MainWindow::showExportDialog(){
@@ -617,8 +701,9 @@ void MainWindow::showExportDialog(){
     if(kiss->isChecked())planned<<QStringLiteral("kiss-packets.json");
     if(ssdv->isChecked())planned<<QStringLiteral("satellite.ssdv");
     if(jpeg->isChecked()){
-        int row=imageTable_?imageTable_->currentRow():-1;if(row<0||row>=images_.size())row=0;
-        if(row>=0&&row<images_.size())planned<<QStringLiteral("BY70-4_ID%1.jpg").arg(images_[row].imageId);
+        int imageId=selectedImageId();
+        if(imageId<0&&!images_.isEmpty())imageId=images_.first().imageId;
+        if(imageId>=0)planned<<QStringLiteral("SSDV_ID%1.jpg").arg(imageId);
     }
     QStringList existing;
     for(const QString &name:planned)if(QFileInfo::exists(QDir(outDir).filePath(name)))existing<<name;
@@ -656,93 +741,132 @@ void MainWindow::buildWorkspace(){
     message_->setObjectName("note");
     fileLayout->addWidget(message_);
     main->addWidget(fileBar);
-    workspaceSplitter_=new QSplitter(Qt::Horizontal);
-    auto *split=workspaceSplitter_;
-    split->setChildrenCollapsible(false);
-    split->setCollapsible(0,true);
-    auto *left=new QFrame;
-    left->setObjectName("panel");
-    left->setMinimumWidth(0);
-    replayPanel_=left;
-    auto *leftLayout=new QVBoxLayout(left);
-    leftLayout->setContentsMargins(13,12,13,12);
-    leftLayout->setSpacing(8);
-    auto *header=new QLabel(QStringLiteral("数据回放列表"));
-    header->setObjectName("detailHeading");
-    leftLayout->addWidget(header);
-    leftLayout->addWidget(subtitle(QStringLiteral("按记录时间浏览已重组的业务数据包")));
-    eventSearch_=new QLineEdit;
-    eventSearch_->setPlaceholderText(QStringLiteral("搜索时间、分系统或数据包"));
-    leftLayout->addWidget(eventSearch_);
-    recognizedOnly_=new QCheckBox(QStringLiteral("仅显示已识别数据"));
-    leftLayout->addWidget(recognizedOnly_);
-    eventTable_=new QTableWidget(0,4);
-    eventTable_->setObjectName("eventTimeline");
-    eventTable_->setHorizontalHeaderLabels({QStringLiteral("时间"),
-        QStringLiteral("数据包 / 事件"),QStringLiteral("状态"),QStringLiteral("来源")});
-    setupTable(eventTable_);
-    eventTable_->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
-    eventTable_->horizontalHeader()->setSectionResizeMode(1,QHeaderView::Interactive);
-    eventTable_->setColumnWidth(1,230);
-    eventTable_->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    eventTable_->horizontalHeader()->setSectionResizeMode(2,QHeaderView::ResizeToContents);
-    eventTable_->horizontalHeader()->setSectionResizeMode(3,QHeaderView::ResizeToContents);
-    eventTable_->verticalHeader()->setDefaultSectionSize(43);
-    leftLayout->addWidget(eventTable_,1);
-    connect(eventTable_,&QTableWidget::itemSelectionChanged,this,[this]{
-        const int row=eventTable_->currentRow();
-        if(row>=0)selectEvent(row);
-    });
-    connect(eventSearch_,&QLineEdit::textChanged,this,[this]{applyEventFilter();});
-    connect(recognizedOnly_,&QCheckBox::toggled,this,[this]{applyEventFilter();});
-    split->addWidget(left);
+
+    workspaceSplitter_=new QSplitter(Qt::Vertical);
+    workspaceSplitter_->setChildrenCollapsible(false);
+    workspaceSplitter_->setCollapsible(1,true);
+
     pages_=new QTabWidget;
     pages_->setObjectName("mainPages");
-    pages_->setMinimumWidth(600);
+    pages_->setMinimumHeight(250);
     buildOverview(pages_);
     buildEngineering(pages_);
     buildAttitude(pages_);
     buildImages(pages_);
     buildRaw(pages_);
     buildDiagnostics(pages_);
-    split->addWidget(pages_);
-    split->setStretchFactor(0,0);
-    split->setStretchFactor(1,1);
-    replayPanelWidth_=490;
-    split->setSizes({replayPanelWidth_,960});
-    main->addWidget(split,1);
-    auto *transport=new QFrame;
-    transport->setObjectName("panel");
+    workspaceSplitter_->addWidget(pages_);
+
+    replayPanel_=new QFrame;
+    replayPanel_->setObjectName("panel");
+    replayPanel_->setMinimumHeight(0);
+    auto *replayLayout=new QVBoxLayout(replayPanel_);
+    replayLayout->setContentsMargins(12,7,12,7);
+    replayLayout->setSpacing(5);
+    auto *header=new QWidget(replayPanel_);
+    auto *headerLayout=new QHBoxLayout(header);
+    headerLayout->setContentsMargins(0,0,0,0);
+    headerLayout->setSpacing(8);
+    auto *headerTitle=new QLabel(QStringLiteral("数据回放时间轴"),header);
+    headerTitle->setObjectName("detailHeading");
+    headerLayout->addWidget(headerTitle);
+    eventSearch_=new QLineEdit(header);
+    eventSearch_->setObjectName(QStringLiteral("replaySearch"));
+    eventSearch_->setPlaceholderText(uiText(QStringLiteral("搜索时间、分系统或数据包")));
+    eventSearch_->setMaximumWidth(270);
+    headerLayout->addWidget(eventSearch_);
+    recognizedOnly_=new QCheckBox(QStringLiteral("仅显示已识别数据"),header);
+    headerLayout->addWidget(recognizedOnly_);
+    headerLayout->addStretch(1);
+    replayCollapseButton_=new QPushButton(QStringLiteral("收起时间轴"),header);
+    replayCollapseButton_->setObjectName(QStringLiteral("replayCollapseButton"));
+    headerLayout->addWidget(replayCollapseButton_);
+    replayLayout->addWidget(header);
+
+    replayContent_=new QWidget(replayPanel_);
+    auto *contentLayout=new QVBoxLayout(replayContent_);
+    contentLayout->setContentsMargins(0,0,0,0);
+    contentLayout->setSpacing(4);
+    timeline_=new ReplayTimelineWidget(replayContent_);
+    timeline_->setObjectName(QStringLiteral("replayKeyframeTimeline"));
+    contentLayout->addWidget(timeline_);
+    auto *transport=new QWidget(replayContent_);
     auto *transportLayout=new QHBoxLayout(transport);
-    transportLayout->setContentsMargins(12,7,12,7);
-    auto *back=new QPushButton(QStringLiteral("上一条"));
-    auto *play=new QPushButton(QStringLiteral("播放"));
-    auto *pause=new QPushButton(QStringLiteral("暂停"));
-    auto *next=new QPushButton(QStringLiteral("下一条"));
+    transportLayout->setContentsMargins(0,0,0,0);
+    transportLayout->setSpacing(6);
+    auto *back=new QPushButton(QStringLiteral("上一条"),transport);
+    auto *next=new QPushButton(QStringLiteral("下一条"),transport);
+    playPauseButton_=new QPushButton(QStringLiteral("播放"),transport);
+    playPauseButton_->setObjectName(QStringLiteral("playPauseButton"));
+    playPauseButton_->setCheckable(true);
+    auto *zoomOut=new QPushButton(QStringLiteral("−"),transport);
+    zoomOut->setObjectName(QStringLiteral("timelineZoomOut"));
+    zoomOut->setToolTip(uiText(QStringLiteral("缩小时间轴范围，显示更多事件")));
+    zoomOut->setFixedWidth(38);
+    auto *zoomIn=new QPushButton(QStringLiteral("+"),transport);
+    zoomIn->setObjectName(QStringLiteral("timelineZoomIn"));
+    zoomIn->setToolTip(uiText(QStringLiteral("放大时间轴范围，查看事件细节")));
+    zoomIn->setFixedWidth(38);
     transportLayout->addWidget(back);
-    transportLayout->addWidget(play);
-    transportLayout->addWidget(pause);
+    transportLayout->addWidget(playPauseButton_);
     transportLayout->addWidget(next);
-    timeline_=new QSlider(Qt::Horizontal);
-    timeline_->setRange(0,0);
-    transportLayout->addWidget(timeline_,1);
-    speedSelect_=new QComboBox;
+    transportLayout->addSpacing(8);
+    transportLayout->addWidget(zoomOut);
+    transportLayout->addWidget(zoomIn);
+    transportLayout->addStretch(1);
+    speedSelect_=new QComboBox(transport);
     speedSelect_->addItems({"0.5×","1×","2×","4×","8×"});
     speedSelect_->setCurrentIndex(1);
+    speedSelect_->setMaximumWidth(90);
     transportLayout->addWidget(speedSelect_);
-    positionLabel_=new QLabel(QStringLiteral("0 / 0"));
-    positionLabel_->setMinimumWidth(63);
+    positionLabel_=new QLabel(QStringLiteral("0 / 0"),transport);
+    positionLabel_->setMinimumWidth(70);
+    positionLabel_->setAlignment(Qt::AlignRight|Qt::AlignVCenter);
     transportLayout->addWidget(positionLabel_);
-    main->addWidget(transport);
+    contentLayout->addWidget(transport);
+    replayLayout->addWidget(replayContent_);
+
+    // Kept as an internal event model so existing filter and previous/next logic
+    // continue to operate on the same stable event indices. The visible surface is
+    // now the bottom keyframe timeline rather than a left-hand table.
+    eventTable_=new QTableWidget(0,4,replayPanel_);
+    eventTable_->setObjectName("eventTimelineModel");
+    eventTable_->setHorizontalHeaderLabels({QStringLiteral("时间"),QStringLiteral("数据包 / 事件"),
+                                             QStringLiteral("状态"),QStringLiteral("来源")});
+    setupTable(eventTable_);
+    eventTable_->hide();
+
+    workspaceSplitter_->addWidget(replayPanel_);
+    workspaceSplitter_->setStretchFactor(0,1);
+    workspaceSplitter_->setStretchFactor(1,0);
+    workspaceSplitter_->setSizes({670,178});
+    main->addWidget(workspaceSplitter_,1);
+
+    connect(eventTable_,&QTableWidget::itemSelectionChanged,this,[this]{
+        const int row=eventTable_->currentRow();
+        if(row>=0)selectEvent(row);
+    });
+    connect(eventSearch_,&QLineEdit::textChanged,this,[this]{applyEventFilter();});
+    connect(recognizedOnly_,&QCheckBox::toggled,this,[this]{applyEventFilter();});
+    connect(replayCollapseButton_,&QPushButton::clicked,this,[this]{setReplayListCollapsed(!replayListCollapsed_);});
+    timeline_->onActivated=[this](int index){selectEvent(index);};
     connect(back,&QPushButton::clicked,this,[this]{seekVisible(-1);});
     connect(next,&QPushButton::clicked,this,[this]{seekVisible(1);});
-    connect(play,&QPushButton::clicked,this,[this]{if(!business_.isEmpty())timer_->start();});
-    connect(pause,&QPushButton::clicked,this,[this]{timer_->stop();});
-    connect(timeline_,&QSlider::valueChanged,this,[this](int i){selectEvent(i);});
+    connect(playPauseButton_,&QPushButton::toggled,this,[this](bool playing){
+        if(playing&&!business_.isEmpty()){
+            playPauseButton_->setText(uiText(QStringLiteral("暂停")));
+            timer_->start();
+        }else{
+            timer_->stop();
+            playPauseButton_->setText(uiText(QStringLiteral("播放")));
+        }
+    });
+    connect(zoomOut,&QPushButton::clicked,timeline_,[this]{timeline_->zoomOut();});
+    connect(zoomIn,&QPushButton::clicked,timeline_,[this]{timeline_->zoomIn();});
     connect(speedSelect_,&QComboBox::currentIndexChanged,this,[this](int i){
         const int intervals[5]={1000,500,250,125,63};if(timer_)timer_->setInterval(intervals[i]);
     });
-    statusBar()->showMessage(QStringLiteral("就绪 · 传输帧 FEC 证据与应用层 CRC 状态独立显示"));
+    statusBar()->showMessage(uiText(QStringLiteral("就绪 · 传输帧 FEC 证据与应用层 CRC 状态独立显示")));
 }
 void MainWindow::buildOverview(QTabWidget *tabs){
     auto *page=new QWidget;
@@ -791,7 +915,7 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
     engineeringSummary_=subtitle(QStringLiteral("选择一条已识别的业务包，查看分系统字段与工程量"));
     layout->addWidget(engineeringSummary_);
     engineeringSearch_=new QLineEdit;
-    engineeringSearch_->setPlaceholderText(QStringLiteral("筛选当前分包字段名或编号"));
+    engineeringSearch_->setPlaceholderText(uiText(QStringLiteral("筛选当前分包字段名或编号")));
     layout->addWidget(engineeringSearch_);
     auto *split=new QSplitter(Qt::Horizontal);
     engineeringTable_=new QTableWidget(0,3);
@@ -834,13 +958,13 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
         if(item->data(0,Qt::UserRole).isNull())return;
         const QString code=item->data(0,Qt::UserRole).toString();
         const QString packet=item->data(0,Qt::UserRole+1).toString();
-        fieldDetail_->setText(QStringLiteral("字段编号 %1 · 位位置 %2 · 换算公式 %3\n英文名：%4\n定义来源：%5\n当前会话尚未找到该字段的已解码样本。")
+        fieldDetail_->setText(uiText(QStringLiteral("字段编号 %1 · 位位置 %2 · 换算公式 %3\n英文名：%4\n定义来源：%5\n当前会话尚未找到该字段的已解码样本。"))
             .arg(code,item->data(0,Qt::UserRole+2).toString(),item->data(0,Qt::UserRole+3).toString(),
                  item->data(0,Qt::UserRole+4).toString(),item->data(0,Qt::UserRole+5).toString()));
         bool hasSample=false;
         for(int i=0;i<business_.size();++i)if(i<=currentIndex_ && business_[i].packetName==packet)
             for(const auto &f:business_[i].fields)if(f.code==code){
-                fieldDetail_->setText(QStringLiteral("字段编号 %1 · 位位置 %2\n原始 HEX：%3 · 原始值：%4\n当前工程值：%5 %6\n换算公式：%7\n定义来源：%8")
+                fieldDetail_->setText(uiText(QStringLiteral("字段编号 %1 · 位位置 %2\n原始 HEX：%3 · 原始值：%4\n当前工程值：%5 %6\n换算公式：%7\n定义来源：%8"))
                     .arg(f.code,f.bits,f.rawHex,f.rawNumber,f.value,f.unit,f.formula,f.definitionEvidence));
                 hasSample=true;
                 break;
@@ -891,8 +1015,9 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                 errorPage->setProperty("treeSatellite",treeSatellite);
                 auto *errorLayout=new QVBoxLayout(errorPage);
                 errorLayout->addWidget(new QLabel(QStringLiteral("官方遥测字段目录无法读取：%1").arg(catalogName)));
-                const int errorTab=systems->addTab(errorPage,QStringLiteral("目录错误"));
-                systems->setTabToolTip(errorTab,treeSatellite+QStringLiteral(" · 目录错误"));
+                errorPage->setProperty("orbitSourceTabText",QStringLiteral("目录错误"));
+                const int errorTab=systems->addTab(errorPage,uiText(QStringLiteral("目录错误")));
+                systems->setTabToolTip(errorTab,uiText(treeSatellite+QStringLiteral(" · 目录错误")));
                 continue;
             }
         }
@@ -907,8 +1032,9 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
             auto *errorLayout=new QVBoxLayout(errorPage);
             errorLayout->addWidget(new QLabel(QStringLiteral("遥测目录格式错误：%1（%2）")
                 .arg(catalogName,parseError.errorString())));
-            const int errorTab=systems->addTab(errorPage,QStringLiteral("目录错误"));
-            systems->setTabToolTip(errorTab,treeSatellite+QStringLiteral(" · 目录错误"));
+            errorPage->setProperty("orbitSourceTabText",QStringLiteral("目录错误"));
+            const int errorTab=systems->addTab(errorPage,uiText(QStringLiteral("目录错误")));
+            systems->setTabToolTip(errorTab,uiText(treeSatellite+QStringLiteral(" · 目录错误")));
             continue;
         }
 
@@ -932,6 +1058,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
             const QString groupName=groupOrder[groupIndex];
             auto *groupPage=new QWidget;
             groupPage->setProperty("treeSatellite",treeSatellite);
+            groupPage->setProperty("orbitSourceTabText",groupName);
             auto *groupLayout=new QVBoxLayout(groupPage);
             groupLayout->setContentsMargins(2,2,2,2);
             groupLayout->setSpacing(2);
@@ -947,6 +1074,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                 const QJsonArray fields=packet.value(QStringLiteral("fields")).toArray();
 
                 auto *table=new QTableWidget(fields.isEmpty()?1:fields.size(),4,packetTabs);
+                table->setProperty("orbitSourceTabText",officialName);
                 table->setObjectName("officialComponentTable");
                 table->setProperty("treeSatellite",treeSatellite);
                 table->setProperty("officialPacketCode",packetCode);
@@ -965,12 +1093,17 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                 table->setColumnWidth(1,190);
 
                 if(fields.isEmpty()){
-                    auto *nameItem=new QTableWidgetItem(QStringLiteral("附件中未提供该包的字段条目"));
+                    auto *nameItem=new QTableWidgetItem(uiText(QStringLiteral("附件中未提供该包的字段条目")));
+                    nameItem->setData(Qt::UserRole+123,QStringLiteral("附件中未提供该包的字段条目"));
                     nameItem->setData(Qt::UserRole+2,true);
-                    nameItem->setToolTip(QStringLiteral("保留官方数据包位置；附件中的对应 JSON data 对象为空，未臆造字段。"));
+                    const QString emptyCatalogTooltip=QStringLiteral("保留官方数据包位置；附件中的对应 JSON data 对象为空，未臆造字段。");
+                    nameItem->setData(Qt::UserRole+124,emptyCatalogTooltip);
+                    nameItem->setToolTip(uiText(emptyCatalogTooltip));
                     table->setItem(0,0,nameItem);
                     table->setItem(0,1,new QTableWidgetItem(QString()));
-                    table->setItem(0,2,new QTableWidgetItem(QStringLiteral("未解析")));
+                    auto *statusItem=new QTableWidgetItem(uiText(QStringLiteral("未解析")));
+                    statusItem->setData(Qt::UserRole+123,QStringLiteral("未解析"));
+                    table->setItem(0,2,statusItem);
                     table->setItem(0,3,new QTableWidgetItem(QString()));
                 }else{
                     for(int row=0;row<fields.size();++row){
@@ -978,14 +1111,21 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                         const QString fieldName=field.value(QStringLiteral("name")).toString();
                         const QString fullCode=field.value(QStringLiteral("code")).toString();
                         const QString englishName=field.value(QStringLiteral("english_name")).toString();
-                        auto *nameItem=new QTableWidgetItem(fieldName);
+                        const QString englishDisplay=orbitEnglishFieldLabel(fieldName.isEmpty()?fullCode:fieldName,englishName,fullCode);
+                        const QString sourceDisplay=fieldName.isEmpty()?fullCode:fieldName;
+                        auto *nameItem=new QTableWidgetItem(languageCode_==QStringLiteral("en-US")?englishDisplay:sourceDisplay);
                         nameItem->setData(Qt::UserRole,fullCode);
                         nameItem->setData(Qt::UserRole+1,englishName);
-                        nameItem->setToolTip(QStringLiteral("官方字段：%1\n英文名：%2")
-                                               .arg(fullCode,englishName));
+                        nameItem->setData(Qt::UserRole+123,sourceDisplay);
+                        nameItem->setData(Qt::UserRole+125,englishDisplay);
+                        const QString nameTooltip=QStringLiteral("官方字段：%1\n英文名：%2").arg(fullCode,englishName);
+                        nameItem->setData(Qt::UserRole+124,nameTooltip);
+                        nameItem->setToolTip(uiText(nameTooltip));
                         table->setItem(row,0,nameItem);
                         table->setItem(row,1,new QTableWidgetItem(fullCode));
-                        table->setItem(row,2,new QTableWidgetItem(QStringLiteral("未解析")));
+                        auto *statusItem=new QTableWidgetItem(uiText(QStringLiteral("未解析")));
+                        statusItem->setData(Qt::UserRole+123,QStringLiteral("未解析"));
+                        table->setItem(row,2,statusItem);
                         table->setItem(row,3,new QTableWidgetItem(QString()));
                     }
                 }
@@ -993,8 +1133,8 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                 componentTables_.insert(treeSatellite+QLatin1Char('|')+packetCode,table);
             }
             groupLayout->addWidget(packetTabs,1);
-            const int systemTab=systems->addTab(groupPage,groupName);
-            systems->setTabToolTip(systemTab,treeSatellite+QStringLiteral(" · ")+groupName);
+            const int systemTab=systems->addTab(groupPage,uiText(groupName));
+            systems->setTabToolTip(systemTab,uiText(treeSatellite+QStringLiteral(" · ")+groupName));
         }
     }
 
@@ -1067,14 +1207,14 @@ void MainWindow::buildImages(QTabWidget *tabs){
     imageCoverage_=new QProgressBar;
     imageCoverage_->setRange(0,1);
     imageCoverage_->setValue(0);
-    imageCoverage_->setFormat(QStringLiteral("尚无观测序号"));
+    imageCoverage_->setFormat(uiText(QStringLiteral("尚无观测序号")));
     layout->addWidget(imageCoverage_);
     auto *split=new QSplitter(Qt::Horizontal);
     imagePreview_=new ImagePreview;
     split->addWidget(imagePreview_);
-    imageTable_=new QTableWidget(0,4);
+    imageTable_=new QTableWidget(0,5);
     imageTable_->setHorizontalHeaderLabels({QStringLiteral("图像 ID"),
-        QStringLiteral("包序号"),QStringLiteral("宽 × 高"),QStringLiteral("校验状态")});
+        QStringLiteral("帧数"),QStringLiteral("分辨率"),QStringLiteral("缺块 / 坏块") ,QStringLiteral("校验状态")});
     setupTable(imageTable_);
     imageTable_->horizontalHeader()->setStretchLastSection(true);
     split->addWidget(imageTable_);
@@ -1082,10 +1222,10 @@ void MainWindow::buildImages(QTabWidget *tabs){
     layout->addWidget(split,1);
     connect(scan,&QPushButton::clicked,this,[this]{scanSsdv();});
     connect(imageTable_,&QTableWidget::itemSelectionChanged,this,[this]{
-        const int idx=imageTable_->currentRow();
-        if(idx>=0&&idx<images_.size()){
-            updateImageProgress(images_[idx].imageId);
-            decodeSsdvImage(images_[idx].imageId,false);
+        const int imageId=selectedImageId();
+        if(imageId>=0){
+            updateImageProgress(imageId);
+            decodeSsdvImage(imageId,false);
         }
     });
     connect(save,&QPushButton::clicked,this,[this]{showExportDialog();});
@@ -1099,7 +1239,7 @@ void MainWindow::buildRaw(QTabWidget *tabs){
     rawHex_=new QPlainTextEdit;
     rawHex_->setReadOnly(true);
     rawHex_->setLineWrapMode(QPlainTextEdit::NoWrap);
-    rawHex_->setPlainText(QStringLiteral("选择业务包后显示 KISS / HEX 数据。"));
+    rawHex_->setPlainText(uiText(QStringLiteral("选择业务包后显示 KISS / HEX 数据。")));
     page->addTab(rawHex_,QStringLiteral("KISS / HEX"));
 
     packetTable_=new QTableWidget(0,6);
@@ -1122,7 +1262,7 @@ void MainWindow::buildRaw(QTabWidget *tabs){
     rawFrameHex_=new QPlainTextEdit;
     rawFrameHex_->setReadOnly(true);
     rawFrameHex_->setLineWrapMode(QPlainTextEdit::NoWrap);
-    rawFrameHex_->setPlaceholderText(QStringLiteral("选择一条原始帧以显示十六进制内容。"));
+    rawFrameHex_->setPlaceholderText(uiText(QStringLiteral("选择一条原始帧以显示十六进制内容。")));
     frameLayout->addWidget(rawFrameHex_,3);
     connect(rawFrameTable_,&QTableWidget::currentCellChanged,this,
             [this](int row,int,int,int){inspectRawFrame(row);});

@@ -40,6 +40,10 @@ QVector<ImagePacket> ImageTools::candidatesFromFrames(const QVector<Frame> &fram
         packet.bytes=status==SSDV_OK?checked:payload;
         packet.apid=-1;packet.imageId=info.image_id;packet.packetId=info.packet_id;
         packet.width=info.width;packet.height=info.height;
+        packet.satellite=canonicalSatelliteName(frame.satellite);
+        packet.captureLocal=frame.captureLocal;packet.sources=frame.sources;
+        packet.fecEvidence=frame.quality;packet.vcid=frame.vcid;
+        packet.firstMaster=frame.master;packet.lastMaster=frame.master;
         packet.status=status==SSDV_OK?QStringLiteral("ssdv_crc32_pass"):
                                        QStringLiteral("ssdv_crc32_failed");
         out.push_back(packet);
@@ -86,6 +90,10 @@ QVector<ImagePacket> ImageTools::candidatesFromKiss(
                 p.imageId=quint8(headerBytes[6]);
                 p.packetId=(quint8(headerBytes[7])<<8)|quint8(headerBytes[8]);
                 p.width=width;p.height=height;
+                p.satellite=canonicalSatelliteName(packet.satellite);
+                p.captureLocal=packet.captureLocal;p.sources=packet.sources;
+                p.fecEvidence=packet.fecEvidence;p.vcid=packet.vcid;
+                p.firstMaster=packet.firstMaster;p.lastMaster=packet.lastMaster;
                 if(packetStatus==SSDV_OK)p.status=QStringLiteral("ssdv_crc_pass");
                 else if(packet.fecEvidence!="log_fec_reported")p.status=QStringLiteral("bin_only_unverified");
                 out.push_back(p);
@@ -175,27 +183,32 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
     const int expectedSize=shortPacketFormat?SSDV_PKT_SIZE_DSLWP:SSDV_PKT_SIZE;
     const ssdv_mode_t mode=shortPacketFormat?ssdv_dslwp_mode:ssdv_normal_mode;
     std::map<int,ImagePacket> ordered;
+    std::map<int,ImagePacket> observed;
     for(const auto &packet:packets){
-        if(packet.imageId!=imageId||packet.bytes.size()!=expectedSize)continue;
-        // Validate/correct each packet before handing it to the JPEG state
-        // machine. The 218-byte TM payload and 256-byte standard packet share
-        // the same image metadata and JPEG reconstruction state machine.
+        if(packet.imageId!=imageId||packet.bytes.size()!=expectedSize||packet.packetId<0)continue;
+        auto rawFound=observed.find(packet.packetId);
+        if(rawFound==observed.end())observed.emplace(packet.packetId,packet);
         QByteArray correctedBytes=packet.bytes;
         int correctedSymbols=0;
-        if(ssdv_dec_is_packet(reinterpret_cast<std::uint8_t*>(correctedBytes.data()),
-                              &correctedSymbols,mode)!=SSDV_OK)continue;
+        const int validation=ssdv_dec_is_packet(
+            reinterpret_cast<std::uint8_t*>(correctedBytes.data()),&correctedSymbols,mode);
+        if(validation!=SSDV_OK){
+            if(!decoded.badPacketIds.contains(packet.packetId))decoded.badPacketIds.push_back(packet.packetId);
+            continue;
+        }
         ImagePacket validated=packet;
         validated.bytes=correctedBytes;
         if(shortPacketFormat)validated.status=QStringLiteral("ssdv_crc32_pass");
         else validated.status=QStringLiteral("ssdv_crc_pass");
         auto found=ordered.find(validated.packetId);
-        if(found==ordered.end()){
-            ordered.emplace(validated.packetId,validated);
-        }else if(found->second.status!="ssdv_crc32_pass"&&
-                 validated.status=="ssdv_crc32_pass"){
-            found->second=validated;
-        }
+        if(found==ordered.end())ordered.emplace(validated.packetId,validated);
     }
+    if(!observed.empty()){
+        const int last=observed.rbegin()->first;
+        for(int id=0;id<=last;++id)
+            if(observed.find(id)==observed.end())decoded.missingPacketIds.push_back(id);
+    }
+    std::sort(decoded.badPacketIds.begin(),decoded.badPacketIds.end());
     if(ordered.empty()){
         decoded.error=QStringLiteral("所选图像没有可用的 SSDV 分片，或分片长度与解码模式不匹配。");
         return decoded;
@@ -216,7 +229,8 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
     // Match the receiver's recovery strategy: if one damaged packet prevents
     // reconstruction, discard that packet and restart with the remaining
     // ordered packets. A later retransmission can still provide a clean copy.
-    while(!ordered.empty()){
+    int restartBudget=int(ordered.size());
+    while(!ordered.empty()&&restartBudget-->=0){
         ssdv_t decoder{};
         if(ssdv_dec_init(&decoder)!=SSDV_OK){
             decoded.error=QStringLiteral("SSDV 解码器初始化失败。");
@@ -244,6 +258,7 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
             if(result==SSDV_OK)break;
         }
         if(rejectedId>=0){
+            if(!decoded.badPacketIds.contains(rejectedId))decoded.badPacketIds.push_back(rejectedId);
             ordered.erase(rejectedId);
             decoded.receivedPackets=int(ordered.size());
             decoded.complete=false;
@@ -263,6 +278,7 @@ DecodedImage ImageTools::decodeImage(const QVector<ImagePacket> &packets,int ima
         return decoded;
     }
     decoded.error=QStringLiteral("有效分片不足，无法重建 JPEG。");
+    std::sort(decoded.badPacketIds.begin(),decoded.badPacketIds.end());
     return decoded;
 }
 }

@@ -32,6 +32,7 @@ class QMenu;
 class QSplitter;
 class AttitudeWidget;
 class ImagePreview;
+class ReplayTimelineWidget;
 class MainWindow final : public QMainWindow {
 public:
     explicit MainWindow(QWidget *parent=nullptr);
@@ -86,6 +87,9 @@ private:
     bool decodeSsdvImage(int imageId,bool showErrors);
     void scanSsdv();
     void updateImageProgress(int imageId);
+    void populateImageTable();
+    int selectedImageId() const;
+    void appendSsdvTimelineEvents();
     QString satellite() const;
     QString resolvedSatellite() const;
     QString eventTitle(const orbit::BusinessPacket &packet) const;
@@ -114,6 +118,10 @@ private:
     int currentIndex_=-1;
     QSplitter *workspaceSplitter_=nullptr;
     QFrame *replayPanel_=nullptr;
+    QWidget *replayContent_=nullptr;
+    QPushButton *replayCollapseButton_=nullptr;
+    QPushButton *tcpToggleButton_=nullptr,*playPauseButton_=nullptr;
+    bool tcpConnected_=false,tcpConnecting_=false;
     QAction *replayListAction_=nullptr;
     QMenu *languageMenu_=nullptr;
     bool replayListCollapsed_=false;
@@ -140,7 +148,7 @@ private:
     AttitudeWidget *attitudeWidget_=nullptr;
     ImagePreview *imagePreview_=nullptr;
     QPlainTextEdit *rawHex_=nullptr,*debugText_=nullptr,*rawFrameHex_=nullptr;
-    QSlider *timeline_=nullptr;
+    ReplayTimelineWidget *timeline_=nullptr;
     QTimer *timer_=nullptr;
     QTabWidget *pages_=nullptr;
     int diagnosticTab_=-1;

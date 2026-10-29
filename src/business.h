@@ -13,6 +13,7 @@ struct BusinessPacket {
     ApplicationPacket transport;
     QString packetName, packetLabel, identification;
     int mainType=-1, subType=-1;
+    int ssdvImageId=-1, ssdvPacketId=-1;
     int skippedFields=0;
     QVector<EngineeringField> fields;
     QString definitionEvidence;
