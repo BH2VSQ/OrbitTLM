@@ -93,6 +93,9 @@ foreach(target OrbitTLM OrbitTLM-cli orbit_tests)
       COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/protocols/asrtu1"
         "$<TARGET_FILE_DIR:${target}>/protocols/asrtu1"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees"
+        "$<TARGET_FILE_DIR:${target}>/telemetry-trees"
       COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target}>/web"
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/web/index.template.html"
@@ -102,6 +105,8 @@ foreach(target OrbitTLM OrbitTLM-cli orbit_tests)
 endforeach()
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/protocols/asrtu1"
         DESTINATION "bin/protocols")
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees"
+        DESTINATION "bin")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/web/index.template.html"
         DESTINATION "bin/web")
 install(FILES "${ORBITTLM_SSDV_DIR}/ssdv.c" "${ORBITTLM_SSDV_DIR}/ssdv.h"

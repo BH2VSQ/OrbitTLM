@@ -501,18 +501,25 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
             }
         }else if(card==attitudeCard_){
             addBy04(QStringLiteral("姿态模式"),{QStringLiteral("姿态模式")});
-            addBy04(QStringLiteral("姿态四元数"),{QStringLiteral("姿态四元数q0"),QStringLiteral("姿态四元数q1"),
-                QStringLiteral("姿态四元数q2"),QStringLiteral("姿态四元数q3")},true);
-            addBy04(QStringLiteral("偏差四元数"),{QStringLiteral("偏差四元数q0"),QStringLiteral("偏差四元数q1"),
-                QStringLiteral("偏差四元数q2"),QStringLiteral("偏差四元数q3")},true);
+            addBy04(QStringLiteral("姿态四元数 q0"),{QStringLiteral("姿态四元数q0")});
+            addBy04(QStringLiteral("姿态四元数 q1"),{QStringLiteral("姿态四元数q1")});
+            addBy04(QStringLiteral("姿态四元数 q2"),{QStringLiteral("姿态四元数q2")});
+            addBy04(QStringLiteral("姿态四元数 q3"),{QStringLiteral("姿态四元数q3")});
+            addBy04(QStringLiteral("偏差四元数 q0"),{QStringLiteral("偏差四元数q0")});
+            addBy04(QStringLiteral("偏差四元数 q1"),{QStringLiteral("偏差四元数q1")});
+            addBy04(QStringLiteral("偏差四元数 q2"),{QStringLiteral("偏差四元数q2")});
+            addBy04(QStringLiteral("偏差四元数 q3"),{QStringLiteral("偏差四元数q3")});
             addBy04(QStringLiteral("卫星姿态更新标志"),{QStringLiteral("卫星姿态更新标志")});
             addBy04(QStringLiteral("卫星姿态可信标志"),{QStringLiteral("卫星姿态可信标志")});
             addBy04(QStringLiteral("GPS轨道有效计数"),{QStringLiteral("GPS轨道有效计数")});
             addBy04(QStringLiteral("使用GPS测量确定轨道"),{QStringLiteral("使用GPS测量确定轨道")});
         }else if(card==thermalCard_){
-            addBy04(QStringLiteral("电池温度"),{QStringLiteral("电池温度1"),QStringLiteral("电池温度2")},true);
-            addBy04(QStringLiteral("温度采集"),{QStringLiteral("温度采集4-屏幕"),QStringLiteral("温度采集6-储箱"),
-                QStringLiteral("温度采集7-冯相机"),QStringLiteral("温度采集8-帆板")},true);
+            addBy04(QStringLiteral("电池温度1"),{QStringLiteral("电池温度1")});
+            addBy04(QStringLiteral("电池温度2"),{QStringLiteral("电池温度2")});
+            addBy04(QStringLiteral("温度采集4-屏幕"),{QStringLiteral("温度采集4-屏幕")});
+            addBy04(QStringLiteral("温度采集6-储箱"),{QStringLiteral("温度采集6-储箱")});
+            addBy04(QStringLiteral("温度采集7-冯相机"),{QStringLiteral("温度采集7-冯相机")});
+            addBy04(QStringLiteral("温度采集8-帆板"),{QStringLiteral("温度采集8-帆板")});
             addBy04(QStringLiteral("PCB温度"),{QStringLiteral("PCB温度")});
             addBy04(QStringLiteral("Z7温度"),{QStringLiteral("Z7温度")});
             addBy04(QStringLiteral("STM32内部温度"),{QStringLiteral("STM32内部温度")});
@@ -600,8 +607,6 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
                         if(field.nameCn!=sourceName||field.value.isEmpty()||field.status==QStringLiteral("invalid_source_bit_position"))continue;
                         if(field.status.startsWith("raw_")&&!(by04&&field.status==QStringLiteral("raw_bits")))continue;
                         QString shown=telemetryValue(field,field.value,field.unit);
-                        if(field.unit.isEmpty()&&field.status==QStringLiteral("raw_bits"))
-                            shown+=QStringLiteral("（原始值，单位未提供）");
                         parts.push_back(sourceName+QStringLiteral("：")+shown);
                         resolvedField=field;
                         when=shortTime(packet.transport.captureLocal);
@@ -671,9 +676,6 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
                 }
                 if(value!=QStringLiteral("未解析")&&!value.isEmpty())break;
             }
-            if(by04&&!row.sourceNames.isEmpty()&&value!=QStringLiteral("未解析")&&
-               unit.isEmpty()&&resolvedField.status==QStringLiteral("raw_bits"))
-                value+=QStringLiteral("（原始值，单位未提供）");
         }
         QString tooltip=row.packet.isEmpty()?QString():row.packet+QStringLiteral(" · ")+row.definition.code;
         if(!row.sourceNames.isEmpty())tooltip=row.sourceNames.join(QStringLiteral("，"));
@@ -696,137 +698,110 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
 }
 
 void MainWindow::updateComponentTabs(int index){
-    if(!catalogReady_||componentTables_.isEmpty())return;
-    const auto definitions=catalog_.definitionPackets();
+    if(componentTables_.isEmpty())return;
     const bool by04=resolvedSatellite()==QStringLiteral("BY04");
-    const QMap<QString,QString> by04TabLabels={
-        {QStringLiteral("全部字段"),QStringLiteral("全部字段")},
-        {QStringLiteral("卫星平台"),QStringLiteral("计算机 OBC-SF")},
-        {QStringLiteral("电源配电"),QStringLiteral("电源与电池")},
-        {QStringLiteral("姿态与轨控"),QStringLiteral("姿态与 GPS 轨道")},
-        {QStringLiteral("热控温度"),QStringLiteral("部件温度")},
-        {QStringLiteral("GNSS"),QStringLiteral("GPS 轨道")},
-        {QStringLiteral("数传通道"),QStringLiteral("基带板")},
-        {QStringLiteral("数传基带"),QStringLiteral("基带板卡")},
-        {QStringLiteral("太阳敏感器"),QStringLiteral("基带 HW")},
-        {QStringLiteral("CMOS相机"),QStringLiteral("基带 UV")},
-        {QStringLiteral("星敏感器Y"),QStringLiteral("星敏 A")},
-        {QStringLiteral("星敏感器Z"),QStringLiteral("星敏 B")}
-    };
-    const QSet<QString> hiddenForBy04={QStringLiteral("高分相机"),QStringLiteral("光纤陀螺"),
-        QStringLiteral("MEMS惯组"),QStringLiteral("磁强计")};
-    for(auto it=componentTables_.begin();it!=componentTables_.end();++it){
-        const QString title=it.key();
+    const QString activeSatellite=by04?QStringLiteral("BY04"):QStringLiteral("ASRTU-1");
+
+    // Hide the other satellite's subsystem tabs while keeping both official trees loaded.
+    auto *systems=pages_?pages_->findChild<QTabWidget*>(QStringLiteral("officialSystemTabs")):nullptr;
+    if(systems){
+        int firstVisible=-1;
+        bool currentIsVisible=false;
+        for(int i=0;i<systems->count();++i){
+            QWidget *groupPage=systems->widget(i);
+            const bool visible=groupPage->property("treeSatellite").toString()==activeSatellite;
+            systems->setTabVisible(i,visible);
+            if(visible&&firstVisible<0)firstVisible=i;
+            if(visible&&i==systems->currentIndex())currentIsVisible=true;
+        }
+        if(firstVisible>=0&&!currentIsVisible)systems->setCurrentIndex(firstVisible);
+    }
+
+    struct PacketScope { QString satellite; QString code; QString key; };
+    struct LiveField { EngineeringField field; QString when; };
+    QVector<PacketScope> scopes;
+    scopes.reserve(componentTables_.size());
+    for(auto it=componentTables_.cbegin();it!=componentTables_.cend();++it){
         QTableWidget *table=it.value();
-        const QStringList prefixes=componentPrefixes_.value(title);
-        const QStringList keywords=componentKeywords_.value(title);
-        struct Row { QString packet; EngineeringField field; };
-        QVector<Row> rows;QSet<QString> seen;
-        auto matches=[&](const QString &packet,const QString &name){
-            if(by04){
-                if(title==QStringLiteral("全部字段"))return true;
-                if(title==QStringLiteral("卫星平台"))return packet==QStringLiteral("BY04-OBC-SF");
-                if(title==QStringLiteral("电源配电"))
-                    return name.contains(QStringLiteral("电压"))||name.contains(QStringLiteral("电流"))||
-                           name.contains(QStringLiteral("电池"))||name.contains(QStringLiteral("电源"))||
-                           name.contains(QStringLiteral("充电"))||name.contains(QStringLiteral("放电"));
-                if(title==QStringLiteral("姿态与轨控"))
-                    return containsAny(name,{QStringLiteral("姿态"),QStringLiteral("四元数"),
-                        QStringLiteral("轨道"),QStringLiteral("GPS"),QStringLiteral("轨控")});
-                if(title==QStringLiteral("热控温度"))
-                    return name.contains(QStringLiteral("温度"))||name.contains(QStringLiteral("热敏"))||
-                           name.contains(QStringLiteral("PCB"))||name.contains(QStringLiteral("Z7"));
-                if(title==QStringLiteral("GNSS"))
-                    return name.contains(QStringLiteral("GPS"))||name.contains(QStringLiteral("GNSS"));
-                if(title==QStringLiteral("数传通道"))
-                    return name==QStringLiteral("基带板继电器")||name==QStringLiteral("基带板开")||
-                           name==QStringLiteral("基带板关")||name==QStringLiteral("基带板开-回读")||
-                           name==QStringLiteral("基带板关-回读");
-                if(title==QStringLiteral("数传基带"))return name==QStringLiteral("基带板卡");
-                if(title==QStringLiteral("太阳敏感器"))return name==QStringLiteral("基带HW");
-                if(title==QStringLiteral("CMOS相机"))return name==QStringLiteral("基带UV");
-                if(title==QStringLiteral("星敏感器Y"))
-                    return name==QStringLiteral("星敏X_5V")||name==QStringLiteral("星敏A遥测计数")||
-                           name==QStringLiteral("故障标志星敏A");
-                if(title==QStringLiteral("星敏感器Z"))
-                    return name==QStringLiteral("星敏Y_5V")||name==QStringLiteral("星敏B遥测计数")||
-                           name==QStringLiteral("故障标志星敏B");
-                return false;
-            }
-            if(prefixes.isEmpty()&&keywords.isEmpty())return true;
-            return startsWithAny(packet,prefixes)||containsAny(name,keywords);
-        };
-        if(by04){
-            // BY04's field names and packet identifiers are independent of the ASRTU-1 catalog.
-            for(int i=0;i<=index&&i<business_.size();++i){
-                const auto &packet=business_[i];
-                if(packet.transport.satellite!="BY04")continue;
-                for(const auto &field:packet.fields){
-                    if(field.nameCn.isEmpty()||!matches(packet.packetName,field.nameCn))continue;
-                    const QString key=packet.packetName+QLatin1Char('|')+field.code;
-                    if(seen.contains(key))continue;
-                    seen.insert(key);rows.push_back({packet.packetName,field});
-                }
-            }
-        }else{
-            for(const auto &packet:definitions)for(const auto &field:packet.fields){
-                if(!matches(packet.packetName,field.nameCn))continue;
-                const QString key=packet.packetName+QLatin1Char('|')+field.code;
-                if(seen.contains(key))continue;
-                seen.insert(key);rows.push_back({packet.packetName,field});
-            }
-            // Include decoded fields unknown to the public catalog, without removing catalog placeholders.
-            for(int i=0;i<=index&&i<business_.size();++i){
-                const auto &packet=business_[i];
-                for(const auto &field:packet.fields){
-                    if(field.nameCn.isEmpty()||field.status.startsWith("raw_")||!matches(packet.packetName,field.nameCn))continue;
-                    const QString key=packet.packetName+QLatin1Char('|')+field.code;
-                    if(seen.contains(key))continue;
-                    seen.insert(key);rows.push_back({packet.packetName,field});
-                }
-            }
-        }
-        table->setRowCount(rows.size());
-        for(int r=0;r<rows.size();++r){
-            const Row &row=rows[r];
-            QString value=QStringLiteral("未解析"),unit,status=QStringLiteral("未解析"),when;
-            EngineeringField resolvedField=row.field;
-            for(int i=qMin(index,int(business_.size())-1);i>=0&&value==QStringLiteral("未解析");--i){
-                const auto &packet=business_[i];
-                if(by04&&packet.transport.satellite!="BY04")continue;
-                if(packet.packetName!=row.packet)continue;
-                for(const auto &field:packet.fields)if(field.code==row.field.code){
-                    if(field.value.isEmpty()||(!by04&&field.status.startsWith("raw_"))||
-                       field.status=="invalid_source_bit_position")continue;
-                    value=field.value;unit=field.unit;status=fieldStatusText(field.status);
-                    resolvedField=field;when=shortTime(packet.transport.captureLocal);break;
-                }
-            }
-            table->setItem(r,0,item(row.packet));
-            table->setItem(r,1,item(row.field.nameCn.isEmpty()?row.field.code:row.field.nameCn,
-                row.field.code+QStringLiteral(" · ")+row.field.bits+QStringLiteral(" · ")+row.field.formula));
-            table->setItem(r,2,item(telemetryValue(resolvedField,value,unit),status));
-            table->setItem(r,3,item(when));
-        }
-        table->verticalHeader()->setDefaultSectionSize(20);
-        QWidget *ancestor=table->parentWidget();
-        QTabWidget *tabWidget=nullptr;
-        for(QWidget *w=ancestor;w;w=w->parentWidget()){
-            if(auto *candidate=qobject_cast<QTabWidget*>(w)){tabWidget=candidate;break;}
-        }
-        if(tabWidget){
-            const int tabIndex=tabWidget->indexOf(table);
-            if(tabIndex>=0){
-                const QString label=by04?by04TabLabels.value(title,title):title;
-                if(auto *wrapping=dynamic_cast<AutoWrapTabWidget*>(tabWidget))
-                    wrapping->setWrappedTabText(tabIndex,label);
-                else tabWidget->setTabText(tabIndex,label);
-                tabWidget->setTabVisible(tabIndex,!by04||!hiddenForBy04.contains(title));
+        if(!table||table->property("treeSatellite").toString()!=activeSatellite)continue;
+        scopes.push_back({activeSatellite,table->property("officialPacketCode").toString(),it.key()});
+    }
+
+    // Build the latest available value index once per replay position instead of
+    // rescanning the whole replay history independently for every displayed field.
+    QHash<QString,QHash<QString,LiveField>> latestValues;
+    for(int i=qMin(index,int(business_.size())-1);i>=0;--i){
+        const BusinessPacket &packet=business_[i];
+        const QString packetSatellite=orbit::canonicalSatelliteName(packet.transport.satellite);
+        if(packetSatellite!=activeSatellite)continue;
+        for(const PacketScope &scope:scopes){
+            if(!packet.packetName.contains(scope.code,Qt::CaseInsensitive)&&
+               !packet.packetLabel.contains(scope.code,Qt::CaseInsensitive))continue;
+            auto &byField=latestValues[scope.key];
+            for(const EngineeringField &field:packet.fields){
+                if(field.value.isEmpty()||field.status=="invalid_source_bit_position"||
+                   field.status=="truncated_field")continue;
+                const QString composite=field.bits.isEmpty()?field.code:
+                    field.code+QLatin1Char('.')+field.bits;
+                const LiveField live{field,shortTime(packet.transport.captureLocal)};
+                if(!composite.isEmpty()&&!byField.contains(composite))byField.insert(composite,live);
+                if(!field.code.isEmpty()&&!byField.contains(field.code))byField.insert(field.code,live);
+                const QString nameKey=QStringLiteral("@")+field.nameCn;
+                if(!field.nameCn.isEmpty()&&!byField.contains(nameKey))byField.insert(nameKey,live);
             }
         }
     }
-}
 
+    for(const PacketScope &scope:scopes){
+        QTableWidget *table=componentTables_.value(scope.key,nullptr);
+        if(!table)continue;
+        const auto byField=latestValues.value(scope.key);
+        for(int row=0;row<table->rowCount();++row){
+            QTableWidgetItem *nameItem=table->item(row,0);
+            if(!nameItem)continue;
+            if(nameItem->data(Qt::UserRole+2).toBool()){
+                if(auto *valueItem=table->item(row,2))valueItem->setText(QStringLiteral("字段目录未提供"));
+                if(auto *timeItem=table->item(row,3))timeItem->setText(QString());
+                continue;
+            }
+
+            const QString officialName=nameItem->text();
+            const QString officialCode=nameItem->data(Qt::UserRole).toString();
+            auto liveIt=byField.constFind(officialCode);
+            if(liveIt==byField.cend()&&!officialCode.isEmpty())
+                liveIt=byField.constFind(officialCode.section(QLatin1Char('.'),0,0));
+            if(liveIt==byField.cend())
+                liveIt=byField.constFind(QStringLiteral("@")+officialName);
+
+            QString shown=QStringLiteral("未解析");
+            QString status=QStringLiteral("当前会话未匹配到该字段");
+            QString when;
+            const bool found=liveIt!=byField.cend();
+            if(found){
+                const EngineeringField &field=liveIt.value().field;
+                shown=telemetryValue(field,field.value,field.unit);
+                status=fieldStatusText(field.status);
+                when=liveIt.value().when;
+            }
+
+            auto *valueItem=table->item(row,2);
+            if(!valueItem){
+                valueItem=new QTableWidgetItem;
+                table->setItem(row,2,valueItem);
+            }
+            valueItem->setText(shown);
+            valueItem->setToolTip(status);
+            valueItem->setForeground(found?QColor("#1f3045"):QColor("#64748b"));
+            auto *timeItem=table->item(row,3);
+            if(!timeItem){
+                timeItem=new QTableWidgetItem;
+                table->setItem(row,3,timeItem);
+            }
+            timeItem->setText(when);
+        }
+        table->verticalHeader()->setDefaultSectionSize(22);
+    }
+}
 void MainWindow::updateWebHistory(){
     const QString root=QCoreApplication::applicationDirPath()+QStringLiteral("/data");
     if(!QDir().mkpath(root))return;

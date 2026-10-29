@@ -47,15 +47,9 @@ private:
     bool updating_=false;
 
     static QString wrapText(const QString &text){
-        if(text.contains(QLatin1Char('\n')))return text;
-        // Keep common Latin acronyms together, then wrap their Chinese suffix.
-        int latinPrefix=0;
-        while(latinPrefix<text.size()&&text.at(latinPrefix).isLetterOrNumber()&&
-              text.at(latinPrefix).unicode()<128)++latinPrefix;
-        if(latinPrefix>=3&&latinPrefix<text.size())
-            return text.left(latinPrefix)+QLatin1Char('\n')+text.mid(latinPrefix);
-        const int split=qBound(1,text.size()/2,text.size()-1);
-        return text.left(split)+QLatin1Char('\n')+text.mid(split);
+        // Keep each tab caption on one line. The subsystem tab row and the nested
+        // official-packet tab row provide navigation levels without breaking labels.
+        return text;
     }
     void applyWrapping(){
         if(updating_||count()==0||width()<80)return;
@@ -97,6 +91,7 @@ public:
     explicit AutoWrapTabWidget(QWidget *parent=nullptr):QTabWidget(parent){
         wrappingBar_=new AutoWrapTabBar(this);
         wrappingBar_->setElideMode(Qt::ElideNone);
+        wrappingBar_->setUsesScrollButtons(true);
         wrappingBar_->setExpanding(false);
         setTabBar(wrappingBar_);
     }

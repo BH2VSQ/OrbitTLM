@@ -7,6 +7,10 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFileDialog>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QFile>
 #include <QFileInfo>
 #include <QDir>
 #include <QDesktopServices>
@@ -102,7 +106,7 @@ void setupTable(QTableWidget *table){
 }
 MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
     setWindowTitle(QStringLiteral("OrbitTLM · 卫星遥测回放工作台"));
-    setMinimumSize(1050,690);
+    setMinimumSize(1100,690);
     resize(1480,910);
     live_=new orbit::LiveTcp(this);
     applyStyles();
@@ -303,6 +307,7 @@ void MainWindow::buildWorkspace(){
     split->setChildrenCollapsible(false);
     auto *left=new QFrame;
     left->setObjectName("panel");
+    left->setMinimumWidth(460);
     auto *leftLayout=new QVBoxLayout(left);
     leftLayout->setContentsMargins(13,12,13,12);
     leftLayout->setSpacing(8);
@@ -321,7 +326,9 @@ void MainWindow::buildWorkspace(){
         QStringLiteral("数据包 / 事件"),QStringLiteral("状态"),QStringLiteral("来源")});
     setupTable(eventTable_);
     eventTable_->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
-    eventTable_->horizontalHeader()->setSectionResizeMode(1,QHeaderView::Stretch);
+    eventTable_->horizontalHeader()->setSectionResizeMode(1,QHeaderView::Interactive);
+    eventTable_->setColumnWidth(1,230);
+    eventTable_->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     eventTable_->horizontalHeader()->setSectionResizeMode(2,QHeaderView::ResizeToContents);
     eventTable_->horizontalHeader()->setSectionResizeMode(3,QHeaderView::ResizeToContents);
     eventTable_->verticalHeader()->setDefaultSectionSize(43);
@@ -335,6 +342,7 @@ void MainWindow::buildWorkspace(){
     split->addWidget(left);
     pages_=new QTabWidget;
     pages_->setObjectName("mainPages");
+    pages_->setMinimumWidth(600);
     buildOverview(pages_);
     buildEngineering(pages_);
     buildAttitude(pages_);
@@ -344,7 +352,7 @@ void MainWindow::buildWorkspace(){
     split->addWidget(pages_);
     split->setStretchFactor(0,0);
     split->setStretchFactor(1,1);
-    split->setSizes({465,995});
+    split->setSizes({490,960});
     main->addWidget(split,1);
     auto *transport=new QFrame;
     transport->setObjectName("panel");
@@ -503,48 +511,116 @@ void MainWindow::buildEngineering(QTabWidget *tabs){
 void MainWindow::buildComponentTabs(QTabWidget *tabs){
     auto *page=new QWidget;
     auto *layout=new QVBoxLayout(page);
-    layout->setContentsMargins(4,4,4,4);layout->setSpacing(3);
-    auto *parts=new AutoWrapTabWidget(page);
-    parts->setDocumentMode(true);
-    struct Spec { QString title; QStringList prefixes; QStringList keywords; };
-    const QVector<Spec> specs={
-        {QStringLiteral("全部字段"),{},{}},
-        {QStringLiteral("卫星平台"),{"SAT"},{ }},
-        {QStringLiteral("电源配电"),{"PDB"},{QStringLiteral("母线"),QStringLiteral("总线"),QStringLiteral("电压"),QStringLiteral("电流"),QStringLiteral("配电"),QStringLiteral("电源")}},
-        {QStringLiteral("姿态与轨控"),{"ZGK","SAT-S3"},{QStringLiteral("姿态"),QStringLiteral("四元数"),QStringLiteral("轨道"),QStringLiteral("半长轴"),QStringLiteral("偏心率"),QStringLiteral("升交点赤经"),QStringLiteral("近地点角距"),QStringLiteral("倾角"),QStringLiteral("GPS速度")}},
-        {QStringLiteral("热控温度"),{"TCB"},{QStringLiteral("温度"),QStringLiteral("热控"),QStringLiteral("热敏"),QStringLiteral("加热带")}},
-        {QStringLiteral("GNSS"),{"GPS"},{QStringLiteral("GNSS"),QStringLiteral("GPS")}},
-        {QStringLiteral("数传通道"),{}, {QStringLiteral("数传通道")}},
-        {QStringLiteral("数传基带"),{"BBB"},{QStringLiteral("数传基带"),QStringLiteral("基带")}},
-        {QStringLiteral("太阳敏感器"),{}, {QStringLiteral("太阳敏感器")}},
-        {QStringLiteral("CMOS相机"),{"CMS"},{QStringLiteral("CMOS")}},
-        {QStringLiteral("高分相机"),{"CAM"},{QStringLiteral("高分相机")}},
-        {QStringLiteral("光纤陀螺"),{}, {QStringLiteral("光纤陀螺")}},
-        {QStringLiteral("MEMS惯组"),{}, {QStringLiteral("MEMS")}},
-        {QStringLiteral("磁强计"),{}, {QStringLiteral("磁强计")}},
-        {QStringLiteral("星敏感器Y"),{"SSY"},{QStringLiteral("星敏Y"),QStringLiteral("星敏感器Y")}},
-        {QStringLiteral("星敏感器Z"),{"SSZ"},{QStringLiteral("星敏Z"),QStringLiteral("星敏感器Z")}}
-    };
-    for(const auto &spec:specs){
-        auto *table=new QTableWidget(0,4,parts);
-        table->setObjectName("componentTable");
-        table->setHorizontalHeaderLabels({QStringLiteral("数据包"),QStringLiteral("字段"),
-                                          QStringLiteral("当前值"),QStringLiteral("接收时间")});
-        setupTable(table);
-        table->verticalHeader()->setDefaultSectionSize(20);
-        table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-        table->horizontalHeader()->setSectionResizeMode(0,QHeaderView::ResizeToContents);
-        table->horizontalHeader()->setSectionResizeMode(1,QHeaderView::ResizeToContents);
-        table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::Stretch);
-        table->horizontalHeader()->setSectionResizeMode(3,QHeaderView::ResizeToContents);
-        parts->addTab(table,spec.title);
-        componentTables_.insert(spec.title,table);
-        componentPrefixes_.insert(spec.title,spec.prefixes);
-        componentKeywords_.insert(spec.title,spec.keywords);
+    layout->setContentsMargins(4,4,4,4);
+    layout->setSpacing(3);
+
+    // Two visible tab levels: subsystem group first, official telemetry packet name second.
+    // The JSON metadata is derived only from official tree labels and field identifiers;
+    // sampled f_text/f_double values are deliberately not copied into the catalog.
+    auto *systems=new AutoWrapTabWidget(page);
+    systems->setObjectName("officialSystemTabs");
+    systems->setDocumentMode(true);
+
+    const QString catalogRoot=QDir(QCoreApplication::applicationDirPath())
+                                  .filePath(QStringLiteral("telemetry-trees"));
+    for(const QString &treeSatellite : {QStringLiteral("ASRTU-1"),QStringLiteral("BY04")}){
+        QFile file(QDir(catalogRoot).filePath(treeSatellite+QStringLiteral(".json")));
+        if(!file.open(QIODevice::ReadOnly))continue;
+        const QJsonDocument document=QJsonDocument::fromJson(file.readAll());
+        if(!document.isObject())continue;
+        const QJsonArray packetArray=document.object().value(QStringLiteral("packets")).toArray();
+
+        QStringList groupOrder;
+        QHash<QString,int> groupIndices;
+        QVector<QVector<QJsonObject>> packetsByGroup;
+        for(const auto &packetValue:packetArray){
+            if(!packetValue.isObject())continue;
+            const QJsonObject packet=packetValue.toObject();
+            const QString groupName=packet.value(QStringLiteral("group")).toString(
+                                        QStringLiteral("其他分系统"));
+            if(!groupIndices.contains(groupName)){
+                groupIndices.insert(groupName,groupOrder.size());
+                groupOrder.push_back(groupName);
+                packetsByGroup.push_back(QVector<QJsonObject>());
+            }
+            packetsByGroup[groupIndices.value(groupName)].push_back(packet);
+        }
+
+        for(int groupIndex=0;groupIndex<groupOrder.size();++groupIndex){
+            const QString groupName=groupOrder[groupIndex];
+            auto *groupPage=new QWidget;
+            groupPage->setProperty("treeSatellite",treeSatellite);
+            auto *groupLayout=new QVBoxLayout(groupPage);
+            groupLayout->setContentsMargins(2,2,2,2);
+            groupLayout->setSpacing(2);
+
+            auto *packetTabs=new AutoWrapTabWidget(groupPage);
+            packetTabs->setObjectName("officialPacketTabs");
+            packetTabs->setDocumentMode(true);
+
+            for(const QJsonObject &packet:packetsByGroup[groupIndex]){
+                const QString officialName=packet.value(QStringLiteral("official_name")).toString();
+                const QString packetCode=packet.value(QStringLiteral("packet_code")).toString();
+                const QJsonArray fields=packet.value(QStringLiteral("fields")).toArray();
+
+                auto *table=new QTableWidget(fields.isEmpty()?1:fields.size(),4,packetTabs);
+                table->setObjectName("officialComponentTable");
+                table->setProperty("treeSatellite",treeSatellite);
+                table->setProperty("officialPacketCode",packetCode);
+                table->setProperty("officialPacketName",officialName);
+                table->setHorizontalHeaderLabels({QStringLiteral("字段名称"),
+                    QStringLiteral("完整字段编号"),QStringLiteral("当前值"),QStringLiteral("接收时间")});
+                setupTable(table);
+                table->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+                table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+                table->verticalHeader()->setDefaultSectionSize(22);
+                table->horizontalHeader()->setSectionResizeMode(0,QHeaderView::Interactive);
+                table->horizontalHeader()->setSectionResizeMode(1,QHeaderView::Interactive);
+                table->horizontalHeader()->setSectionResizeMode(2,QHeaderView::Stretch);
+                table->horizontalHeader()->setSectionResizeMode(3,QHeaderView::ResizeToContents);
+                table->setColumnWidth(0,250);
+                table->setColumnWidth(1,190);
+
+                if(fields.isEmpty()){
+                    auto *nameItem=new QTableWidgetItem(QStringLiteral("附件中未提供该包的字段条目"));
+                    nameItem->setData(Qt::UserRole+2,true);
+                    nameItem->setToolTip(QStringLiteral("保留官方数据包位置；附件中的对应 JSON data 对象为空，未臆造字段。"));
+                    table->setItem(0,0,nameItem);
+                    table->setItem(0,1,new QTableWidgetItem(QString()));
+                    table->setItem(0,2,new QTableWidgetItem(QStringLiteral("未解析")));
+                    table->setItem(0,3,new QTableWidgetItem(QString()));
+                }else{
+                    for(int row=0;row<fields.size();++row){
+                        const QJsonObject field=fields.at(row).toObject();
+                        const QString fieldName=field.value(QStringLiteral("name")).toString();
+                        const QString fullCode=field.value(QStringLiteral("code")).toString();
+                        const QString englishName=field.value(QStringLiteral("english_name")).toString();
+                        auto *nameItem=new QTableWidgetItem(fieldName);
+                        nameItem->setData(Qt::UserRole,fullCode);
+                        nameItem->setData(Qt::UserRole+1,englishName);
+                        nameItem->setToolTip(QStringLiteral("官方字段：%1
+英文名：%2")
+                                               .arg(fullCode,englishName));
+                        table->setItem(row,0,nameItem);
+                        table->setItem(row,1,new QTableWidgetItem(fullCode));
+                        table->setItem(row,2,new QTableWidgetItem(QStringLiteral("未解析")));
+                        table->setItem(row,3,new QTableWidgetItem(QString()));
+                    }
+                }
+                packetTabs->addTab(table,officialName);
+                componentTables_.insert(treeSatellite+QLatin1Char('|')+packetCode,table);
+            }
+            groupLayout->addWidget(packetTabs,1);
+            systems->addTab(groupPage,treeSatellite+QStringLiteral(" · ")+groupName);
+        }
     }
-    parts->refreshTabWrapping();
-    layout->addWidget(parts,1);
+
+    layout->addWidget(systems,1);
     tabs->addTab(page,QStringLiteral("分系统数据"));
+    if(satelliteSelect_){
+        connect(satelliteSelect_,&QComboBox::currentTextChanged,this,
+                [this]{updateComponentTabs(currentIndex_);});
+    }
 }
 void MainWindow::buildAttitude(QTabWidget *tabs){
     auto *page=new QWidget;auto *layout=new QVBoxLayout(page);
