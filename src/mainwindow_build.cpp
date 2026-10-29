@@ -20,6 +20,7 @@
 #include <QFormLayout>
 #include <QFrame>
 #include <functional>
+#include <algorithm>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -119,13 +120,51 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
         seekVisible(1);
     });
     connect(live_,&orbit::LiveTcp::status,this,[this](const QString &message){
-        statusBar()->showMessage(QStringLiteral("TCP 连接状态：")+message,7500);
+        statusBar()->showMessage(QStringLiteral("TCP 状态：")+message,7500);
+        if(!tcpStatusLabel_)return;
+        if(message==QStringLiteral("Connected")){
+            tcpStatusLabel_->setText(QStringLiteral("TCP：已连接"));
+            tcpStatusLabel_->setStyleSheet(QStringLiteral("color:#15803d;font-weight:600;"));
+        }else if(message.startsWith(QStringLiteral("正在连接"))){
+            tcpStatusLabel_->setText(QStringLiteral("TCP：连接中"));
+            tcpStatusLabel_->setStyleSheet(QStringLiteral("color:#b45309;font-weight:600;"));
+        }else if(message.startsWith(QStringLiteral("连接失败"))){
+            tcpStatusLabel_->setText(QStringLiteral("TCP：连接失败"));
+            tcpStatusLabel_->setToolTip(message);
+            tcpStatusLabel_->setStyleSheet(QStringLiteral("color:#b91c1c;font-weight:600;"));
+        }else if(message==QStringLiteral("Disconnected")){
+            if(tcpStatusLabel_->text()!=QStringLiteral("TCP：连接失败")){
+                tcpStatusLabel_->setText(QStringLiteral("TCP：未连接"));
+                tcpStatusLabel_->setStyleSheet(QString());
+                tcpStatusLabel_->setToolTip(QString());
+            }
+        }
     });
-    connect(live_,&orbit::LiveTcp::received,this,[this](const orbit::Frame &f){
-        for(const auto &existing:frames_)if(existing.hash==f.hash)return;
-        frames_.push_back(f);
+    connect(live_,&orbit::LiveTcp::received,this,[this](const orbit::Frame &frame){
+        bool inserted=false;
+        QString storageError;
+        const bool stored=satelliteStore_.append(frame,&inserted,&storageError);
+        if(!stored){
+            statusBar()->showMessage(QStringLiteral("SQLite 写入失败：%1").arg(storageError),10000);
+        }else if(!inserted){
+            statusBar()->showMessage(QStringLiteral("重复帧已去重：%1").arg(frame.satellite),3000);
+            return;
+        }
+        for(const auto &existing:frames_){
+            if(existing.satellite==frame.satellite&&existing.hash==frame.hash)return;
+        }
+        frames_.push_back(frame);
+        std::stable_sort(frames_.begin(),frames_.end(),[](const orbit::Frame &left,const orbit::Frame &right){
+            if(left.captureLocal.isValid()!=right.captureLocal.isValid())return left.captureLocal.isValid();
+            if(left.captureLocal.isValid()&&right.captureLocal.isValid()&&left.captureLocal!=right.captureLocal)
+                return left.captureLocal<right.captureLocal;
+            if(left.satellite!=right.satellite)return left.satellite<right.satellite;
+            return left.hash<right.hash;
+        });
         rebuildSession();
-        statusBar()->showMessage(QStringLiteral("接收到新的传输帧；尚未独立校验应用层 CRC"),7000);
+        if(stored){
+            statusBar()->showMessage(QStringLiteral("已保存至 %1.db（按时间排序，重复帧自动忽略）").arg(frame.satellite),5000);
+        }
     });
     const QString dbFile=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+
                          "/orbittlm.sqlite";
@@ -140,6 +179,10 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
         statusBar()->showMessage(QStringLiteral("缺少 ASRTU-1 遥测字段库：")+error,18000);
     }
     updatePaths();
+    QString startupStoreError;
+    frames_=satelliteStore_.loadAll(&startupStoreError);
+    if(!startupStoreError.isEmpty())statusBar()->showMessage(QStringLiteral("读取 SQLite 遥测库失败：%1").arg(startupStoreError),10000);
+    if(!frames_.isEmpty())rebuildSession();
     updateMetrics();
     updateWebHistory();
     showEvent(-1);
@@ -230,6 +273,10 @@ void MainWindow::buildToolbar(){
     connect(exportQ,&QAction::triggered,this,[this]{exportQuaternions(false);});
     bar->addSeparator();
     auto *connectTcp=bar->addAction(QStringLiteral("连接 TCP"));
+    tcpStatusLabel_=new QLabel(QStringLiteral("TCP：未连接"),bar);
+    tcpStatusLabel_->setObjectName(QStringLiteral("tcpStatusLabel"));
+    tcpStatusLabel_->setMinimumWidth(112);
+    bar->addWidget(tcpStatusLabel_);
     connect(connectTcp,&QAction::triggered,this,[this]{
         bool ok=false;
         const QString address=QInputDialog::getText(this,QStringLiteral("TCP 实时输入"),
@@ -237,7 +284,7 @@ void MainWindow::buildToolbar(){
         if(!ok||address.trimmed().isEmpty())return;
         const int port=QInputDialog::getInt(this,QStringLiteral("TCP 实时输入"),
             QStringLiteral("端口"),9985,1,65535,1,&ok);
-        if(ok)live_->start(address,quint16(port),satellite());
+        if(ok)live_->start(address,quint16(port),QStringLiteral("AUTO"));
     });
     auto *stop=bar->addAction(QStringLiteral("断开"));
     connect(stop,&QAction::triggered,live_,&orbit::LiveTcp::stop);
@@ -414,7 +461,7 @@ void MainWindow::buildOverview(QTabWidget *tabs){
     cardsLayout->setContentsMargins(0,0,0,0);
     cardsLayout->setHorizontalSpacing(4);cardsLayout->setVerticalSpacing(4);
     powerCard_=statusCard(QStringLiteral("总线电压与电流"));
-    attitudeCard_=statusCard(QStringLiteral("姿态与 GPS 轨道"));
+    attitudeCard_=statusCard(QStringLiteral("姿态与轨道"));
     thermalCard_=statusCard(QStringLiteral("各总线与部件温度"));
     payloadCard_=statusCard(QStringLiteral("部件开关状态"));
     for(auto *card:{powerCard_,attitudeCard_,thermalCard_,payloadCard_})
@@ -524,8 +571,18 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
     const QString catalogRoot=QDir(QCoreApplication::applicationDirPath())
                                   .filePath(QStringLiteral("telemetry-trees"));
     for(const QString &treeSatellite : {QStringLiteral("ASRTU-1"),QStringLiteral("BY04")}){
-        QFile file(QDir(catalogRoot).filePath(treeSatellite+QStringLiteral(".json")));
-        if(!file.open(QIODevice::ReadOnly))continue;
+        const QString catalogName=treeSatellite+QStringLiteral(".json");
+        QFile file(QStringLiteral(":/telemetry-trees/")+catalogName);
+        if(!file.open(QIODevice::ReadOnly)){
+            file.setFileName(QDir(catalogRoot).filePath(catalogName));
+            if(!file.open(QIODevice::ReadOnly)){
+                auto *errorPage=new QWidget;
+                auto *errorLayout=new QVBoxLayout(errorPage);
+                errorLayout->addWidget(new QLabel(QStringLiteral("官方遥测字段目录未加载：%1").arg(catalogName)));
+                systems->addTab(errorPage,treeSatellite+QStringLiteral(" · 目录错误"));
+                continue;
+            }
+        }
         const QJsonDocument document=QJsonDocument::fromJson(file.readAll());
         if(!document.isObject())continue;
         const QJsonArray packetArray=document.object().value(QStringLiteral("packets")).toArray();
@@ -618,7 +675,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
     tabs->addTab(page,QStringLiteral("分系统数据"));
     if(satelliteSelect_){
         connect(satelliteSelect_,&QComboBox::currentTextChanged,this,
-                [this]{updateComponentTabs(currentIndex_);});
+                [this]{updateComponentTabs(currentIndex_);populateEngineering(currentIndex_);updateOverview(currentIndex_);updateAttitude(currentIndex_);});
     }
 }
 void MainWindow::buildAttitude(QTabWidget *tabs){

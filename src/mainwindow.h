@@ -1,5 +1,6 @@
 #pragma once
 #include "core.h"
+#include "telemetry_store.h"
 #include "business.h"
 #include "schema.h"
 #include "ssdv.h"
@@ -81,6 +82,7 @@ private:
 
     QString logPath_,binPath_;
     orbit::Database db_;
+    orbit::SatelliteTelemetryStore satelliteStore_;
     orbit::BusinessCatalog catalog_;
     orbit::Schema customSchema_;
     bool catalogReady_=false,hasCustomSchema_=false;
@@ -101,6 +103,7 @@ private:
            *engineeringSummary_=nullptr,*fieldDetail_=nullptr,*attitudeInfo_=nullptr,
            *imageInfo_=nullptr,*diagnosticsSummary_=nullptr;
     QComboBox *satelliteSelect_=nullptr,*speedSelect_=nullptr;
+    QLabel *tcpStatusLabel_=nullptr;
     QLineEdit *eventSearch_=nullptr,*engineeringSearch_=nullptr;
     QCheckBox *recognizedOnly_=nullptr;
     QTableWidget *eventTable_=nullptr,*engineeringTable_=nullptr,

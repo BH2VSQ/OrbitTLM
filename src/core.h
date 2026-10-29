@@ -64,16 +64,8 @@ signals:
     void received(const orbit::Frame &frame);
     void status(const QString &message);
 private:
-    void openArchive(const QString &satellite);
-    void closeArchive();
     QTcpSocket socket_;
     QByteArray queued_;
-    QString satellite_ = "ASRTU-1";
-    QDateTime connectionTime_;
-    QString archiveStem_;
-    QFile archiveLog_;
-    QFile archiveBin_;
-    int archivedFrames_ = 0;
 };
 }
 Q_DECLARE_METATYPE(orbit::Frame)

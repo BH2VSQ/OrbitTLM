@@ -236,6 +236,12 @@ void MainWindow::importSession(){
         QMessageBox::warning(this,QStringLiteral("二进制读取失败"),error);return;
     }
     frames_=orbit::Protocol::fuse(log,bin,&frameStats_);
+    QString importStoreError;
+    for(const orbit::Frame &importedFrame:frames_){
+        bool inserted=false;
+        if(!satelliteStore_.append(importedFrame,&inserted,&importStoreError))break;
+    }
+    if(!importStoreError.isEmpty())statusBar()->showMessage(QStringLiteral("导入帧写入卫星 SQLite 库失败：%1").arg(importStoreError),10000);
     const QString actualSat=resolvedSatellite();
     if(hasCustomSchema_&&customSchema_.satellite()==actualSat)
         for(auto &f:frames_)customSchema_.apply(f);
@@ -260,6 +266,13 @@ void MainWindow::loadHistory(){
     if(!ok||selected.isEmpty())return;
     const int i=choices.indexOf(selected);
     frames_=db_.load(entries[i].first,&error);
+    QString legacyStoreError;
+    for(const orbit::Frame &legacyFrame:frames_){
+        bool inserted=false;
+        if(!satelliteStore_.append(legacyFrame,&inserted,&legacyStoreError))break;
+    }
+    if(!legacyStoreError.isEmpty())statusBar()->showMessage(QStringLiteral("旧历史迁移到卫星 SQLite 库失败：%1").arg(legacyStoreError),10000);
+
     if(!error.isEmpty()){QMessageBox::warning(this,QStringLiteral("历史会话读取失败"),error);return;}
     if(!frames_.isEmpty()){
         const QString sat=frames_.first().satellite;
@@ -463,8 +476,9 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     if(!card)return;
     auto *table=overviewTables_.value(card,card->findChild<QTableWidget*>("statusTable"));
     if(!table)return;
-    const QString title=card->title();
     const bool by04=resolvedSatellite()==QStringLiteral("BY04");
+    if(card==attitudeCard_)card->setTitle(by04?QStringLiteral("姿态与轨道"):QStringLiteral("姿态与 GPS 轨道"));
+    const QString title=card->title();
     struct Row {
         QString name;
         QString packet;
@@ -512,7 +526,6 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
             addBy04(QStringLiteral("卫星姿态更新标志"),{QStringLiteral("卫星姿态更新标志")});
             addBy04(QStringLiteral("卫星姿态可信标志"),{QStringLiteral("卫星姿态可信标志")});
             addBy04(QStringLiteral("GPS轨道有效计数"),{QStringLiteral("GPS轨道有效计数")});
-            addBy04(QStringLiteral("使用GPS测量确定轨道"),{QStringLiteral("使用GPS测量确定轨道")});
         }else if(card==thermalCard_){
             addBy04(QStringLiteral("电池温度1"),{QStringLiteral("电池温度1")});
             addBy04(QStringLiteral("电池温度2"),{QStringLiteral("电池温度2")});
@@ -588,9 +601,40 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
             add(device.first,QString(),EngineeringField{device.first,{},device.first,{},{},{},{},{},{},QStringLiteral("catalog_definition")},true);
     }
 
+    const bool alignedBy04Quaternions=by04&&card==attitudeCard_;
+    struct RowCell{int row=0;int column=0;};
+    QVector<RowCell> rowCells(rows.size());
     const int rowsPerColumn=qMax(1,(rows.size()+1)/2);
-    table->setWordWrap(by04);
-    table->setRowCount(rowsPerColumn);
+    int renderRows=rowsPerColumn;
+    if(alignedBy04Quaternions){
+        renderRows=6;
+        int extraSlot=0;
+        for(int r=0;r<rows.size();++r){
+            const QString &name=rows[r].name;
+            const bool pose=name.startsWith(QStringLiteral("姿态四元数 q"));
+            const bool deviation=name.startsWith(QStringLiteral("偏差四元数 q"));
+            if(pose||deviation){
+                const int marker=name.lastIndexOf(QLatin1Char('q'));
+                bool ok=false;
+                const int qIndex=name.mid(marker+1).toInt(&ok);
+                if(ok&&qIndex>=0&&qIndex<4){
+                    rowCells[r]={qIndex,deviation?2:0};
+                    continue;
+                }
+            }
+            int slot=-1;
+            if(name==QStringLiteral("姿态模式"))slot=0;
+            else if(name==QStringLiteral("GPS轨道有效计数"))slot=1;
+            else if(name==QStringLiteral("卫星姿态更新标志"))slot=2;
+            else if(name==QStringLiteral("卫星姿态可信标志"))slot=3;
+            else slot=4+extraSlot++;
+            const int row=4+slot/2;
+            rowCells[r]={row,(slot%2)*2};
+            renderRows=qMax(renderRows,row+1);
+        }
+    }
+    table->setWordWrap(false);
+    table->setRowCount(renderRows);
     for(int r=0;r<rows.size();++r){
         const Row &row=rows[r];
         QString value=QStringLiteral("未解析"),unit,status=QStringLiteral("未解析"),when;
@@ -681,8 +725,9 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
         if(!row.sourceNames.isEmpty())tooltip=row.sourceNames.join(QStringLiteral("，"));
         auto *nameItem=item(row.name,tooltip);
         auto *valueItem=item(row.combineSources?value:telemetryValue(resolvedField,value,unit),status);
-        const int rowIndex=r%rowsPerColumn;
-        const int columnOffset=(r/rowsPerColumn)*2;
+        int rowIndex=r%rowsPerColumn;
+        int columnOffset=(r/rowsPerColumn)*2;
+        if(alignedBy04Quaternions){rowIndex=rowCells[r].row;columnOffset=rowCells[r].column;}
         table->setItem(rowIndex,columnOffset,nameItem);
         table->setItem(rowIndex,columnOffset+1,valueItem);
         if(title==QStringLiteral("部件开关状态")){
@@ -803,65 +848,53 @@ void MainWindow::updateComponentTabs(int index){
     }
 }
 void MainWindow::updateWebHistory(){
-    const QString root=QCoreApplication::applicationDirPath()+QStringLiteral("/data");
-    if(!QDir().mkpath(root))return;
-    const QString jsonPath=root+QStringLiteral("/telemetry.json");
-    QJsonArray records;QSet<QString> seen;
-    QFile existing(jsonPath);
-    if(existing.open(QIODevice::ReadOnly)){
-        const auto doc=QJsonDocument::fromJson(existing.readAll());
-        if(doc.isArray())for(const auto &value:doc.array())if(value.isObject()){
-            const auto obj=value.toObject();
-            const QString key=obj.value(QStringLiteral("satellite")).toString()+QLatin1Char('|')+
-                obj.value(QStringLiteral("capture_local")).toString()+QLatin1Char('|')+
-                obj.value(QStringLiteral("raw_kiss_hex")).toString();
-            if(!seen.contains(key)){seen.insert(key);records.append(obj);}
-        }
-    }
+    // business_ is rebuilt from frames loaded from the per-satellite SQLite DBs.
+    // Use it as the in-memory view; do not create JSON/CSV telemetry sidecars.
+    QJsonArray records;
     for(const auto &packet:business_){
-        QJsonObject obj=orbit::BusinessCatalog::toJson(packet);
-        obj.insert(QStringLiteral("satellite"),packet.transport.satellite);
-        const QString key=packet.transport.satellite+QLatin1Char('|')+
-            obj.value(QStringLiteral("capture_local")).toString()+QLatin1Char('|')+
-            obj.value(QStringLiteral("raw_kiss_hex")).toString();
-        if(!seen.contains(key)){seen.insert(key);records.append(obj);}
+        QJsonObject record=orbit::BusinessCatalog::toJson(packet);
+        records.append(record);
     }
-    QVector<QJsonObject> sorted;sorted.reserve(records.size());
-    for(const auto &value:records)if(value.isObject())sorted.push_back(value.toObject());
-    std::stable_sort(sorted.begin(),sorted.end(),[](const QJsonObject &a,const QJsonObject &b){
-        return a.value(QStringLiteral("capture_local")).toString()<b.value(QStringLiteral("capture_local")).toString();
-    });
-    records=QJsonArray();for(const auto &obj:sorted)records.append(obj);
-    const QByteArray json=QJsonDocument(records).toJson(QJsonDocument::Indented);
-    auto writeFile=[](const QString &path,const QByteArray &bytes){
-        QSaveFile file(path);if(!file.open(QIODevice::WriteOnly))return false;
-        if(file.write(bytes)!=bytes.size())return false;return file.commit();
+    QByteArray json=QJsonDocument(records).toJson(QJsonDocument::Compact);
+    json.replace("<","\\u003c");
+
+    const QDir appDir(QCoreApplication::applicationDirPath());
+    const QString dataDir=appDir.filePath(QStringLiteral("data"));
+    if(!QDir().mkpath(dataDir)){
+        statusBar()->showMessage(QStringLiteral("无法创建网页历史目录：%1").arg(dataDir),8000);
+        return;
+    }
+
+    QStringList templateCandidates={
+        appDir.filePath(QStringLiteral("web/index.template.html")),
+        appDir.filePath(QStringLiteral("web/index.html")),
+        appDir.filePath(QStringLiteral("index.template.html"))
     };
-    writeFile(jsonPath,json);
-    QString csv=QStringLiteral("time,satellite,packet,field_code,name_cn,name_en,raw_hex,raw_number,value,unit,status\r\n");
-    auto quote=[](QString v){v.replace(QStringLiteral("\""),QStringLiteral("\"\""));return QStringLiteral("\"")+v+QStringLiteral("\"");};
-    for(const auto &value:records){
-        const auto packet=value.toObject();
-        const QString time=packet.value(QStringLiteral("capture_local")).toString();
-        const QString sat=packet.value(QStringLiteral("satellite")).toString();
-        const QString name=packet.value(QStringLiteral("packet")).toString();
-        for(const auto &fieldValue:packet.value(QStringLiteral("fields")).toArray()){
-            const auto f=fieldValue.toObject();
-            QStringList row={time,sat,name,f.value("code").toString(),f.value("name_cn").toString(),
-                f.value("name_en").toString(),f.value("raw_hex").toString(),f.value("raw_number").toString(),
-                f.value("value").toString(),f.value("unit").toString(),f.value("status").toString()};
-            for(QString &v:row)v=quote(v);
-            csv+=row.join(QLatin1Char(','))+QStringLiteral("\r\n");
+    QFile templateFile;
+    for(const QString &candidate:templateCandidates){
+        if(QFileInfo::exists(candidate)){
+            templateFile.setFileName(candidate);
+            if(templateFile.open(QIODevice::ReadOnly))break;
         }
     }
-    writeFile(root+QStringLiteral("/telemetry.csv"),csv.toUtf8());
-    QFile templateFile(QCoreApplication::applicationDirPath()+QStringLiteral("/web/index.template.html"));
-    QByteArray html;
-    if(templateFile.open(QIODevice::ReadOnly))html=templateFile.readAll();
-    if(html.isEmpty())return;
-    QByteArray safeJson=json;safeJson.replace("<","\\u003c");
-    html.replace("__DATA_JSON__",safeJson);
-    writeFile(root+QStringLiteral("/index.html"),html);
+    if(!templateFile.isOpen()){
+        statusBar()->showMessage(QStringLiteral("未找到网页模板，SQLite 遥测数据已正常保存"),8000);
+        return;
+    }
+    QByteArray html=templateFile.readAll();
+    templateFile.close();
+    if(!html.contains("__DATA_JSON__")){
+        statusBar()->showMessage(QStringLiteral("网页模板缺少 __DATA_JSON__ 占位符；SQLite 数据不受影响"),8000);
+        return;
+    }
+    html.replace("__DATA_JSON__",json);
+    QSaveFile output(QDir(dataDir).filePath(QStringLiteral("index.html")));
+    if(!output.open(QIODevice::WriteOnly)||output.write(html)!=html.size()||!output.commit()){
+        statusBar()->showMessage(QStringLiteral("网页历史输出失败：%1").arg(output.errorString()),8000);
+        return;
+    }
+    // Telemetry is persisted only in per-satellite SQLite databases. The HTML is a
+    // derived view with inlined data; no telemetry sidecar is written.
 }
 
 void MainWindow::populateEngineering(int index){
@@ -898,125 +931,82 @@ void MainWindow::populateEngineering(int index){
             }
             return root;
         };
-        auto appendFields=[&](QTreeWidgetItem *packetNode,const BusinessPacket &definition){
-            for(const auto &f:definition.fields){
-                const QString code=f.code;
-                QString unit=f.unit;
-                if(unit.isEmpty()&&f.formula.endsWith(QLatin1Char('>'))){
-                    const int left=f.formula.lastIndexOf(QLatin1Char('<'));
-                    if(left>=0)unit=f.formula.mid(left+1,f.formula.size()-left-2);
+        const QString treeSatellite=by04?QStringLiteral("BY04"):QStringLiteral("ASRTU-1");
+        const QString treePath=QDir(QCoreApplication::applicationDirPath())
+                              .filePath(QStringLiteral("telemetry-trees/")+treeSatellite+QStringLiteral(".json"));
+        QFile officialFile(QStringLiteral(":/telemetry-trees/")+treeSatellite+QStringLiteral(".json"));
+        bool officialOpen=officialFile.open(QIODevice::ReadOnly);
+        if(!officialOpen){
+            officialFile.setFileName(treePath);
+            officialOpen=officialFile.open(QIODevice::ReadOnly);
+        }
+        bool loadedOfficial=false;
+        if(officialOpen){
+            const QJsonDocument document=QJsonDocument::fromJson(officialFile.readAll());
+            officialFile.close();
+            if(document.isObject()){
+                const QJsonArray packets=document.object().value(QStringLiteral("packets")).toArray();
+                if(!packets.isEmpty()){
+                    QHash<QString,QTreeWidgetItem*> groups;
+                    for(const QJsonValue &packetValue:packets){
+                        if(!packetValue.isObject())continue;
+                        const QJsonObject packet=packetValue.toObject();
+                        const QString officialName=packet.value(QStringLiteral("official_name")).toString();
+                        const QString packetCode=packet.value(QStringLiteral("packet_code")).toString();
+                        const QString groupName=packet.value(QStringLiteral("group")).toString(QStringLiteral("其他分系统"));
+                        const QString internalPacketName=by04
+                            ?QStringLiteral("BY04-")+packetCode:packetCode;
+                        QTreeWidgetItem *groupNode=groups.value(groupName,nullptr);
+                        if(!groupNode){
+                            groupNode=componentRoot(groupName);
+                            groups.insert(groupName,groupNode);
+                        }
+                        auto *packetNode=new QTreeWidgetItem(groupNode,
+                            {officialName+QStringLiteral(" [%1]").arg(packetCode),QString(),QString(),QString()});
+                        packetNode->setToolTip(0,QStringLiteral("官方遥测包名：%1\n包代码：%2").arg(officialName,packetCode));
+                        packetNode->setData(0,Qt::UserRole,internalPacketName);
+                        const QJsonArray fields=packet.value(QStringLiteral("fields")).toArray();
+                        if(fields.isEmpty()){
+                            auto *placeholder=new QTreeWidgetItem(packetNode,
+                                {QStringLiteral("附件未提供该包的字段条目"),QString(),QStringLiteral("未解析"),QStringLiteral("目录未提供")});
+                            placeholder->setToolTip(0,QStringLiteral("保留官方数据包位置；附件中该包 fields 数组为空，未臆造字段。"));
+                            placeholder->setData(0,Qt::UserRole+7,true);
+                            continue;
+                        }
+                        for(const QJsonValue &fieldValue:fields){
+                            if(!fieldValue.isObject())continue;
+                            const QJsonObject field=fieldValue.toObject();
+                            const QString fieldName=field.value(QStringLiteral("name")).toString();
+                            const QString fullCode=field.value(QStringLiteral("code")).toString();
+                            const QString englishName=field.value(QStringLiteral("english_name")).toString();
+                            const QString baseCode=fullCode.section(QLatin1Char('.'),0,0);
+                            const QString bitWidth=fullCode.contains(QLatin1Char('.'))
+                                ?fullCode.section(QLatin1Char('.'),1):QString();
+                            auto *entry=new QTreeWidgetItem(packetNode,
+                                {fieldName.isEmpty()?fullCode:fieldName,fullCode,
+                                 QStringLiteral("未解析"),QStringLiteral("官方字段定义")});
+                            entry->setData(0,Qt::UserRole,fullCode);
+                            entry->setData(0,Qt::UserRole+1,internalPacketName);
+                            entry->setData(0,Qt::UserRole+2,bitWidth);
+                            entry->setData(0,Qt::UserRole+3,QString());
+                            entry->setData(0,Qt::UserRole+4,englishName);
+                            entry->setData(0,Qt::UserRole+5,QStringLiteral("官方遥测树"));
+                            entry->setData(0,Qt::UserRole+6,QString());
+                            entry->setToolTip(0,QStringLiteral("官方字段编号：%1\n位/宽度：%2\n英文名：%3\n工程换算公式：官方目录未提供；当前不生成推测数值。")
+                                                  .arg(fullCode,bitWidth,englishName));
+                            fieldTreeFieldItems_.insert(internalPacketName+QLatin1Char('|')+fullCode,entry);
+                        }
+                    }
+                    loadedOfficial=true;
                 }
-                auto *entry=new QTreeWidgetItem(packetNode,{
-                    f.nameCn.isEmpty()?code:f.nameCn,QStringLiteral("未解析"),unit,
-                    QStringLiteral("等待样本")});
-                entry->setData(0,Qt::UserRole,code);
-                entry->setData(0,Qt::UserRole+1,definition.packetName);
-                entry->setData(0,Qt::UserRole+2,f.bits);
-                entry->setData(0,Qt::UserRole+3,f.formula);
-                entry->setData(0,Qt::UserRole+4,f.nameEn);
-                entry->setData(0,Qt::UserRole+5,f.definitionEvidence);
-                entry->setData(0,Qt::UserRole+6,unit);
-                entry->setToolTip(0,QStringLiteral("字段编号：%1\n位位置：%2\n英文名：%3\n换算公式：%4\n定义来源：%5")
-                    .arg(code,f.bits,f.nameEn,f.formula,f.definitionEvidence));
-                fieldTreeFieldItems_.insert(definition.packetName+QLatin1Char('|')+code,entry);
-            }
-        };
-        const auto definitions=by04?orbit::By04Decoder::definitionPackets():catalog_.definitionPackets();
-        if(by04){
-            struct PanelPacket { QString label; QString code; };
-            static const QVector<PanelPacket> panel={
-                {QStringLiteral("测控板-测控-00包"),QStringLiteral("TTC-S0")},
-                {QStringLiteral("DBW-00包"),QStringLiteral("BDM-S0")},
-                {QStringLiteral("CMOS小相机-小相机-00包"),QStringLiteral("SXJ-S0")},
-                {QStringLiteral("姿轨控-姿轨控00-00包"),QStringLiteral("ZGK-S0")},
-                {QStringLiteral("姿轨控-姿轨控01-01包"),QStringLiteral("ZGK-S1")},
-                {QStringLiteral("姿轨控-姿轨控02-02包"),QStringLiteral("ZGK-S2")},
-                {QStringLiteral("姿轨控-姿轨控03慢包-03包"),QStringLiteral("ZGK-S3")},
-                {QStringLiteral("姿轨控-姿轨控04查询包-04包"),QStringLiteral("ZGK-S4")},
-                {QStringLiteral("姿轨控-姿轨控05控制参数-05包"),QStringLiteral("ZGK-S5")},
-                {QStringLiteral("姿轨控-姿轨控06查询包-06包"),QStringLiteral("ZGK-S6")},
-                {QStringLiteral("姿轨控-姿轨控07轨道预报-07包"),QStringLiteral("ZGK-S7")},
-                {QStringLiteral("姿轨控-姿轨控08执行机构-08包"),QStringLiteral("ZGK-S8")},
-                {QStringLiteral("姿轨控-姿轨控09屏蔽卸载-09包"),QStringLiteral("ZGK-S9")},
-                {QStringLiteral("姿轨控-姿轨控0A任务启动-0A包"),QStringLiteral("ZGK-SA")},
-                {QStringLiteral("姿轨控-姿轨控0B安装矩阵-0B包"),QStringLiteral("ZGK-SB")},
-                {QStringLiteral("姿轨控-姿轨控0C指令地点-0C包"),QStringLiteral("ZGK-SC")},
-                {QStringLiteral("姿轨控-姿轨控0D测试-0D包"),QStringLiteral("ZGK-SD")},
-                {QStringLiteral("姿轨控-姿轨控0E指令地点短-0E包"),QStringLiteral("ZGK-SE")},
-                {QStringLiteral("AI板-AI板0-00包"),QStringLiteral("AIB-S0")},
-                {QStringLiteral("AI板-AI板1-01包"),QStringLiteral("AIB-S1")},
-                {QStringLiteral("AI板-AI板2-02包"),QStringLiteral("AIB-S2")},
-                {QStringLiteral("飞轮X-FWX-00包"),QStringLiteral("FWX-S0")},
-                {QStringLiteral("飞轮Y-FWY-00包"),QStringLiteral("FWY-S0")},
-                {QStringLiteral("飞轮Z-FWZ-00包"),QStringLiteral("FWZ-S0")},
-                {QStringLiteral("飞轮S-FWS-00包"),QStringLiteral("FWS-S0")},
-                {QStringLiteral("星敏A-星敏A-00包"),QStringLiteral("XMA-S0")},
-                {QStringLiteral("星敏B-星敏B-00包"),QStringLiteral("XMB-S0")},
-                {QStringLiteral("太敏-太敏-00包"),QStringLiteral("TYM-S0")},
-                {QStringLiteral("GNSS-GNSS工参-00包"),QStringLiteral("GNS-S0")},
-                {QStringLiteral("GNSS-GNSS广播-01包"),QStringLiteral("GNS-S1")},
-                {QStringLiteral("MEMS陀螺1-MEMS1-00包"),QStringLiteral("MEA-S0")},
-                {QStringLiteral("MEMS陀螺2-MEMS2-00包"),QStringLiteral("MEB-S0")},
-                {QStringLiteral("磁强计1-磁强计1-00包"),QStringLiteral("CQA-S0")},
-                {QStringLiteral("磁强计2-磁强计2-00包"),QStringLiteral("CQB-S0")},
-                {QStringLiteral("基带板UV-UV基带板遥测-00包"),QStringLiteral("BUV-S0")},
-                {QStringLiteral("基带板UV-偏振相机遥测-01包"),QStringLiteral("BUV-S1")},
-                {QStringLiteral("基带板UV-屏幕遥测-02包"),QStringLiteral("BUV-S2")},
-                {QStringLiteral("高清相机-冯学姐相机-00包"),QStringLiteral("FXJ-S0")},
-                {QStringLiteral("高清相机-冯学姐文件-01包"),QStringLiteral("FXJ-S1")},
-                {QStringLiteral("屏幕-屏幕遥测响应-00包"),QStringLiteral("SCR-S0")},
-                {QStringLiteral("计算机-计算机00-00包"),QStringLiteral("OBC-S0")},
-                {QStringLiteral("计算机-计算机数传-01包"),QStringLiteral("OBC-S1")},
-                {QStringLiteral("计算机-计算机上注-02包"),QStringLiteral("OBC-S2")},
-                {QStringLiteral("计算机-电源开关状态-03包"),QStringLiteral("OBC-S3")},
-                {QStringLiteral("计算机-电源开关计数-04包"),QStringLiteral("OBC-S4")},
-                {QStringLiteral("计算机-计算机快包-05包"),QStringLiteral("OBC-S5")},
-                {QStringLiteral("计算机-平台相关FRAM-06包"),QStringLiteral("OBC-S6")},
-                {QStringLiteral("计算机-姿轨控相关FRAM-07包"),QStringLiteral("OBC-S7")},
-                {QStringLiteral("计算机-姿轨控相关FRAMP2-08包"),QStringLiteral("OBC-S8")},
-                {QStringLiteral("计算机-ADC采集-09包"),QStringLiteral("OBC-S9")},
-                {QStringLiteral("计算机-单机状态快-0A包"),QStringLiteral("OBC-SA")},
-                {QStringLiteral("计算机-单机状态慢-0B包"),QStringLiteral("OBC-SB")},
-                {QStringLiteral("计算机-计算机ADC-0C包"),QStringLiteral("OBC-SC")},
-                {QStringLiteral("计算机-关键遥测-0F包"),QStringLiteral("OBC-SF")}
-            };
-            QHash<QString,BusinessPacket> by04Definitions;
-            for(const auto &definition:definitions)by04Definitions.insert(definition.packetName,definition);
-            for(const auto &entry:panel){
-                const QString component=entry.label.section(QLatin1Char('-'),0,0);
-                auto *root=componentRoot(component);
-                const QString packetName=QStringLiteral("BY04-")+entry.code;
-                auto *packetNode=new QTreeWidgetItem(root,{entry.label+QStringLiteral("  [")+entry.code+QStringLiteral("]"),"","",""});
-                if(by04Definitions.contains(packetName))appendFields(packetNode,by04Definitions.value(packetName));
-                else{
-                    auto *placeholder=new QTreeWidgetItem(packetNode,{QStringLiteral("字段定义待接入"),"","",QStringLiteral("未配置字段表")});
-                    placeholder->setToolTip(0,QStringLiteral("该分包来自 BY70-4 官方遥测面板。当前版本尚无可验证的字段位位置、换算公式和单位定义，因此仅列出官方分组，不猜测工程字段。"));
-                }
-            }
-        }else{
-            auto asrtuComponent=[](const QString &packet){
-                const QString prefix=packet.section(QLatin1Char('-'),0,0);
-                if(prefix==QStringLiteral("SAT"))return QStringLiteral("卫星平台");
-                if(prefix==QStringLiteral("PDB"))return QStringLiteral("电源配电");
-                if(prefix==QStringLiteral("ZGK"))return QStringLiteral("姿态与轨控");
-                if(prefix==QStringLiteral("TCB"))return QStringLiteral("热控温度");
-                if(prefix==QStringLiteral("TTC"))return QStringLiteral("测控板");
-                if(prefix==QStringLiteral("BBB"))return QStringLiteral("数传基带");
-                if(prefix==QStringLiteral("GPS"))return QStringLiteral("GNSS");
-                if(prefix==QStringLiteral("CAM"))return QStringLiteral("高分相机");
-                if(prefix==QStringLiteral("CMS"))return QStringLiteral("CMOS相机");
-                if(prefix==QStringLiteral("SSY"))return QStringLiteral("星敏感器Y");
-                if(prefix==QStringLiteral("SSZ"))return QStringLiteral("星敏感器Z");
-                return QStringLiteral("其他");
-            };
-            for(const auto &definition:definitions){
-                auto *root=componentRoot(asrtuComponent(definition.packetName));
-                auto *packetNode=new QTreeWidgetItem(root,{
-                    definition.packetName+QStringLiteral(" · ")+definition.packetLabel,"","",""});
-                appendFields(packetNode,definition);
             }
         }
-        fieldTree_->expandToDepth(0);
+        if(!loadedOfficial){
+            auto *missing=new QTreeWidgetItem(fieldTree_,
+                {QStringLiteral("官方遥测树字段目录未加载"),treePath,QStringLiteral("不可用"),QStringLiteral("请检查安装资源")});
+            missing->setToolTip(0,QStringLiteral("无法读取官方字段树 JSON；没有退回到不完整的静态字段清单。"));
+        }
+        fieldTree_->expandToDepth(3);
     }
 
     QHash<QString,EngineeringField> latestFields;

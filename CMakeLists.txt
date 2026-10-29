@@ -8,6 +8,11 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 include(CTest)
+foreach(tree_file IN ITEMS ASRTU-1.json BY04.json)
+  if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees/${tree_file}")
+    message(FATAL_ERROR "Official telemetry tree JSON is required: telemetry-trees/${tree_file}")
+  endif()
+endforeach()
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Widgets Network Sql Charts)
 qt_standard_project_setup()
 
@@ -55,7 +60,17 @@ foreach(catalog_file IN ITEMS OBC-SF.json BUV-S0.json)
     "protocols/by04/${catalog_file}" "${ORBITTLM_BY04_DIR}/${catalog_file}")
 endforeach()
 
-add_library(orbittlm_core STATIC src/core.cpp src/core.h src/schema.cpp src/schema.h src/ssdv.cpp src/ssdv.h src/transport.cpp src/transport.h src/business.cpp src/business.h src/by04.cpp src/by04.h)
+add_library(orbittlm_core STATIC src/core.cpp src/core.h src/schema.cpp src/schema.h src/ssdv.cpp src/ssdv.h src/transport.cpp src/transport.h src/business.cpp src/business.h src/by04.cpp src/by04.h
+  src/telemetry_store.cpp src/telemetry_store.h
+)
+qt_add_resources(orbittlm_core official_telemetry_tree
+  PREFIX "/telemetry-trees"
+  BASE "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees"
+  FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees/ASRTU-1.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees/BY04.json"
+)
+
 target_include_directories(orbittlm_core PUBLIC src)
 target_link_libraries(orbittlm_core PUBLIC Qt6::Core Qt6::Sql Qt6::Network)
 target_sources(orbittlm_core PRIVATE "${ORBITTLM_SSDV_DIR}/ssdv.c" "${ORBITTLM_SSDV_DIR}/rs8.c")
@@ -80,6 +95,9 @@ if(BUILD_TESTING)
     add_executable(orbit_ui_tests tests/ui_smoke.cpp)
     target_link_libraries(orbit_ui_tests PRIVATE orbittlm_ui Qt6::Test)
     add_test(NAME ui_smoke COMMAND orbit_ui_tests)
+  add_executable(orbit_store_tests tests/telemetry_store.cpp)
+    target_link_libraries(orbit_store_tests PRIVATE orbittlm_core Qt6::Test)
+    add_test(NAME telemetry_store COMMAND orbit_store_tests)
     if(UNIX AND NOT APPLE)
       set_tests_properties(ui_smoke PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endif()

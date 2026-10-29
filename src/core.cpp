@@ -385,83 +385,40 @@ QVector<Frame> Database::load(qint64 sessionId,QString *error) const {
 LiveTcp::LiveTcp(QObject *parent):QObject(parent){
     connect(&socket_,&QTcpSocket::readyRead,this,[this]{
         queued_+=socket_.readAll();
-        while(queued_.size()>=223){
-            const QByteArray bytes=queued_.left(223);queued_.remove(0,223);
-            Frame frame=Protocol::parse(bytes,satellite_);
-            frame.sources<<"live:tcp";
+        constexpr int frameSize=223;
+        while(queued_.size()>=frameSize){
+            const QByteArray bytes=queued_.left(frameSize);
+            queued_.remove(0,frameSize);
+            Frame frame=Protocol::parse(bytes,QStringLiteral("AUTO"));
+            frame.sources<<QStringLiteral("live:tcp");
             frame.captureLocal=QDateTime::currentDateTime();
-            frame.timeBasis="receiver_local";
-            if(!archiveBin_.isOpen())openArchive(frame.satellite);
-            if(archiveBin_.isOpen()){
-                archiveBin_.write(bytes);
-                archiveBin_.flush();
-            }
-            if(archiveLog_.isOpen()){
-                QString text=frame.captureLocal.toString("yyyy-MM-dd HH:mm:ss.zzz")+
-                    QStringLiteral(" TCP frame #%1 [tcp]\n").arg(++archivedFrames_);
-                text+=QStringLiteral("pdu length = 223 bytes\npdu vector contents =\n");
-                for(int offset=0;offset<bytes.size();offset+=16){
-                    QStringList octets;
-                    for(int j=offset;j<qMin(offset+16,bytes.size());++j)
-                        octets<<QStringLiteral("%1").arg(quint8(bytes.at(j)),2,16,QChar('0')).toUpper();
-                    text+=QStringLiteral("%1: %2\n").arg(offset,4,16,QChar('0')).arg(octets.join(' '));
-                }
-                text+=QLatin1Char('\n');
-                archiveLog_.write(text.toUtf8());
-                archiveLog_.flush();
-            }
+            frame.timeBasis=QStringLiteral("receiver_local");
             emit received(frame);
         }
     });
     connect(&socket_,&QTcpSocket::connected,this,[this]{
-        connectionTime_=QDateTime::currentDateTime();
-        archivedFrames_=0;
-        if(satellite_!="AUTO")openArchive(satellite_);
-        emit status(QStringLiteral("Connected")+
-            (archiveStem_.isEmpty()?QString():QStringLiteral("，记录文件 data/%1.log 与 data/%1.bin").arg(archiveStem_)));
+        emit status(QStringLiteral("Connected"));
     });
-    connect(&socket_,&QTcpSocket::disconnected,this,[this]{closeArchive();emit status("Disconnected");});
-    connect(&socket_,&QTcpSocket::errorOccurred,this,[this](auto){emit status(socket_.errorString());});
-}
-void LiveTcp::openArchive(const QString &satellite){
-    if(archiveLog_.isOpen()||archiveBin_.isOpen())return;
-    if(!connectionTime_.isValid())connectionTime_=QDateTime::currentDateTime();
-    const QString safeSat=satellite.isEmpty()?QStringLiteral("UNKNOWN"):satellite;
-    const QString stamp=connectionTime_.toString("yyyyMMdd_HHmmss_zzz");
-    archiveStem_=stamp+QLatin1Char('_')+safeSat;
-    const QString directory=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
-    if(!QDir().mkpath(directory)){archiveStem_.clear();emit status(QStringLiteral("无法创建 data 记录目录"));return;}
-    const QString baseStem=archiveStem_;
-    int suffix=1;
-    while(QFile::exists(QDir(directory).filePath(archiveStem_+QStringLiteral(".log"))) ||
-          QFile::exists(QDir(directory).filePath(archiveStem_+QStringLiteral(".bin")))){
-        archiveStem_=baseStem+QStringLiteral("_%1").arg(suffix++);
-    }
-    archiveLog_.setFileName(QDir(directory).filePath(archiveStem_+QStringLiteral(".log")));
-    archiveBin_.setFileName(QDir(directory).filePath(archiveStem_+QStringLiteral(".bin")));
-    const QString logPath=QDir(directory).filePath(archiveStem_+QStringLiteral(".log"));
-    const QString binPath=QDir(directory).filePath(archiveStem_+QStringLiteral(".bin"));
-    const bool logOk=archiveLog_.open(QIODevice::WriteOnly|QIODevice::NewOnly);
-    const bool binOk=logOk && archiveBin_.open(QIODevice::WriteOnly|QIODevice::NewOnly);
-    if(!logOk||!binOk){
-        const QString reason=!logOk?archiveLog_.errorString():archiveBin_.errorString();
-        closeArchive();
-        // Remove only files created by this attempt. NewOnly may fail because
-        // another process already owns the candidate path.
-        if(logOk)QFile::remove(logPath);
-        if(binOk)QFile::remove(binPath);
-        archiveStem_.clear();
-        emit status(QStringLiteral("TCP 已连接，但创建自动记录文件失败：")+reason);return;
-    }
-    emit status(QStringLiteral("开始自动记录：data/%1.log 与 data/%1.bin").arg(archiveStem_));
-}
-void LiveTcp::closeArchive(){
-    if(archiveLog_.isOpen()){archiveLog_.flush();archiveLog_.close();}
-    if(archiveBin_.isOpen()){archiveBin_.flush();archiveBin_.close();}
+    connect(&socket_,&QTcpSocket::disconnected,this,[this]{
+        emit status(QStringLiteral("Disconnected"));
+    });
+    connect(&socket_,&QTcpSocket::errorOccurred,this,[this](QAbstractSocket::SocketError){
+        emit status(QStringLiteral("连接失败：")+socket_.errorString());
+    });
 }
 void LiveTcp::start(const QString &host,quint16 port,const QString &satellite){
-    closeArchive();archiveStem_.clear();connectionTime_={};archivedFrames_=0;
-    socket_.abort();queued_.clear();satellite_=satellite;socket_.connectToHost(host,port);
+    Q_UNUSED(satellite);
+    queued_.clear();
+    socket_.abort();
+    emit status(QStringLiteral("正在连接 %1:%2").arg(host).arg(port));
+    socket_.connectToHost(host,port);
 }
-void LiveTcp::stop(){socket_.disconnectFromHost();closeArchive();queued_.clear();}
+void LiveTcp::stop(){
+    queued_.clear();
+    if(socket_.state()==QAbstractSocket::UnconnectedState){
+        emit status(QStringLiteral("Disconnected"));
+        return;
+    }
+    socket_.disconnectFromHost();
+}
 }
