@@ -39,7 +39,7 @@ private:
     void buildEngineering(QTabWidget *tabs);
     void buildComponentTabs(QTabWidget *tabs);
     void updateComponentTabs(int index);
-    void updateWebHistory();
+    bool updateWebHistory(QString *error=nullptr);
     void buildAttitude(QTabWidget *tabs);
     void buildImages(QTabWidget *tabs);
     void buildRaw(QTabWidget *tabs);

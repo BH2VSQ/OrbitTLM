@@ -218,37 +218,58 @@ void MainWindow::updatePaths(){
     sourceLabel_->setToolTip(QStringLiteral("LOG: %1\nBIN: %2").arg(logPath_,binPath_));
 }
 void MainWindow::importSession(){
+    // ORBITTLM_ROUND4_IMPORT
     if(logPath_.isEmpty()&&binPath_.isEmpty()){
         QMessageBox::information(this,QStringLiteral("导入会话"),
                   QStringLiteral("请选择解码日志或 223 字节 BIN 文件。"));
         return;
     }
     QString error;
-    const QString sat=satellite();
-    auto log=logPath_.isEmpty()?QVector<orbit::Frame>{}:
-        orbit::Protocol::fromLog(logPath_,sat,&error);
+    const QString selectedSatellite=satellite();
+    const auto log=logPath_.isEmpty()?QVector<orbit::Frame>{}:
+        orbit::Protocol::fromLog(logPath_,selectedSatellite,&error);
     if(!error.isEmpty()){
         QMessageBox::warning(this,QStringLiteral("日志读取失败"),error);return;
     }
-    auto bin=binPath_.isEmpty()?QVector<orbit::Frame>{}:
-        orbit::Protocol::fromBin(binPath_,sat,&error);
+    const auto bin=binPath_.isEmpty()?QVector<orbit::Frame>{}:
+        orbit::Protocol::fromBin(binPath_,selectedSatellite,&error);
     if(!error.isEmpty()){
         QMessageBox::warning(this,QStringLiteral("二进制读取失败"),error);return;
     }
-    frames_=orbit::Protocol::fuse(log,bin,&frameStats_);
+    const QVector<orbit::Frame> importedFrames=orbit::Protocol::fuse(log,bin,&frameStats_);
+    if(importedFrames.isEmpty()){
+        QMessageBox::warning(this,QStringLiteral("导入未完成"),
+            QStringLiteral("所选文件没有解析出有效传输帧。当前会话保持不变，也不会创建空的卫星数据库。"));
+        return;
+    }
+    frames_=importedFrames;
     QString importStoreError;
+    QStringList databasePaths;
+    QSet<QString> seenDatabasePaths;
     for(const orbit::Frame &importedFrame:frames_){
+        const QString path=satelliteStore_.databasePath(importedFrame.satellite);
+        if(!seenDatabasePaths.contains(path)){seenDatabasePaths.insert(path);databasePaths.push_back(path);}
         bool inserted=false;
         if(!satelliteStore_.append(importedFrame,&inserted,&importStoreError))break;
     }
-    if(!importStoreError.isEmpty())statusBar()->showMessage(QStringLiteral("导入帧写入卫星 SQLite 库失败：%1").arg(importStoreError),10000);
     const QString actualSat=resolvedSatellite();
     if(hasCustomSchema_&&customSchema_.satellite()==actualSat)
-        for(auto &f:frames_)customSchema_.apply(f);
+        for(auto &frame:frames_)customSchema_.apply(frame);
     rebuildSession();
-    if(!db_.save(actualSat+QStringLiteral(" · LOG/BIN 离线会话"),frames_,&error))
-        statusBar()->showMessage(QStringLiteral("数据可回放，但未保存到 SQLite：")+error,12000);
-    else statusBar()->showMessage(QStringLiteral("会话导入完成，原始传输帧及来源已保留"),8500);
+
+    QString sessionStoreError;
+    const bool sessionStored=db_.save(actualSat+QStringLiteral(" · LOG/BIN 离线会话"),frames_,&sessionStoreError);
+    QString htmlStoreError;
+    const bool htmlStored=updateWebHistory(&htmlStoreError);
+    const QString htmlPath=QDir(satelliteStore_.rootDirectory()).filePath(QStringLiteral("index.html"));
+    QStringList report;
+    report<<QStringLiteral("导入 %1 帧完成").arg(frames_.size());
+    if(importStoreError.isEmpty())report<<QStringLiteral("卫星数据库：")+databasePaths.join(QStringLiteral("；"));
+    else report<<QStringLiteral("卫星数据库写入失败：%1（目标：%2）").arg(importStoreError,databasePaths.join(QStringLiteral("；")));
+    if(!sessionStored)report<<QStringLiteral("历史会话保存失败：%1").arg(sessionStoreError);
+    if(htmlStored)report<<QStringLiteral("HTML 索引：%1").arg(htmlPath);
+    else report<<QStringLiteral("HTML 索引生成失败：%1").arg(htmlStoreError);
+    statusBar()->showMessage(report.join(QStringLiteral("  |  ")),20000);
 }
 void MainWindow::loadHistory(){
     QString error;
@@ -504,16 +525,18 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     const auto definitions=catalog_.definitionPackets();
     if(by04){
         if(card==powerCard_){
+            // ORBITTLM_ROUND4_POWER_ORDER: keep six rows per column; battery voltage is on the left,
+            // and RF 3.3V voltage is directly above RF 3.3V current in the right column.
             addBy04(QStringLiteral("母线电压"),{QStringLiteral("母线电压"),QStringLiteral("A12-母线电压遥测")});
             addBy04(QStringLiteral("12V电压"),{QStringLiteral("12V电压"),QStringLiteral("A15-12V电压遥测")});
             addBy04(QStringLiteral("12V电流"),{QStringLiteral("12V电流"),QStringLiteral("A20-12V电流遥测")});
             addBy04(QStringLiteral("5V电压"),{QStringLiteral("5V电压"),QStringLiteral("A14-5V电压遥测")});
             addBy04(QStringLiteral("5V电流"),{QStringLiteral("5V电流"),QStringLiteral("A19-5V电流遥测")});
+            addBy04(QStringLiteral("电池电压"),{QStringLiteral("电池电压"),QStringLiteral("A17-蓄电池电压")});
             addBy04(QStringLiteral("射频3.3V电压"),{QStringLiteral("射频 3.3V电压")});
             addBy04(QStringLiteral("射频3.3V电流"),{QStringLiteral("射频 3.3V电流")});
             addBy04(QStringLiteral("射频1.8V电压"),{QStringLiteral("射频 1.8V电压")});
             addBy04(QStringLiteral("射频1.8V电流"),{QStringLiteral("射频 1.8V电流")});
-            addBy04(QStringLiteral("电池电压"),{QStringLiteral("电池电压"),QStringLiteral("A17-蓄电池电压")});
             addBy04(QStringLiteral("充电电流"),{QStringLiteral("充电电流"),QStringLiteral("A26-充电电流")});
             addBy04(QStringLiteral("放电电流"),{QStringLiteral("放电电流"),QStringLiteral("A24-放电电流")});
         }else if(card==attitudeCard_){
@@ -859,9 +882,9 @@ void MainWindow::updateComponentTabs(int index){
         table->verticalHeader()->setDefaultSectionSize(22);
     }
 }
-void MainWindow::updateWebHistory(){
-    // business_ is rebuilt from frames loaded from the per-satellite SQLite DBs.
-    // Use it as the in-memory view; do not create JSON/CSV telemetry sidecars.
+bool MainWindow::updateWebHistory(QString *error){
+    // ORBITTLM_ROUND4_HISTORY
+    if(error)error->clear();
     QJsonArray records;
     for(const auto &packet:business_){
         QJsonObject record=orbit::BusinessCatalog::toJson(packet);
@@ -870,43 +893,44 @@ void MainWindow::updateWebHistory(){
     QByteArray json=QJsonDocument(records).toJson(QJsonDocument::Compact);
     json.replace("<","\\u003c");
 
-    const QDir appDir(QCoreApplication::applicationDirPath());
-    const QString dataDir=appDir.filePath(QStringLiteral("data"));
+    // Keep each satellite .db and the generated index.html in the same writable directory.
+    const QString dataDir=satelliteStore_.rootDirectory();
     if(!QDir().mkpath(dataDir)){
-        statusBar()->showMessage(QStringLiteral("无法创建网页历史目录：%1").arg(dataDir),8000);
-        return;
+        const QString message=QStringLiteral("无法创建遥测存储目录：%1").arg(dataDir);
+        if(error)*error=message;statusBar()->showMessage(message,10000);return false;
     }
-
-    QStringList templateCandidates={
+    const QDir appDir(QCoreApplication::applicationDirPath());
+    const QStringList templateCandidates={
         appDir.filePath(QStringLiteral("web/index.template.html")),
         appDir.filePath(QStringLiteral("web/index.html")),
         appDir.filePath(QStringLiteral("index.template.html"))
     };
     QFile templateFile;
+    QByteArray html;
     for(const QString &candidate:templateCandidates){
-        if(QFileInfo::exists(candidate)){
-            templateFile.setFileName(candidate);
-            if(templateFile.open(QIODevice::ReadOnly))break;
+        if(!QFileInfo::exists(candidate))continue;
+        templateFile.setFileName(candidate);
+        if(templateFile.open(QIODevice::ReadOnly)){
+            html=templateFile.readAll();templateFile.close();break;
         }
     }
-    if(!templateFile.isOpen()){
-        statusBar()->showMessage(QStringLiteral("未找到网页模板，SQLite 遥测数据已正常保存"),8000);
-        return;
-    }
-    QByteArray html=templateFile.readAll();
-    templateFile.close();
-    if(!html.contains("__DATA_JSON__")){
-        statusBar()->showMessage(QStringLiteral("网页模板缺少 __DATA_JSON__ 占位符；SQLite 数据不受影响"),8000);
-        return;
+    // A self-contained fallback guarantees that an index is still generated when a
+    // packaged build forgot to copy web/index.template.html.
+    if(html.isEmpty()||!html.contains("__DATA_JSON__")){
+        html=QString::fromUtf8(R"ORBITTLM_HTML(<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OrbitTLM 遥测历史</title><style>body{font:14px system-ui,sans-serif;margin:24px;color:#1e293b;background:#f8fafc}h1{font-size:22px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;border:1px solid #cbd5e1;border-radius:8px;padding:16px}</style></head>
+<body><h1>OrbitTLM 遥测历史索引</h1><p>自动生成的离线索引；完整记录保存在各卫星 SQLite 数据库中。</p><pre id="records">正在加载…</pre>
+<script>const records=__DATA_JSON__;document.getElementById('records').textContent=JSON.stringify(records,null,2);</script></body></html>)ORBITTLM_HTML").toUtf8();
     }
     html.replace("__DATA_JSON__",json);
-    QSaveFile output(QDir(dataDir).filePath(QStringLiteral("index.html")));
+    const QString outputPath=QDir(dataDir).filePath(QStringLiteral("index.html"));
+    QSaveFile output(outputPath);
     if(!output.open(QIODevice::WriteOnly)||output.write(html)!=html.size()||!output.commit()){
-        statusBar()->showMessage(QStringLiteral("网页历史输出失败：%1").arg(output.errorString()),8000);
-        return;
+        const QString message=QStringLiteral("HTML 历史索引写入失败：%1（%2）").arg(outputPath,output.errorString());
+        if(error)*error=message;statusBar()->showMessage(message,10000);return false;
     }
-    // Telemetry is persisted only in per-satellite SQLite databases. The HTML is a
-    // derived view with inlined data; no telemetry sidecar is written.
+    return true;
 }
 
 void MainWindow::populateEngineering(int index){

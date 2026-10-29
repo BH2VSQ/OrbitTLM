@@ -292,7 +292,7 @@ void MainWindow::buildToolbar(){
     auto *openWeb=bar->addAction(QStringLiteral("HTML 历史"));
     connect(openWeb,&QAction::triggered,this,[this]{
         updateWebHistory();
-        const QString path=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data/index.html"));
+        const QString path=QDir(satelliteStore_.rootDirectory()).filePath(QStringLiteral("index.html"));
         if(!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
             QMessageBox::warning(this,QStringLiteral("打开 HTML 历史失败"),path);
     });
@@ -302,7 +302,7 @@ void MainWindow::buildMenus(){
     file->addAction(QStringLiteral("打开 SQLite 历史会话"),[this]{loadHistory();});
     file->addAction(QStringLiteral("打开 HTML 遥测历史"),[this]{
         updateWebHistory();
-        const QString path=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data/index.html"));
+        const QString path=QDir(satelliteStore_.rootDirectory()).filePath(QStringLiteral("index.html"));
         if(!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
             QMessageBox::warning(this,QStringLiteral("打开 HTML 历史失败"),path);
     });
@@ -567,6 +567,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
     auto *systems=new AutoWrapTabWidget(page);
     systems->setObjectName("officialSystemTabs");
     systems->setDocumentMode(true);
+    systems->setTabPresentation(false,QStringLiteral("system"));
 
     const QString catalogRoot=QDir(QCoreApplication::applicationDirPath())
                                   .filePath(QStringLiteral("telemetry-trees"));
@@ -628,6 +629,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
             auto *packetTabs=new AutoWrapTabWidget(groupPage);
             packetTabs->setObjectName("officialPacketTabs");
             packetTabs->setDocumentMode(true);
+            packetTabs->setTabPresentation(true,QStringLiteral("packet"));
 
             for(const QJsonObject &packet:packetsByGroup[groupIndex]){
                 const QString officialName=packet.value(QStringLiteral("official_name")).toString();
