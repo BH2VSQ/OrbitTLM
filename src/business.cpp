@@ -173,6 +173,14 @@ EngineeringField BusinessCatalog::decodeField(const QJsonObject &definition,cons
         field.status="truncated_field";
         return field;
     }
+    const bool by04BatteryTemperature =
+        field.code == QStringLiteral("OBC-CF0066.7.16") ||
+        field.code == QStringLiteral("OBC-CF0068.7.16");
+    // The payload contains an unsigned decimal count in hundredths of a degree C,
+    // not a hexadecimal display value. Keep this exception scoped to the two
+    // confirmed BY04 battery-temperature fields.
+    if(by04BatteryTemperature)
+        field.formula=QStringLiteral("F=UX*0.01<℃>");
     const auto converted=convert(field.formula,raw,width);
     field.rawHex=raw.hex;
     field.rawNumber=raw.hasNumber?QString::number(raw.bits):QString();
@@ -180,6 +188,8 @@ EngineeringField BusinessCatalog::decodeField(const QJsonObject &definition,cons
     field.unit=converted.unit;
     field.status=converted.status;
     if(field.dataType=="raw_bits"&&!field.status.startsWith("raw_"))field.status="raw_bits";
+    if(by04BatteryTemperature && raw.hasNumber)
+        field.status=QStringLiteral("table_formula");
     if((field.dataType=="sample_checked_linear"||field.dataType=="adapted_unit_reference")&&
        field.status=="table_formula")field.status="reference_formula";
     return field;

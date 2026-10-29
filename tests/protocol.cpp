@@ -132,6 +132,28 @@ private slots:
         QFile json(temp.filePath("samples.json"));QVERIFY(json.open(QIODevice::ReadOnly));
         QVERIFY(json.readAll().contains("candidate_unverified"));
     }
+    void by04BatteryTemperaturesUseDecimalHundredths(){
+        auto decode=[](const QString &code,const QString &name,int raw){
+            QJsonObject definition;
+            definition.insert(QStringLiteral("id"),code);
+            definition.insert(QStringLiteral("bits"),QStringLiteral("0.7.16"));
+            definition.insert(QStringLiteral("name_cn"),name);
+            definition.insert(QStringLiteral("formula"),QStringLiteral("F=HX"));
+            definition.insert(QStringLiteral("data_type"),QStringLiteral("raw_bits"));
+            QByteArray payload;
+            payload.append(char((raw>>8)&0xff));
+            payload.append(char(raw&0xff));
+            return BusinessCatalog::decodeField(definition,payload);
+        };
+        const auto first=decode(QStringLiteral("OBC-CF0066.7.16"),QStringLiteral("电池温度1"),2690);
+        QCOMPARE(first.rawNumber,QStringLiteral("2690"));
+        QCOMPARE(first.value,QStringLiteral("26.9"));
+        QCOMPARE(first.unit,QStringLiteral("℃"));
+        QCOMPARE(first.status,QStringLiteral("table_formula"));
+        const auto second=decode(QStringLiteral("OBC-CF0068.7.16"),QStringLiteral("电池温度2"),2671);
+        QCOMPARE(second.value,QStringLiteral("26.71"));
+        QCOMPARE(second.unit,QStringLiteral("℃"));
+    }
     void externalSchemaIsSatelliteIsolated(){
         QTemporaryDir temp;QVERIFY(temp.isValid());
         QFile file(temp.filePath("fields.json"));

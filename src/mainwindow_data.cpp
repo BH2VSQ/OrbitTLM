@@ -109,18 +109,30 @@ bool isSwitchTelemetryField(const EngineeringField &field){
        name.contains(QStringLiteral("状态"))||name.contains(QStringLiteral("继电器")))return true;
     return name==QStringLiteral("基带板卡")||name==QStringLiteral("基带HW")||
            name==QStringLiteral("基带UV")||name==QStringLiteral("星敏X_5V")||
-           name==QStringLiteral("星敏Y_5V");
+           name==QStringLiteral("星敏Y_5V")||name==QStringLiteral("GNSS_5V")||
+           name==QStringLiteral("GNSS_5V-回读")||
+           name.contains(QStringLiteral("X测控数传"))||
+           name.contains(QStringLiteral("X频段数传"));
 }
 QString telemetryValue(const EngineeringField &field,const QString &value,const QString &unit){
     QString shown=value;
     const bool switchField=isSwitchTelemetryField(field);
     bool widthOk=false;
     const int width=field.bits.section('.',2,2).toInt(&widthOk);
-    if(switchField&&widthOk&&width==1&&field.status==QStringLiteral("raw_bits")){
-        if(field.rawNumber==QStringLiteral("0"))shown=QStringLiteral("关");
-        else if(field.rawNumber==QStringLiteral("1"))shown=QStringLiteral("开");
+    if(switchField&&widthOk&&width==1){
+        // Use the unsigned decoded value when available, regardless of whether
+        // the field came through a raw_bits or a table-formula definition.
+        const QString raw=field.rawNumber.isEmpty()?value.trimmed():field.rawNumber.trimmed();
+        if(raw==QStringLiteral("0"))shown=QStringLiteral("0(关)");
+        else if(raw==QStringLiteral("1"))shown=QStringLiteral("1(开)");
     }
-    if(!unit.isEmpty()&&unit!=QStringLiteral("1"))shown+=QLatin1Char(' ')+unit;
+    QString displayUnit=unit;
+    if(field.nameCn.contains(QStringLiteral("温度")) &&
+       (displayUnit.isEmpty()||displayUnit==QStringLiteral("1")||
+        displayUnit==QStringLiteral("C")||displayUnit==QStringLiteral("°C")))
+        displayUnit=QStringLiteral("℃");
+    if(!displayUnit.isEmpty()&&displayUnit!=QStringLiteral("1"))
+        shown+=QLatin1Char(' ')+displayUnit;
     return shown;
 }
 int telemetrySwitchState(const EngineeringField &field,const QString &value){
@@ -129,9 +141,10 @@ int telemetrySwitchState(const EngineeringField &field,const QString &value){
     if(value.contains(QStringLiteral("关")))return 0;
     bool widthOk=false;
     const int width=field.bits.section('.',2,2).toInt(&widthOk);
-    if(widthOk&&width==1&&field.status==QStringLiteral("raw_bits")){
-        if(field.rawNumber==QStringLiteral("1"))return 1;
-        if(field.rawNumber==QStringLiteral("0"))return 0;
+    if(widthOk&&width==1){
+        const QString raw=field.rawNumber.isEmpty()?value.trimmed():field.rawNumber.trimmed();
+        if(raw==QStringLiteral("1"))return 1;
+        if(raw==QStringLiteral("0"))return 0;
     }
     return -1;
 }
@@ -593,9 +606,9 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     }else if(title==QStringLiteral("姿态与 GPS 轨道")){
         const QStringList fixed={QStringLiteral("解算四元数q0"),QStringLiteral("解算四元数q1"),
             QStringLiteral("解算四元数q2"),QStringLiteral("解算四元数q3"),
+            QStringLiteral("升交点赤经"),QStringLiteral("近地点角距"),
             QStringLiteral("GPS速度X"),QStringLiteral("GPS速度Y"),QStringLiteral("GPS速度Z"),
-            QStringLiteral("半长轴"),QStringLiteral("偏心率"),QStringLiteral("升交点赤经"),
-            QStringLiteral("近地点角距"),QStringLiteral("轨道倾角")};
+            QStringLiteral("半长轴"),QStringLiteral("偏心率"),QStringLiteral("轨道倾角")};
         for(const QString &name:fixed){
             bool added=false;
             for(const auto &packet:definitions)for(const auto &field:packet.fields){

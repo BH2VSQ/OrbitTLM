@@ -3,6 +3,7 @@
 #include <QScrollArea>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QGridLayout>
 #include <QPainter>
 #include <QVBoxLayout>
 #include <QToolButton>
@@ -81,25 +82,28 @@ public:
         scrollRowLayout->setContentsMargins(0,0,0,0);scrollRowLayout->setSpacing(4);
         previous_=new QPushButton(QStringLiteral("◀"),scrollRow_);
         previous_->setObjectName(QStringLiteral("packetTabPrevious"));
-        previous_->setFixedSize(30,30);previous_->setToolTip(QStringLiteral("向左滑动子包标签"));
+        previous_->setFixedSize(30,66);previous_->setToolTip(QStringLiteral("向左翻页子包标签"));
         next_=new QPushButton(QStringLiteral("▶"),scrollRow_);
         next_->setObjectName(QStringLiteral("packetTabNext"));
-        next_->setFixedSize(30,30);next_->setToolTip(QStringLiteral("向右滑动子包标签"));
+        next_->setFixedSize(30,66);next_->setToolTip(QStringLiteral("向右翻页子包标签"));
         scrollArea_=new QScrollArea(scrollRow_);
         scrollArea_->setObjectName(QStringLiteral("packetTabScrollArea"));
         scrollArea_->setWidgetResizable(false);
+        scrollArea_->setFixedHeight(70);
         scrollArea_->setFrameShape(QFrame::NoFrame);
         scrollArea_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         scrollArea_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         scrollContents_=new QWidget;
         scrollContents_->setObjectName(QStringLiteral("packetTabScrollContents"));
         scrollContents_->setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
-        scrollTabsLayout_=new QHBoxLayout(scrollContents_);
-        scrollTabsLayout_->setContentsMargins(0,0,0,0);scrollTabsLayout_->setSpacing(4);
-        scrollTabsLayout_->setAlignment(Qt::AlignLeft|Qt::AlignVCenter);
+        scrollTabsLayout_=new QGridLayout(scrollContents_);
+        scrollTabsLayout_->setContentsMargins(0,0,0,0);
+        scrollTabsLayout_->setHorizontalSpacing(4);
+        scrollTabsLayout_->setVerticalSpacing(3);
+        scrollTabsLayout_->setAlignment(Qt::AlignLeft|Qt::AlignTop);
         scrollArea_->setWidget(scrollContents_);
         scrollRowLayout->addWidget(previous_);scrollRowLayout->addWidget(scrollArea_,1);scrollRowLayout->addWidget(next_);
-        scrollRow_->setMinimumHeight(32);
+        scrollRow_->setMinimumHeight(70);
         root->addWidget(scrollRow_,0);
         scrollRow_->hide();
 
@@ -126,7 +130,7 @@ public:
         button->setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
         applyTabButtonStyle(button);button->adjustSize();button->setFixedSize(button->sizeHint());
         buttons_.push_back(button);
-        if(horizontalScrollable_)scrollTabsLayout_->addWidget(button);else tabLayout_->addWidget(button);
+        if(horizontalScrollable_)scrollTabsLayout_->addWidget(button,index%2,index/2);else tabLayout_->addWidget(button);
         QObject::connect(button,&QToolButton::clicked,this,[this,index]{setCurrentIndex(index);});
         if(currentIndex_<0)setCurrentIndex(index);
         refreshTabWrapping();return index;
@@ -134,11 +138,12 @@ public:
     void setDocumentMode(bool) {}
     void setTabPresentation(bool horizontalScrollable,const QString &level){
         horizontalScrollable_=horizontalScrollable;tabLevel_=level;
-        for(QToolButton *button:buttons_){
+        for(int i=0;i<buttons_.size();++i){
+            QToolButton *button=buttons_[i];
             const int flowIndex=tabLayout_->indexOf(button);
             if(flowIndex>=0){QLayoutItem *item=tabLayout_->takeAt(flowIndex);delete item;}
             scrollTabsLayout_->removeWidget(button);
-            if(horizontalScrollable_)scrollTabsLayout_->addWidget(button);else tabLayout_->addWidget(button);
+            if(horizontalScrollable_)scrollTabsLayout_->addWidget(button,i%2,i/2);else tabLayout_->addWidget(button);
             applyTabButtonStyle(button);button->adjustSize();button->setFixedSize(button->sizeHint());
         }
         wrapArea_->setVisible(!horizontalScrollable_);
@@ -169,6 +174,18 @@ public:
     void setWrappedTabText(int index,const QString &text){setTabText(index,text);}
     void refreshTabWrapping(){
         if(tabLayout_){tabLayout_->invalidate();tabLayout_->activate();}
+        if(horizontalScrollable_&&scrollTabsLayout_){
+            for(QToolButton *button:buttons_)scrollTabsLayout_->removeWidget(button);
+            int visibleIndex=0;
+            for(int i=0;i<buttons_.size();++i){
+                QToolButton *button=buttons_[i];
+                if(!visible_.value(i)){button->hide();continue;}
+                button->show();
+                scrollTabsLayout_->addWidget(button,visibleIndex%2,visibleIndex/2);
+                ++visibleIndex;
+            }
+            scrollTabsLayout_->invalidate();scrollTabsLayout_->activate();
+        }
         if(scrollContents_){scrollContents_->adjustSize();scrollContents_->updateGeometry();}
         if(scrollArea_&&scrollArea_->widget())scrollArea_->widget()->adjustSize();
         updateGeometry();
@@ -192,7 +209,7 @@ private:
     QStackedWidget *stack_=nullptr;
     QWidget *wrapArea_=nullptr,*scrollRow_=nullptr,*scrollContents_=nullptr;
     QScrollArea *scrollArea_=nullptr;
-    QHBoxLayout *scrollTabsLayout_=nullptr;
+    QGridLayout *scrollTabsLayout_=nullptr;
     QPushButton *previous_=nullptr,*next_=nullptr;
     QVector<QWidget*> pages_;
     QVector<QToolButton*> buttons_;

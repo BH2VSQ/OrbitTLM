@@ -20,8 +20,17 @@ SatelliteTelemetryStore::SatelliteTelemetryStore(const QString &rootDirectory)
     : rootDirectory_(rootDirectory.trimmed()),
       connectionPrefix_(QStringLiteral("OrbitTLM_satellite_")) {
     if (rootDirectory_.isEmpty()) {
-        rootDirectory_ = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
-                         + QStringLiteral("/telemetry");
+        const QString legacyRoot=QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+                                     .filePath(QStringLiteral("telemetry"));
+        rootDirectory_=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+        if(QDir().mkpath(rootDirectory_)){
+            // Keep existing user data available, but never open the legacy path for new writes.
+            QDir legacy(legacyRoot);
+            for(const QString &name:legacy.entryList({QStringLiteral("*.db")},QDir::Files)){
+                const QString destination=QDir(rootDirectory_).filePath(name);
+                if(!QFileInfo::exists(destination))QFile::copy(legacy.filePath(name),destination);
+            }
+        }
     }
 }
 

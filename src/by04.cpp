@@ -176,6 +176,11 @@ QVector<BusinessPacket> By04Decoder::definitionPackets(){
             field.nameEn=object.value("name_en").toString();
             field.formula=object.value("formula").toString();
             field.unit=object.value("unit").toString();
+            if(field.code==QStringLiteral("OBC-CF0066.7.16") ||
+               field.code==QStringLiteral("OBC-CF0068.7.16")){
+                field.formula=QStringLiteral("F=UX*0.01<℃>");
+                field.unit=QStringLiteral("℃");
+            }
             field.dataType=object.value("data_type").toString();
             field.definitionEvidence=object.value("formula_source").toString();
             field.status=QStringLiteral("catalog_definition");

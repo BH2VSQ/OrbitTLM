@@ -166,9 +166,13 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
             statusBar()->showMessage(QStringLiteral("已保存至 %1.db（按时间排序，重复帧自动忽略）").arg(frame.satellite),5000);
         }
     });
-    const QString dbFile=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+
-                         "/orbittlm.sqlite";
-    QDir().mkpath(QFileInfo(dbFile).absolutePath());
+    const QString dataDir=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+    QDir().mkpath(dataDir);
+    const QString dbFile=QDir(dataDir).filePath(QStringLiteral("orbittlm.sqlite"));
+    // One-time copy from the previous location; subsequent writes go only to exe/data.
+    const QString legacyDbFile=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+
+                               QStringLiteral("/orbittlm.sqlite");
+    if(!QFileInfo::exists(dbFile)&&QFileInfo::exists(legacyDbFile))QFile::copy(legacyDbFile,dbFile);
     QString error;
     if(!db_.open(dbFile,&error))
         statusBar()->showMessage(QStringLiteral("SQLite 数据库无法打开：")+error,18000);
