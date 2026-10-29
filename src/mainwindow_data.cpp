@@ -564,6 +564,9 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
     auto *table=overviewTables_.value(card,card->findChild<QTableWidget*>("statusTable"));
     if(!table)return;
     table->clearContents();
+    table->clearSpans();
+    table->horizontalHeader()->setVisible(true);
+    table->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);
     const QString activeSatellite=resolvedSatellite();
     const bool by04=activeSatellite==QStringLiteral("BY04");
     if(card==attitudeCard_){
@@ -575,7 +578,10 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
         table->setRowCount(0);
         return;
     }
-    const QString title=card->title();
+    // Branch on the untranslated source title. The visible title can be English,
+    // so using QGroupBox::title() here would silently skip all field-mapping rules.
+    const QString savedTitle=card->property("orbitSourceText").toString();
+    const QString title=savedTitle.isEmpty()?card->title():savedTitle;
     struct Row {
         QString name;
         QString packet;
@@ -731,6 +737,16 @@ void MainWindow::updateFieldCard(QGroupBox *card,const QStringList &prefixes,int
             rows.insert(qMax(0,current5),target);
         }
     }
+    if(rows.isEmpty()){
+        table->setRowCount(1);
+        auto *empty=item(QStringLiteral("未找到匹配的遥测字段定义；请检查当前卫星类型和字段目录。"));
+        empty->setForeground(QColor("#64748b"));
+        empty->setFlags(empty->flags()&~Qt::ItemIsSelectable);
+        table->setItem(0,0,empty);
+        table->setSpan(0,0,1,4);
+        return;
+    }
+
     const bool alignedBy04Quaternions=by04&&card==attitudeCard_;
     struct RowCell{int row=0;int column=0;};
     QVector<RowCell> rowCells(rows.size());
@@ -1442,6 +1458,16 @@ void MainWindow::updateAttitude(int index){
     attitudeChart_->setChart(chart);
 }
 void MainWindow::updateRawPacket(int index){
+    // The raw KISS/HEX widget is only populated while both its outer page and
+    // its own nested tab are selected. This prevents raw-packet diagnostic text
+    // from leaking into (or visually obscuring) the overview on Windows.
+    if(!rawHex_)return;
+    if(!pages_||!rawPage_||pages_->currentWidget()!=rawPage_||rawPage_->currentWidget()!=rawHex_){
+        rawHex_->clear();
+        rawHex_->hide();
+        return;
+    }
+    rawHex_->show();
     if(index<0||index>=business_.size()){
         rawHex_->setPlainText(uiText(QStringLiteral("当前没有可检查的 KISS 应用包。")));
         return;

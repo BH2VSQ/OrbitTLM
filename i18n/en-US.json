@@ -3027,6 +3027,7 @@
     "未分类": "ParameterMinuteParameter",
     "未分类 KISS 业务包": "Unclassified KISS application packet",
     "未命名": "ParameterParameterParameter",
+    "未找到匹配的遥测字段定义；请检查当前卫星类型和字段目录。": "No matching telemetry field definitions. Check the selected spacecraft and field catalog.",
     "未收到样本": "No sample received",
     "未知": "Unknown",
     "未知值": "Unknown value",

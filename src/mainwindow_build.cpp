@@ -86,6 +86,7 @@ QWidget *metricCard(const QString &label,QLabel *&number){
 QGroupBox *statusCard(const QString &title){
     auto *card=new QGroupBox(title);
     card->setObjectName("statusCard");
+    card->setProperty("orbitSourceText",title);
     auto *layout=new QVBoxLayout(card);
     layout->setContentsMargins(4,11,4,3);
     layout->setSpacing(0);
@@ -848,6 +849,26 @@ void MainWindow::buildWorkspace(){
     buildDiagnostics(pages_);
     workspaceSplitter_->addWidget(pages_);
 
+    // Keep the raw KISS text editor strictly scoped to its own nested tab.
+    // Selection changes elsewhere in the workspace should never update or leave
+    // a large raw-payload widget painting over the overview cards.
+    const auto syncRawView=[this](){
+        if(!rawHex_)return;
+        const bool active=pages_&&rawPage_&&pages_->currentWidget()==rawPage_&&
+                          rawPage_->currentWidget()==rawHex_;
+        if(active){
+            rawHex_->show();
+            updateRawPacket(currentIndex_);
+        }else{
+            rawHex_->clear();
+            rawHex_->hide();
+        }
+    };
+    connect(pages_,&QTabWidget::currentChanged,this,[syncRawView](int){syncRawView();});
+    if(rawPage_)
+        connect(rawPage_,&QTabWidget::currentChanged,this,[syncRawView](int){syncRawView();});
+    syncRawView();
+
     replayPanel_=new QFrame;
     replayPanel_->setObjectName("panel");
     replayPanel_->setMinimumHeight(0);
@@ -1331,8 +1352,11 @@ void MainWindow::buildImages(QTabWidget *tabs){
     tabs->addTab(page,QStringLiteral("图像数据"));
 }
 void MainWindow::buildRaw(QTabWidget *tabs){
-    auto *page=new QTabWidget;
+    rawPage_=new QTabWidget;
+    rawPage_->setObjectName(QStringLiteral("rawDataTabs"));
+    auto *page=rawPage_;
     rawHex_=new QPlainTextEdit;
+    rawHex_->setObjectName(QStringLiteral("rawPacketHexView"));
     rawHex_->setReadOnly(true);
     rawHex_->setLineWrapMode(QPlainTextEdit::NoWrap);
     rawHex_->setPlainText(uiText(QStringLiteral("选择业务包后显示 KISS / HEX 数据。")));

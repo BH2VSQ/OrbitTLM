@@ -158,7 +158,7 @@ private:
     QPlainTextEdit *rawHex_=nullptr,*debugText_=nullptr,*rawFrameHex_=nullptr;
     ReplayTimelineWidget *timeline_=nullptr;
     QTimer *timer_=nullptr;
-    QTabWidget *pages_=nullptr;
+    QTabWidget *pages_=nullptr,*rawPage_=nullptr;
     int diagnosticTab_=-1;
     QGroupBox *powerCard_=nullptr,*attitudeCard_=nullptr,*thermalCard_=nullptr,*payloadCard_=nullptr;
     QHash<QGroupBox*,QTableWidget*> overviewTables_;

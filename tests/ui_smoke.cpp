@@ -8,6 +8,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QPushButton>
+#include <QPlainTextEdit>
 #include <QGroupBox>
 #include <QStandardPaths>
 #include <QFile>
@@ -58,6 +59,16 @@ private slots:
         QCOMPARE(tabs->tabText(4),QStringLiteral("图像数据"));
         QCOMPARE(tabs->tabText(5),QStringLiteral("原始数据"));
         QVERIFY(!tabs->isTabVisible(tabs->count()-1));
+        auto *rawTabs=window.findChild<QTabWidget*>("rawDataTabs");
+        auto *rawHex=window.findChild<QPlainTextEdit*>("rawPacketHexView");
+        QVERIFY(rawTabs!=nullptr);
+        QVERIFY(rawHex!=nullptr);
+        QVERIFY2(rawHex->isHidden(),"Raw KISS/HEX content must stay hidden while the Overview tab is active");
+        tabs->setCurrentIndex(5); QApplication::processEvents();
+        QVERIFY2(!rawHex->isHidden(),"Raw KISS/HEX view should be visible inside the Raw Data tab");
+        tabs->setCurrentIndex(0); QApplication::processEvents();
+        QVERIFY2(rawHex->isHidden(),"Raw KISS/HEX view must be hidden again when returning to Overview");
+        QVERIFY(rawHex->toPlainText().isEmpty());
         auto *languageMenu=window.findChild<QMenu*>("languageMenu");
         QVERIFY(languageMenu!=nullptr);
         QCOMPARE(languageMenu->actions().size(),2);
