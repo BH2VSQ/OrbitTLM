@@ -598,8 +598,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                         auto *nameItem=new QTableWidgetItem(fieldName);
                         nameItem->setData(Qt::UserRole,fullCode);
                         nameItem->setData(Qt::UserRole+1,englishName);
-                        nameItem->setToolTip(QStringLiteral("官方字段：%1
-英文名：%2")
+                        nameItem->setToolTip(QStringLiteral("官方字段：%1\n英文名：%2")
                                                .arg(fullCode,englishName));
                         table->setItem(row,0,nameItem);
                         table->setItem(row,1,new QTableWidgetItem(fullCode));
