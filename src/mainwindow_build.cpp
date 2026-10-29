@@ -1055,9 +1055,9 @@ void MainWindow::buildImages(QTabWidget *tabs){
     auto *exportImageBin=new QPushButton(QStringLiteral("导出所选图像 BIN"));
     exportImageBin->setObjectName(QStringLiteral("exportSelectedImageBin"));
     row->addWidget(exportImageBin);
-    auto *importImageBin=new QPushButton(QStringLiteral("导入 BIN 并解码"));
-    importImageBin->setObjectName(QStringLiteral("importImageBin"));
-    row->addWidget(importImageBin);
+    auto *importImageBinButton=new QPushButton(QStringLiteral("导入 BIN 并解码"));
+    importImageBinButton->setObjectName(QStringLiteral("importImageBin"));
+    row->addWidget(importImageBinButton);
     auto *decode=new QPushButton(QStringLiteral("重建 JPEG 预览"));
     row->addWidget(decode);
     row->addStretch(1);
@@ -1090,7 +1090,7 @@ void MainWindow::buildImages(QTabWidget *tabs){
     });
     connect(save,&QPushButton::clicked,this,[this]{showExportDialog();});
     connect(exportImageBin,&QPushButton::clicked,this,[this]{exportSelectedImageBin();});
-    connect(importImageBin,&QPushButton::clicked,this,[this]{importImageBin();});
+    connect(importImageBinButton,&QPushButton::clicked,this,[this]{importImageBin();});
     connect(decode,&QPushButton::clicked,this,[this]{decodeSsdv();});
     tabs->addTab(page,QStringLiteral("图像数据"));
 }
