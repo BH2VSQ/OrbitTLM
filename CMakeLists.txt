@@ -81,7 +81,6 @@ qt_add_resources(orbittlm_core by04_catalog
 add_executable(OrbitTLM-cli src/cli.cpp)
 target_link_libraries(OrbitTLM-cli PRIVATE orbittlm_core)
 add_library(orbittlm_ui STATIC src/mainwindow.h src/mainwindow_widgets.h src/mainwindow_build.cpp src/mainwindow_data.cpp)
-# Embed every locale dictionary into the UI binary; runtime language switching reads :/i18n resources.
 qt_add_resources(orbittlm_ui orbittlm_i18n
   PREFIX "/i18n"
   BASE "${CMAKE_CURRENT_SOURCE_DIR}/i18n"
@@ -126,6 +125,9 @@ foreach(target OrbitTLM OrbitTLM-cli orbit_tests)
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/web/index.template.html"
         "$<TARGET_FILE_DIR:${target}>/web/index.template.html"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/i18n"
+        "$<TARGET_FILE_DIR:${target}>/i18n"
       VERBATIM)
   endif()
 endforeach()
@@ -135,6 +137,7 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees"
         DESTINATION "bin")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/web/index.template.html"
         DESTINATION "bin/web")
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/i18n" DESTINATION "bin")
 install(FILES "${ORBITTLM_SSDV_DIR}/ssdv.c" "${ORBITTLM_SSDV_DIR}/ssdv.h"
               "${ORBITTLM_SSDV_DIR}/rs8.c" "${ORBITTLM_SSDV_DIR}/rs8.h" "${ORBITTLM_SSDV_DIR}/COPYING"
         DESTINATION "share/OrbitTLM/third_party/ssdv_dslwp")
