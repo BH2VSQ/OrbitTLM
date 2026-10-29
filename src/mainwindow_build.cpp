@@ -603,13 +603,20 @@ void MainWindow::applyLanguage(){
             }
         }
         if(auto *tabs=qobject_cast<QTabWidget*>(widget)){
-            QStringList sources=tabs->property("orbitSourceTabTexts").toStringList();
-            while(sources.size()<tabs->count())sources.push_back(tabs->tabText(sources.size()));
-            if(sources.size()>tabs->count())sources=sources.mid(0,tabs->count());
-            tabs->setProperty("orbitSourceTabTexts",sources);
-            for(int i=0;i<tabs->count();++i){
-                const QString value=uiText(sources[i]);
-                if(tabs->tabText(i)!=value)tabs->setTabText(i,value);
+            // AutoWrapTabWidget delegates tab ownership/visibility to this native
+            // QTabWidget. Its outer wrapper translates labels from the official
+            // source properties; do not capture already-translated tab text as
+            // a second source key here, otherwise switching EN -> ZH can leave
+            // nested telemetry tabs in English.
+            if(!tabs->property("orbitManagedByAutoWrap").toBool()){
+                QStringList sources=tabs->property("orbitSourceTabTexts").toStringList();
+                while(sources.size()<tabs->count())sources.push_back(tabs->tabText(sources.size()));
+                if(sources.size()>tabs->count())sources=sources.mid(0,tabs->count());
+                tabs->setProperty("orbitSourceTabTexts",sources);
+                for(int i=0;i<tabs->count();++i){
+                    const QString value=uiText(sources[i]);
+                    if(tabs->tabText(i)!=value)tabs->setTabText(i,value);
+                }
             }
         }
         if(auto *menu=qobject_cast<QMenu*>(widget)){

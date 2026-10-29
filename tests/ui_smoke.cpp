@@ -74,6 +74,31 @@ private slots:
         tabs->setCurrentIndex(0); QApplication::processEvents();
         QVERIFY2(!rawHex->isVisible(),"Raw KISS/HEX view must not paint over Overview after switching back");
         QVERIFY(rawHex->toPlainText().isEmpty());
+
+        // The telemetry catalog contains nested subsystem/packet tabs. They
+        // must stay inside the Subsystem page and must never paint over Overview
+        // or SSDV when the outer page changes.
+        auto *systemsTabs=window.findChild<QWidget*>("officialSystemTabs");
+        QVERIFY(systemsTabs!=nullptr);
+        const auto packetTabs=window.findChildren<QWidget*>("officialPacketTabs");
+        QVERIFY(!packetTabs.isEmpty());
+        for(auto *packetTab:packetTabs){
+            QVERIFY2(systemsTabs->isAncestorOf(packetTab),
+                     "Each packet tab container must remain a descendant of the subsystem tab container");
+            QVERIFY2(!packetTab->isVisible(),
+                     "Packet tabs must not be visible while Overview is the selected page");
+        }
+        tabs->setCurrentIndex(2); QApplication::processEvents();
+        QVERIFY(systemsTabs->isVisible());
+        int visiblePacketTabs=0;
+        for(auto *packetTab:packetTabs)if(packetTab->isVisible())++visiblePacketTabs;
+        QVERIFY2(visiblePacketTabs>0,"At least the selected subsystem's packet tabs must be visible on the Subsystem page");
+        tabs->setCurrentIndex(4); QApplication::processEvents();
+        QVERIFY2(!systemsTabs->isVisible(),"Subsystem tab controls must not paint over SSDV images");
+        for(auto *packetTab:packetTabs)
+            QVERIFY2(!packetTab->isVisible(),"Packet tab controls must be hidden with the Subsystem page");
+        tabs->setCurrentIndex(0); QApplication::processEvents();
+
         auto *languageMenu=window.findChild<QMenu*>("languageMenu");
         QVERIFY(languageMenu!=nullptr);
         QCOMPARE(languageMenu->actions().size(),2);

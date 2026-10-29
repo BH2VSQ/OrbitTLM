@@ -72,226 +72,126 @@ inline QString orbitWidgetText(const QString &source){
     if(source.size()<=256&&cache.size()<20000)cache.insert(source,translated);
     return translated;
 }
-// ORBITTLM_ROUND4_PACKET_ARROWS
-class FlowLayout final : public QLayout {
-public:
-    explicit FlowLayout(QWidget *parent=nullptr,int spacing=4):QLayout(parent){
-        setContentsMargins(0,0,0,0);setSpacing(spacing);
-    }
-    ~FlowLayout() override { while(QLayoutItem *item=takeAt(0))delete item; }
-    void addItem(QLayoutItem *item) override { items_.push_back(item); }
-    int count() const override { return int(items_.size()); }
-    QLayoutItem *itemAt(int index) const override { return index>=0&&index<count()?items_.at(index):nullptr; }
-    QLayoutItem *takeAt(int index) override { if(index<0||index>=count())return nullptr; return items_.takeAt(index); }
-    Qt::Orientations expandingDirections() const override { return {}; }
-    bool hasHeightForWidth() const override { return true; }
-    int heightForWidth(int width) const override { return doLayout(QRect(0,0,width,0),true); }
-    QSize sizeHint() const override { return minimumSize(); }
-    QSize minimumSize() const override {
-        QSize size;
-        for(QLayoutItem *item:items_)if(!item->isEmpty())size=size.expandedTo(item->minimumSize());
-        const QMargins margins=contentsMargins();
-        return size+QSize(margins.left()+margins.right(),margins.top()+margins.bottom());
-    }
-    void setGeometry(const QRect &rect) override { QLayout::setGeometry(rect); doLayout(rect,false); }
-private:
-    int doLayout(const QRect &rect,bool testOnly) const {
-        const QMargins margins=contentsMargins();
-        const QRect effective=rect.adjusted(margins.left(),margins.top(),-margins.right(),-margins.bottom());
-        int x=effective.x(),y=effective.y(),lineHeight=0;
-        const int gap=qMax(0,spacing());
-        for(QLayoutItem *item:items_){
-            if(item->isEmpty())continue;
-            const QSize size=item->sizeHint();
-            int nextX=x+size.width()+gap;
-            if(nextX-gap>effective.right()+1&&lineHeight>0){
-                x=effective.x();y+=lineHeight+gap;nextX=x+size.width()+gap;lineHeight=0;
-            }
-            if(!testOnly)item->setGeometry(QRect(QPoint(x,y),size));
-            x=nextX;lineHeight=qMax(lineHeight,size.height());
-        }
-        return y+lineHeight-rect.y()+margins.bottom();
-    }
-    QVector<QLayoutItem*> items_;
-};
-
 class AutoWrapTabWidget final : public QWidget {
     Q_OBJECT
 public:
     explicit AutoWrapTabWidget(QWidget *parent=nullptr):QWidget(parent){
-        auto *root=new QVBoxLayout(this);root->setContentsMargins(0,0,0,0);root->setSpacing(3);
-        // Keep the wrapping layout directly in the root layout so Qt can honor
-        // FlowLayout::heightForWidth() and allocate every wrapped row visibly.
-        wrapArea_=new QWidget(this);
-        tabLayout_=new FlowLayout(wrapArea_,4);
-        tabLayout_->setAlignment(Qt::AlignLeft|Qt::AlignTop);
-        root->addWidget(wrapArea_,0);
+        auto *root=new QVBoxLayout(this);
+        root->setContentsMargins(0,0,0,0);
+        root->setSpacing(0);
 
-        scrollRow_=new QWidget(this);
-        auto *scrollRowLayout=new QHBoxLayout(scrollRow_);
-        scrollRowLayout->setContentsMargins(0,0,0,0);scrollRowLayout->setSpacing(4);
-        previous_=new QPushButton(QStringLiteral("◀"),scrollRow_);
-        previous_->setObjectName(QStringLiteral("packetTabPrevious"));
-        previous_->setFixedSize(26,48);previous_->setToolTip(orbitWidgetText(QStringLiteral("向左翻页子包标签")));
-        next_=new QPushButton(QStringLiteral("▶"),scrollRow_);
-        next_->setObjectName(QStringLiteral("packetTabNext"));
-        next_->setFixedSize(26,48);next_->setToolTip(orbitWidgetText(QStringLiteral("向右翻页子包标签")));
-        scrollArea_=new QScrollArea(scrollRow_);
-        scrollArea_->setObjectName(QStringLiteral("packetTabScrollArea"));
-        scrollArea_->setWidgetResizable(false);
-        scrollArea_->setFixedHeight(52);
-        scrollArea_->setFrameShape(QFrame::NoFrame);
-        scrollArea_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        scrollArea_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        scrollContents_=new QWidget;
-        scrollContents_->setObjectName(QStringLiteral("packetTabScrollContents"));
-        scrollContents_->setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
-        scrollTabsLayout_=new QGridLayout(scrollContents_);
-        scrollTabsLayout_->setContentsMargins(0,0,0,0);
-        scrollTabsLayout_->setHorizontalSpacing(4);
-        scrollTabsLayout_->setVerticalSpacing(3);
-        scrollTabsLayout_->setAlignment(Qt::AlignLeft|Qt::AlignTop);
-        scrollArea_->setWidget(scrollContents_);
-        scrollRowLayout->addWidget(previous_);scrollRowLayout->addWidget(scrollArea_,1);scrollRowLayout->addWidget(next_);
-        scrollRow_->setMinimumHeight(52);
-        root->addWidget(scrollRow_,0);
-        scrollRow_->hide();
-
-        stack_=new QStackedWidget(this);
-        root->addWidget(stack_,1);
-        QObject::connect(previous_,&QPushButton::clicked,this,[this]{
-            if(scrollArea_)scrollArea_->horizontalScrollBar()->setValue(
-                scrollArea_->horizontalScrollBar()->value()-qMax(120,scrollArea_->viewport()->width()*3/4));
-        });
-        QObject::connect(next_,&QPushButton::clicked,this,[this]{
-            if(scrollArea_)scrollArea_->horizontalScrollBar()->setValue(
-                scrollArea_->horizontalScrollBar()->value()+qMax(120,scrollArea_->viewport()->width()*3/4));
-        });
-        scrollRow_->setStyleSheet(QStringLiteral("QPushButton {background:#e2e8f0;color:#334155;border:1px solid #cbd5e1;border-radius:5px;padding:2px;} QPushButton:hover {background:#cbd5e1;}"));
+        // Use Qt's native tab/stack implementation instead of manually moving
+        // QToolButtons between layouts. The custom implementation could leave
+        // packet-tab buttons painting over unrelated pages after a page switch.
+        tabs_=new QTabWidget(this);
+        tabs_->setObjectName(QStringLiteral("autoWrapNativeTabs"));
+        tabs_->setDocumentMode(true);
+        if(auto *bar=nativeTabBar()){
+            bar->setMovable(false);
+            bar->setTabsClosable(false);
+            bar->setUsesScrollButtons(true);
+            bar->setExpanding(false);
+            bar->setElideMode(Qt::ElideRight);
+        }
+        tabs_->setProperty("orbitManagedByAutoWrap",true);
+        root->addWidget(tabs_,1);
         setTabPresentation(false,QStringLiteral("system"));
     }
+
     int addTab(QWidget *page,const QString &text){
         if(!page)return -1;
-        const int index=int(buttons_.size());pages_.push_back(page);labels_.push_back(text);visible_.push_back(true);
-        stack_->addWidget(page);
-        auto *button=new QToolButton;
-        button->setToolButtonStyle(Qt::ToolButtonTextOnly);button->setText(text);
-        QString tooltipSource=page->property("orbitSourceTabTooltip").toString();
-        if(tooltipSource.isEmpty())tooltipSource=page->property("orbitSourceTabText").toString();
-        if(tooltipSource.isEmpty())tooltipSource=text;
-        button->setProperty("orbitSourceToolTip",tooltipSource);
-        button->setToolTip(orbitWidgetText(tooltipSource));
-        button->setCheckable(true);button->setAutoRaise(false);button->setMinimumHeight(24);
-        button->setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
-        applyTabButtonStyle(button);button->adjustSize();button->setFixedSize(button->sizeHint());
-        buttons_.push_back(button);
-        if(horizontalScrollable_)scrollTabsLayout_->addWidget(button,index%2,index/2);else tabLayout_->addWidget(button);
-        QObject::connect(button,&QToolButton::clicked,this,[this,index]{setCurrentIndex(index);});
-        if(currentIndex_<0)setCurrentIndex(index);
-        refreshTabWrapping();return index;
+        const int index=tabs_->addTab(page,text);
+        labels_.push_back(text);
+        visible_.push_back(true);
+        applyTabStyle();
+        return index;
     }
-    void setDocumentMode(bool) {}
+    void setDocumentMode(bool enabled){tabs_->setDocumentMode(enabled);}
     void setTabPresentation(bool horizontalScrollable,const QString &level){
-        horizontalScrollable_=horizontalScrollable;tabLevel_=level;
-        for(int i=0;i<buttons_.size();++i){
-            QToolButton *button=buttons_[i];
-            const int flowIndex=tabLayout_->indexOf(button);
-            if(flowIndex>=0){QLayoutItem *item=tabLayout_->takeAt(flowIndex);delete item;}
-            scrollTabsLayout_->removeWidget(button);
-            if(horizontalScrollable_)scrollTabsLayout_->addWidget(button,i%2,i/2);else tabLayout_->addWidget(button);
-            applyTabButtonStyle(button);button->adjustSize();button->setFixedSize(button->sizeHint());
+        // Native QTabBar scroll buttons are used for long labels at both levels.
+        // This avoids manually showing child buttons outside their stacked page.
+        horizontalScrollable_=horizontalScrollable;
+        tabLevel_=level;
+        if(auto *bar=nativeTabBar()){
+            bar->setUsesScrollButtons(true);
+            bar->setExpanding(false);
+            bar->setElideMode(Qt::ElideRight);
         }
-        wrapArea_->setVisible(!horizontalScrollable_);
-        scrollRow_->setVisible(horizontalScrollable_);
-        refreshTabWrapping();
+        applyTabStyle();
     }
-    int count() const { return int(pages_.size()); }
-    QWidget *widget(int index) const { return index>=0&&index<count()?pages_.at(index):nullptr; }
-    int currentIndex() const { return currentIndex_; }
+    int count() const {return tabs_->count();}
+    QWidget *widget(int index) const {return index>=0&&index<count()?tabs_->widget(index):nullptr;}
+    int currentIndex() const {return tabs_->currentIndex();}
     void setCurrentIndex(int index){
-        if(index<0||index>=count()||!visible_.at(index))return;
-        currentIndex_=index;stack_->setCurrentIndex(index);
-        for(int i=0;i<buttons_.size();++i)buttons_[i]->setChecked(i==index);
+        if(index<0||index>=count()||!visible_.value(index,true))return;
+        tabs_->setCurrentIndex(index);
     }
     void setTabVisible(int index,bool visible){
         if(index<0||index>=count())return;
-        visible_[index]=visible;buttons_[index]->setVisible(visible);
-        if(!visible&&currentIndex_==index){currentIndex_=-1;for(int i=0;i<count();++i)if(visible_[i]){setCurrentIndex(i);break;}}
-        refreshTabWrapping();
+        visible_[index]=visible;
+        tabs_->setTabVisible(index,visible);
+        if(visible&&tabs_->currentIndex()<0)tabs_->setCurrentIndex(index);
+        if(!visible&&tabs_->currentIndex()==index){
+            for(int i=0;i<count();++i){
+                if(visible_.value(i,true)){tabs_->setCurrentIndex(i);break;}
+            }
+        }
     }
     void setTabText(int index,const QString &text){
         if(index<0||index>=count())return;
-        labels_[index]=text;buttons_[index]->setText(text);applyTabButtonStyle(buttons_[index]);
-        buttons_[index]->adjustSize();buttons_[index]->setFixedSize(buttons_[index]->sizeHint());refreshTabWrapping();
+        labels_[index]=text;
+        tabs_->setTabText(index,text);
+        applyTabStyle();
     }
     void setTabTexts(const QStringList &texts){
         const int n=qMin(count(),texts.size());
         bool changed=false;
         for(int i=0;i<n;++i){
-            if(labels_[i]==texts.at(i)&&buttons_[i]->text()==texts.at(i))continue;
+            if(labels_.value(i)==texts.at(i)&&tabs_->tabText(i)==texts.at(i))continue;
             labels_[i]=texts.at(i);
-            buttons_[i]->setText(texts.at(i));
-            applyTabButtonStyle(buttons_[i]);
-            buttons_[i]->adjustSize();
-            buttons_[i]->setFixedSize(buttons_[i]->sizeHint());
+            tabs_->setTabText(i,texts.at(i));
             changed=true;
         }
-        // Reflow all tabs exactly once, and only if at least one label changed.
-        if(changed)refreshTabWrapping();
+        if(changed){applyTabStyle();if(auto *bar=nativeTabBar())bar->updateGeometry();tabs_->updateGeometry();}
     }
-    QString tabText(int index) const { return index>=0&&index<count()?labels_.at(index):QString(); }
+    QString tabText(int index) const {return index>=0&&index<count()?tabs_->tabText(index):QString();}
     void setTabToolTip(int index,const QString &tip){
         if(index<0||index>=count())return;
-        buttons_[index]->setProperty("orbitSourceToolTip",tip);
-        buttons_[index]->setToolTip(orbitWidgetText(tip));
+        tabs_->setTabToolTip(index,orbitWidgetText(tip));
     }
     void setWrappedTabText(int index,const QString &text){setTabText(index,text);}
     void refreshTabWrapping(){
-        if(tabLayout_){tabLayout_->invalidate();tabLayout_->activate();}
-        if(horizontalScrollable_&&scrollTabsLayout_){
-            for(QToolButton *button:buttons_)scrollTabsLayout_->removeWidget(button);
-            int visibleIndex=0;
-            for(int i=0;i<buttons_.size();++i){
-                QToolButton *button=buttons_[i];
-                if(!visible_.value(i)){button->hide();continue;}
-                button->show();
-                scrollTabsLayout_->addWidget(button,visibleIndex%2,visibleIndex/2);
-                ++visibleIndex;
-            }
-            scrollTabsLayout_->invalidate();scrollTabsLayout_->activate();
-        }
-        if(scrollContents_){scrollContents_->adjustSize();scrollContents_->updateGeometry();}
-        if(scrollArea_&&scrollArea_->widget())scrollArea_->widget()->adjustSize();
-        updateGeometry();
+        // Kept for source/API compatibility; native QTabWidget owns layout,
+        // clipping, child visibility and repaint scheduling.
+        if(tabs_){if(auto *bar=nativeTabBar())bar->updateGeometry();tabs_->updateGeometry();tabs_->update();}
     }
 private:
-    void applyTabButtonStyle(QToolButton *button){
-        if(!button)return;
+    QTabBar *nativeTabBar() const {return tabs_?tabs_->findChild<QTabBar*>():nullptr;}
+    void applyTabStyle(){
+        if(!tabs_)return;
         if(tabLevel_==QStringLiteral("packet")){
-            button->setStyleSheet(QStringLiteral(
-                "QToolButton {background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:5px;padding:2px 6px;font-weight:500;}"
-                "QToolButton:checked {background:#0f766e;color:white;border-color:#115e59;font-weight:700;}"
-                "QToolButton:hover {background:#ccfbf1;border-color:#5eead4;}"));
+            tabs_->setStyleSheet(QStringLiteral(
+                "QTabWidget::pane { border: 1px solid #dbe5f1; top: -1px; }"
+                "QTabBar::tab { background:#f1f5f9; color:#334155; border:1px solid #cbd5e1;"
+                " border-bottom:0; border-top-left-radius:5px; border-top-right-radius:5px;"
+                " padding:3px 7px; margin-right:3px; min-height:20px; }"
+                "QTabBar::tab:selected { background:#0f766e; color:white; border-color:#115e59; font-weight:600; }"
+                "QTabBar::tab:hover:!selected { background:#ccfbf1; }"));
         }else{
-            button->setStyleSheet(QStringLiteral(
-                "QToolButton {background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;border-radius:6px;padding:2px 7px;font-weight:600;}"
-                "QToolButton:checked {background:#2563eb;color:white;border-color:#1d4ed8;font-weight:700;}"
-                "QToolButton:hover {background:#bfdbfe;border-color:#60a5fa;}"));
+            tabs_->setStyleSheet(QStringLiteral(
+                "QTabWidget::pane { border: 1px solid #dbe5f1; top: -1px; }"
+                "QTabBar::tab { background:#dbeafe; color:#1e3a8a; border:1px solid #bfdbfe;"
+                " border-bottom:0; border-top-left-radius:5px; border-top-right-radius:5px;"
+                " padding:3px 8px; margin-right:3px; min-height:20px; }"
+                "QTabBar::tab:selected { background:#2563eb; color:white; border-color:#1d4ed8; font-weight:600; }"
+                "QTabBar::tab:hover:!selected { background:#bfdbfe; }"));
         }
     }
-    FlowLayout *tabLayout_=nullptr;
-    QStackedWidget *stack_=nullptr;
-    QWidget *wrapArea_=nullptr,*scrollRow_=nullptr,*scrollContents_=nullptr;
-    QScrollArea *scrollArea_=nullptr;
-    QGridLayout *scrollTabsLayout_=nullptr;
-    QPushButton *previous_=nullptr,*next_=nullptr;
-    QVector<QWidget*> pages_;
-    QVector<QToolButton*> buttons_;
+    QTabWidget *tabs_=nullptr;
     QVector<QString> labels_;
     QVector<bool> visible_;
     QString tabLevel_=QStringLiteral("system");
     bool horizontalScrollable_=false;
-    int currentIndex_=-1;
 };
 
 class AttitudeWidget final : public QWidget {
