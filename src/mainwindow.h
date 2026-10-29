@@ -103,7 +103,6 @@ private:
     QString utcLabel(const QDateTime &dt) const;
     const orbit::BusinessPacket *latestRecognized(int index,const QStringList &prefixes) const;
     void updateFieldCard(QGroupBox *card,const QStringList &prefixes,int index);
-    void renderUnifiedOverviewTable(int index);
     void setDiagnosticsVisible(bool enabled);
 
     QString logPath_,binPath_;
@@ -163,7 +162,6 @@ private:
     int diagnosticTab_=-1;
     QGroupBox *powerCard_=nullptr,*attitudeCard_=nullptr,*thermalCard_=nullptr,*payloadCard_=nullptr;
     QHash<QGroupBox*,QTableWidget*> overviewTables_;
-    QTableWidget *overviewUnifiedTable_=nullptr;
     QString fieldTreeSatellite_;
     QHash<QString,QTreeWidgetItem*> fieldTreeFieldItems_;
     QHash<QString,QTableWidget*> componentTables_;

@@ -42,7 +42,6 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QProgressBar>
-#include <QResizeEvent>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSlider>
@@ -81,26 +80,6 @@ QWidget *metricCard(const QString &label,QLabel *&number){
     layout->addWidget(number);
     return panel;
 }
-class ResponsiveOverviewTable final : public QTableWidget {
-public:
-    explicit ResponsiveOverviewTable(QWidget *parent=nullptr):QTableWidget(parent) {}
-    void adjustOverviewColumns(){
-        if(columnCount()!=8)return;
-        const int width=qMax(1,viewport()->width());
-        const int labelWidth=qBound(68,width/14,150);
-        for(int pair=0;pair<4;++pair){
-            horizontalHeader()->setSectionResizeMode(pair*2,QHeaderView::Fixed);
-            setColumnWidth(pair*2,labelWidth);
-            horizontalHeader()->setSectionResizeMode(pair*2+1,QHeaderView::Stretch);
-        }
-    }
-protected:
-    void resizeEvent(QResizeEvent *event) override{
-        QTableWidget::resizeEvent(event);
-        adjustOverviewColumns();
-    }
-};
-
 QGroupBox *statusCard(const QString &title){
     auto *card=new QGroupBox(title);
     card->setObjectName("statusCard");
@@ -1003,45 +982,23 @@ void MainWindow::buildOverview(QTabWidget *tabs){
     heroLayout->addWidget(attitudeModeLabel_);
     layout->addWidget(hero,0);
 
-    // One continuous telemetry surface replaces the former four-card overview.
-    // Four hidden source tables are retained internally so the established
-    // BY04/ASRTU-1 field mapping rules remain the single source of truth.
-    overviewUnifiedTable_=new ResponsiveOverviewTable(page);
-    overviewUnifiedTable_->setObjectName("overviewUnifiedTable");
-    overviewUnifiedTable_->setColumnCount(8); // four compact parameter/value pairs
-    overviewUnifiedTable_->setHorizontalHeaderLabels({
-        QStringLiteral("参数"),QStringLiteral("当前值"),
-        QStringLiteral("参数"),QStringLiteral("当前值"),
-        QStringLiteral("参数"),QStringLiteral("当前值"),
-        QStringLiteral("参数"),QStringLiteral("当前值")});
-    overviewUnifiedTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    overviewUnifiedTable_->setSelectionMode(QAbstractItemView::NoSelection);
-    overviewUnifiedTable_->setFocusPolicy(Qt::NoFocus);
-    overviewUnifiedTable_->verticalHeader()->hide();
-    overviewUnifiedTable_->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
-    overviewUnifiedTable_->verticalHeader()->setDefaultSectionSize(19);
-    overviewUnifiedTable_->horizontalHeader()->setMinimumSectionSize(28);
-    overviewUnifiedTable_->horizontalHeader()->setSectionsClickable(false);
-    overviewUnifiedTable_->setShowGrid(true);
-    overviewUnifiedTable_->setAlternatingRowColors(true);
-    overviewUnifiedTable_->setWordWrap(false);
-    overviewUnifiedTable_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    overviewUnifiedTable_->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    overviewUnifiedTable_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    overviewUnifiedTable_->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);
-    overviewUnifiedTable_->setMinimumHeight(0);
-    layout->addWidget(overviewUnifiedTable_,1);
-
+    auto *cards=new QWidget;
+    auto *cardsLayout=new QGridLayout(cards);
+    cardsLayout->setContentsMargins(0,0,0,0);
+    cardsLayout->setHorizontalSpacing(4);cardsLayout->setVerticalSpacing(4);
     powerCard_=statusCard(QStringLiteral("总线电压与电流"));
     attitudeCard_=statusCard(QStringLiteral("姿态与轨道"));
     thermalCard_=statusCard(QStringLiteral("各总线与部件温度"));
     payloadCard_=statusCard(QStringLiteral("部件开关状态"));
-    for(auto *card:{powerCard_,attitudeCard_,thermalCard_,payloadCard_}){
-        card->setParent(page);
-        card->hide();
+    for(auto *card:{powerCard_,attitudeCard_,thermalCard_,payloadCard_})
         overviewTables_.insert(card,card->findChild<QTableWidget*>("statusTable"));
-    }
-    static_cast<ResponsiveOverviewTable*>(overviewUnifiedTable_)->adjustOverviewColumns();
+    cardsLayout->addWidget(powerCard_,0,0);
+    cardsLayout->addWidget(attitudeCard_,0,1);
+    cardsLayout->addWidget(thermalCard_,1,0);
+    cardsLayout->addWidget(payloadCard_,1,1);
+    cardsLayout->setRowStretch(0,1);cardsLayout->setRowStretch(1,1);
+    cardsLayout->setColumnStretch(0,1);cardsLayout->setColumnStretch(1,1);
+    layout->addWidget(cards,1);
     tabs->addTab(page,QStringLiteral("总览"));
 }
 

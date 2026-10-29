@@ -4391,8 +4391,7 @@
     "高清相机遥测计数": "HD Camera Telemetry Count",
     "（候选未验证）": " (candidate; unverified)",
     "（单位未提供）": "(unit not provided)",
-    "：未解析": ": Not parsed",
-    "当前数据包暂无可显示的遥测字段": "No telemetry fields are available for the current packet."
+    "：未解析": ": Not parsed"
   },
   "webTranslations": {
     " · 单位 ${usable[0].unit}": " · unit ${usable[0].unit}",
