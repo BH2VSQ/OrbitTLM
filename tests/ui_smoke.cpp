@@ -49,7 +49,7 @@ private slots:
         const QPixmap preview=window.grab();
         if(!preview.isNull())
             preview.save(QApplication::applicationDirPath()+"/OrbitTLM-UI-preview.png");
-        const auto *tabs=window.findChild<QTabWidget*>("mainPages");
+        auto *tabs=window.findChild<QTabWidget*>("mainPages");
         QVERIFY(tabs!=nullptr);
         QVERIFY(tabs->count()>=6);
         QCOMPARE(tabs->tabText(0),QStringLiteral("总览"));
