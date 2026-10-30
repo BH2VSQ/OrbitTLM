@@ -80,7 +80,11 @@ qt_add_resources(orbittlm_core by04_catalog
   FILES "${ORBITTLM_BY04_DIR}/OBC-SF.json" "${ORBITTLM_BY04_DIR}/BUV-S0.json")
 add_executable(OrbitTLM-cli src/cli.cpp)
 target_link_libraries(OrbitTLM-cli PRIVATE orbittlm_core)
-add_library(orbittlm_ui STATIC src/mainwindow.h src/mainwindow_widgets.h src/mainwindow_build.cpp src/mainwindow_data.cpp)
+find_file(ORBITTLM_QTBASE_JA qtbase_ja.qm
+  HINTS "${Qt6_DIR}/../../../translations" "/usr/share/qt6/translations"
+  REQUIRED)
+set_source_files_properties("${ORBITTLM_QTBASE_JA}" PROPERTIES QT_RESOURCE_ALIAS "qtbase_ja.qm")
+add_library(orbittlm_ui STATIC src/mainwindow.h src/mainwindow_widgets.h src/mainwindow_build.cpp src/mainwindow_data.cpp src/i18n.h src/i18n.cpp)
 # Embed every locale dictionary into the UI binary; runtime language switching reads :/i18n resources.
 qt_add_resources(orbittlm_ui orbittlm_i18n
   PREFIX "/i18n"
@@ -88,7 +92,10 @@ qt_add_resources(orbittlm_ui orbittlm_i18n
   FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/i18n/zh-CN.json"
     "${CMAKE_CURRENT_SOURCE_DIR}/i18n/en-US.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/i18n/ja-JP.json"
 )
+qt_add_resources(orbittlm_ui orbittlm_qt_i18n
+  PREFIX "/qt-i18n" FILES "${ORBITTLM_QTBASE_JA}")
 target_include_directories(orbittlm_ui PUBLIC src)
 target_link_libraries(orbittlm_ui PUBLIC orbittlm_core Qt6::Widgets Qt6::Charts)
 add_executable(OrbitTLM src/main.cpp)
@@ -99,6 +106,8 @@ if(BUILD_TESTING)
   add_executable(orbit_tests tests/protocol.cpp)
   target_link_libraries(orbit_tests PRIVATE orbittlm_core Qt6::Test)
   add_test(NAME protocol COMMAND orbit_tests)
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  add_test(NAME i18n COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_i18n.py")
     add_test(NAME cli_help COMMAND OrbitTLM-cli --help)
     add_executable(orbit_ui_tests tests/ui_smoke.cpp)
     target_link_libraries(orbit_ui_tests PRIVATE orbittlm_ui Qt6::Test)

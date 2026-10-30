@@ -1,4 +1,5 @@
 #pragma once
+#include "i18n.h"
 #include <QScrollBar>
 #include <QCoreApplication>
 #include <QJsonObject>
@@ -45,7 +46,8 @@ inline bool orbitContainsCjk(const QString &text){
 // matching when the input contains no CJK characters.
 inline QString orbitWidgetText(const QString &source){
     auto *app=QCoreApplication::instance();
-    if(!app||app->property("orbitTlmLanguage").toString()!=QStringLiteral("en-US"))return source;
+    if(!app||app->property("orbitTlmLanguage").toString().isEmpty()||
+       app->property("orbitTlmLanguage").toString()==QStringLiteral("zh-CN"))return source;
     static QString cacheLanguage;
     static QHash<QString,QString> cache;
     const QString language=app->property("orbitTlmLanguage").toString();
@@ -60,15 +62,8 @@ inline QString orbitWidgetText(const QString &source){
         return result;
     }
     if(!orbitContainsCjk(source))return source;
-    QString translated=source;
     const QStringList keys=app->property("orbitTlmTranslationKeys").toStringList();
-    for(const QString &key:keys){
-        if(key.isEmpty()||!translated.contains(key))continue;
-        const QString value=map.value(key).toString();
-        if(key==value)continue;
-        translated.replace(key,value);
-        if(!orbitContainsCjk(translated))break;
-    }
+    const QString translated=orbitTranslateSource(source,map,keys);
     if(source.size()<=256&&cache.size()<20000)cache.insert(source,translated);
     return translated;
 }

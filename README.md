@@ -2,6 +2,19 @@
 
 OrbitTLM is a C++20 / Qt 6 / CMake / SQLite desktop workbench for **offline satellite telemetry replay and engineering analysis**.
 
+## Interface languages
+
+Chinese, English and Japanese are available from **工具 → 界面语言 → 日本語**
+(Tools → Language). The choice is saved for the next launch. Japanese also covers
+the ASRTU-1/BY04 field catalogs, live TCP indicators, and the HTML history page.
+Protocol identifiers, conversion formulas, units and recorded values retain their
+original meaning. Project-specific device names with no confirmed Japanese name
+retain their original labels.
+
+On Windows, extract the complete Release ZIP and run `OrbitTLM.exe`.
+The Linux x64 archive requires Qt 6 Widgets, Charts, Network, SQL and the SQLite
+driver; on Ubuntu 24.04 install `qt6-base-dev qt6-charts-dev libqt6sql6-sqlite fonts-noto-cjk`, then run `OrbitTLM/bin/OrbitTLM`.
+
 ## Data integrity rules
 
 - Imports `decoder.log` and `SSDV_received_frames223.bin` into the **same session**.
@@ -26,6 +39,10 @@ P4 TCP receive input and optional SSDV packet reconstruction tools.
 ## Build
 
 Requires a C++20 compiler, CMake 3.21+, Qt 6.4+ components Core, Widgets, Sql, Network, Charts and Test (for tests). SQLite is accessed using Qt's QSQLITE driver.
+
+Builds also require Python 3 for locale validation when testing is enabled, and
+Qt's `qtbase_ja.qm` translation catalog (Ubuntu: `qt6-translations-l10n`). The
+application embeds the Japanese dictionary and standard Qt dialog translations.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

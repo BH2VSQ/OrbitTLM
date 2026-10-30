@@ -253,7 +253,7 @@ const BusinessPacket *MainWindow::latestRecognized(int index,
     return nullptr;
 }
 void MainWindow::updatePaths(){
-    auto basename=[](const QString &p){return p.isEmpty()?QStringLiteral("未选择"):QFileInfo(p).fileName();};
+    auto basename=[this](const QString &p){return p.isEmpty()?uiText(QStringLiteral("未选择")):QFileInfo(p).fileName();};
     const QString sourceFormat=QStringLiteral("解码日志：%1     数据帧文件：%2");
     sourceLabel_->setProperty("orbitSourceText",sourceFormat);
     sourceLabel_->setText(uiText(sourceFormat).arg(basename(logPath_),basename(binPath_)));
@@ -1010,6 +1010,16 @@ bool MainWindow::updateWebHistory(QString *error){
     QJsonArray records;
     for(const auto &packet:business_){
         QJsonObject record=orbit::BusinessCatalog::toJson(packet);
+        if(languageCode_!=QStringLiteral("zh-CN")){
+            QJsonArray fields=record.value(QStringLiteral("fields")).toArray();
+            for(qsizetype i=0;i<fields.size();++i){
+                QJsonObject field=fields.at(i).toObject();
+                const QString name=field.value(QStringLiteral("name_cn")).toString();
+                field.insert(QStringLiteral("name_cn"),uiText(name));
+                fields[i]=field;
+            }
+            record.insert(QStringLiteral("fields"),fields);
+        }
         records.append(record);
     }
     QByteArray json=QJsonDocument(records).toJson(QJsonDocument::Compact);
@@ -1065,25 +1075,15 @@ $('sat').addEventListener('change',()=>{fillFields();render();});$('fields').add
     }
     // The exported HTML page is a separate static UI, so apply the active locale
     // to its visible labels before inserting telemetry JSON (which must stay intact).
-    if(languageCode_==QStringLiteral("en-US")){
-        QString localized=QString::fromUtf8(html);
-        QStringList webKeys=webTranslations_.keys();
-        std::stable_sort(webKeys.begin(),webKeys.end(),[](const QString &left,const QString &right){
-            return left.size()>right.size();
-        });
-        for(const QString &key:webKeys){
-            const QString value=webTranslations_.value(key).toString(key);
-            if(!key.isEmpty()&&value!=key)localized.replace(key,value);
-        }
-        QStringList textKeys=translations_.keys();
-        std::stable_sort(textKeys.begin(),textKeys.end(),[](const QString &left,const QString &right){
-            return left.size()>right.size();
-        });
-        for(const QString &key:textKeys){
-            if(!orbitContainsCjk(key))continue;
-            const QString value=translations_.value(key).toString(key);
-            if(value!=key)localized.replace(key,value);
-        }
+    if(languageCode_!=QStringLiteral("zh-CN")){
+        QJsonObject dictionary=translations_;
+        for(auto it=webTranslations_.constBegin();it!=webTranslations_.constEnd();++it)
+            dictionary.insert(it.key(),it.value());
+        QStringList keys=dictionary.keys();
+        keys.removeAll(QString());
+        QString localized=orbitTranslateSource(QString::fromUtf8(html),dictionary,keys,false);
+        localized.replace(QStringLiteral("lang=\"zh-CN\""),QStringLiteral("lang=\"")+languageCode_+QStringLiteral("\""));
+        localized.replace(QStringLiteral("'zh-CN'"),QStringLiteral("'")+languageCode_+QStringLiteral("'"));
         html=localized.toUtf8();
     }
     html.replace("__DATA_JSON__",json);

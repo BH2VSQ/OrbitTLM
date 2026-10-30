@@ -3,6 +3,10 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+env:
+  PYTHONUTF8: "1"
+permissions:
+  contents: read
 jobs:
   linux:
     runs-on: ubuntu-24.04
@@ -11,7 +15,7 @@ jobs:
       - name: Install Qt6 and SQLite
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build g++ qt6-base-dev qt6-charts-dev libqt6sql6-sqlite
+          sudo apt-get install -y ninja-build g++ qt6-base-dev qt6-charts-dev qt6-translations-l10n libqt6sql6-sqlite fonts-noto-cjk
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
       - name: Compile
@@ -22,16 +26,21 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: OrbitTLM-UI-preview
-          path: build/OrbitTLM-UI-preview.png
+          path: build/*preview.png
           if-no-files-found: ignore
+      - name: Package Linux program
+        run: |
+          cmake --install build --prefix dist/OrbitTLM
+          cp README.md dist/OrbitTLM/
+          tar -C dist -czf OrbitTLM-Linux-x64.tar.gz OrbitTLM
+          sha256sum OrbitTLM-Linux-x64.tar.gz > OrbitTLM-Linux-x64.tar.gz.sha256
       - name: Archive Linux program
         uses: actions/upload-artifact@v4
         with:
           name: OrbitTLM-linux
           path: |
-            build/OrbitTLM
-            build/OrbitTLM-cli
-            build/protocols/asrtu1/**
+            OrbitTLM-Linux-x64.tar.gz
+            OrbitTLM-Linux-x64.tar.gz.sha256
 
   windows:
     runs-on: windows-2022
@@ -69,6 +78,11 @@ jobs:
           if (-not (Test-Path $catalog)) { throw "Missing packaged ASRTU-1 field catalog: $catalog" }
           New-Item -ItemType Directory -Force -Path (Join-Path $stage "protocols") | Out-Null
           Copy-Item $catalog (Join-Path $stage "protocols\asrtu1") -Recurse
+          Copy-Item (Join-Path $release "telemetry-trees") (Join-Path $stage "telemetry-trees") -Recurse
+          Copy-Item (Join-Path $release "web") (Join-Path $stage "web") -Recurse
+          Copy-Item "README.md" $stage
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage "licenses\ssdv_dslwp") | Out-Null
+          Copy-Item "build\_deps\orbittlm_vendor\third_party\ssdv_dslwp\COPYING" (Join-Path $stage "licenses\ssdv_dslwp")
 
           $deploy = Join-Path $env:QT_ROOT_DIR "bin\windeployqt.exe"
           if (-not (Test-Path $deploy)) { throw "windeployqt.exe missing in Qt installation" }
@@ -83,7 +97,7 @@ jobs:
             "Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll",
             "Qt6Charts.dll", "Qt6Network.dll", "Qt6Sql.dll",
             "platforms\qwindows.dll", "sqldrivers\qsqlite.dll",
-            "protocols\asrtu1\SAT-S3.json"
+            "protocols\asrtu1\SAT-S3.json", "telemetry-trees\BY04.json", "web\index.template.html"
           )
           foreach ($relative in $required) {
             $target = Join-Path $stage $relative
@@ -111,6 +125,8 @@ jobs:
           '@ | Set-Content -Path (Join-Path $stage "使用说明.txt") -Encoding utf8
 
           Compress-Archive -Path (Join-Path $stage "*") -DestinationPath "OrbitTLM-Windows-x64.zip" -Force
+          $digest = (Get-FileHash "OrbitTLM-Windows-x64.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$digest  OrbitTLM-Windows-x64.zip" | Set-Content "OrbitTLM-Windows-x64.zip.sha256" -Encoding ascii
 
       - name: Verify Windows ZIP excludes developer test programs
         shell: pwsh
@@ -131,4 +147,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: OrbitTLM-windows-x64
-          path: OrbitTLM-Windows-x64.zip
+          path: |
+            OrbitTLM-Windows-x64.zip
+            OrbitTLM-Windows-x64.zip.sha256
+      - name: Upload Windows Japanese UI preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrbitTLM-UI-preview-windows
+          path: build/Release/*preview.png
+          if-no-files-found: error
