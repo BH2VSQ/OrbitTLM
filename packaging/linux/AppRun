@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+APPDIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+export APPDIR
+# Host Qt/Conda plugin paths must not be mixed with the bundled Qt runtime.
+unset QTDIR QML_IMPORT_PATH QML2_IMPORT_PATH QT_PLUGIN_PATH QT_QPA_PLATFORM_PLUGIN_PATH
+export QT_PLUGIN_PATH="$APPDIR/usr/plugins"
+export QT_QPA_PLATFORM_PLUGIN_PATH="$QT_PLUGIN_PATH/platforms"
+export LD_LIBRARY_PATH="$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="$APPDIR/usr/bin:$PATH"
+if [ "${1-}" = "--cli" ]; then
+    shift
+    exec "$APPDIR/usr/bin/OrbitTLM-cli" "$@"
+fi
+exec "$APPDIR/usr/bin/OrbitTLM" "$@"

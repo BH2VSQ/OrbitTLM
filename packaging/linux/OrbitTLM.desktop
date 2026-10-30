@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=OrbitTLM
+Comment=Satellite telemetry replay and analysis
+Exec=OrbitTLM
+Icon=orbittlm
+Terminal=false
+Categories=Science;HamRadio;
+StartupWMClass=OrbitTLM

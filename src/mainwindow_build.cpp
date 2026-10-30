@@ -198,13 +198,14 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
             statusBar()->showMessage(uiText(QStringLiteral("已保存至 %1.db（按时间排序，重复帧自动忽略）")).arg(frame.satellite),5000);
         }
     });
-    const QString dataDir=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+    const QString dataDir=orbit::applicationDataDirectory();
     QDir().mkpath(dataDir);
     const QString dbFile=QDir(dataDir).filePath(QStringLiteral("orbittlm.sqlite"));
-    // One-time copy from the previous location; subsequent writes go only to exe/data.
-    const QString legacyDbFile=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+
-                               QStringLiteral("/orbittlm.sqlite");
-    if(!QFileInfo::exists(dbFile)&&QFileInfo::exists(legacyDbFile))QFile::copy(legacyDbFile,dbFile);
+    const QStringList legacyDbFiles={
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+QStringLiteral("/orbittlm.sqlite"),
+        QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data/orbittlm.sqlite"))};
+    for(const QString &legacyDbFile:legacyDbFiles)
+        if(!QFileInfo::exists(dbFile)&&QFileInfo::exists(legacyDbFile))QFile::copy(legacyDbFile,dbFile);
     QString error;
     if(!db_.open(dbFile,&error))
         statusBar()->showMessage(uiText(QStringLiteral("SQLite 数据库无法打开："))+error,18000);
@@ -434,9 +435,11 @@ void MainWindow::setReplayListCollapsed(bool collapsed){
 }
 
 void MainWindow::loadApplicationSettings(){
-    const QString dataDirectory=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+    const QString dataDirectory=orbit::applicationDataDirectory();
     QDir().mkpath(dataDirectory);
     const QString settingsPath=QDir(dataDirectory).filePath(QStringLiteral("app-settings.json"));
+    const QString legacySettings=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data/app-settings.json"));
+    if(!QFileInfo::exists(settingsPath)&&QFileInfo::exists(legacySettings))QFile::copy(legacySettings,settingsPath);
     QFile settingsFile(settingsPath);
     if(!settingsFile.open(QIODevice::ReadOnly))return;
     const QJsonObject settings=QJsonDocument::fromJson(settingsFile.readAll()).object();
@@ -448,7 +451,7 @@ void MainWindow::loadApplicationSettings(){
 }
 
 void MainWindow::saveApplicationSettings(){
-    const QString dataDirectory=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+    const QString dataDirectory=orbit::applicationDataDirectory();
     if(!QDir().mkpath(dataDirectory)){
         statusBar()->showMessage(uiText(QStringLiteral("无法创建应用配置目录：%1")).arg(dataDirectory),9000);return;
     }
@@ -744,7 +747,12 @@ void MainWindow::showExportDialog(){
     auto *ssdv=makeCheck(QStringLiteral("SSDV 候选分片"),!images_.isEmpty(),3,1);
     auto *jpeg=makeCheck(QStringLiteral("重建当前 SSDV 图像为 JPEG"),!images_.isEmpty(),4,0);
     auto *directoryRow=new QHBoxLayout;
-    auto *directory=new QLineEdit(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("exports")),&dialog);
+#ifdef Q_OS_LINUX
+    const QString exportRoot=orbit::applicationDataDirectory();
+#else
+    const QString exportRoot=QCoreApplication::applicationDirPath();
+#endif
+    auto *directory=new QLineEdit(QDir(exportRoot).filePath(QStringLiteral("exports")),&dialog);
     auto *browse=new QPushButton(uiText(QStringLiteral("浏览…")),&dialog);
     directoryRow->addWidget(directory,1);directoryRow->addWidget(browse);
     layout->addWidget(new QLabel(uiText(QStringLiteral("导出目录")),&dialog));layout->addLayout(directoryRow);

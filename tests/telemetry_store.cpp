@@ -3,6 +3,7 @@
 #include <QCryptographicHash>
 #include <QFileInfo>
 #include <QTemporaryDir>
+#include <QStandardPaths>
 #include <QtTest>
 
 class SatelliteTelemetryStoreTests final : public QObject {
@@ -28,6 +29,15 @@ private:
     }
 
 private slots:
+    void defaultDataDirectoryIsWritableUserStorage(){
+        QStandardPaths::setTestModeEnabled(true);
+        orbit::SatelliteTelemetryStore store;
+        QCOMPARE(store.rootDirectory(),orbit::applicationDataDirectory());
+#ifdef Q_OS_LINUX
+        QCOMPARE(store.rootDirectory(),QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
+        QVERIFY(!store.rootDirectory().startsWith(QCoreApplication::applicationDirPath()+"/"));
+#endif
+    }
     void duplicateFramesAreIgnoredPerSatellite() {
         QTemporaryDir temp;
         QVERIFY(temp.isValid());

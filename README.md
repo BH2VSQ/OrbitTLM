@@ -12,8 +12,21 @@ original meaning. Project-specific device names with no confirmed Japanese name
 retain their original labels.
 
 On Windows, extract the complete Release ZIP and run `OrbitTLM.exe`.
-The Linux x64 archive requires Qt 6 Widgets, Charts, Network, SQL and the SQLite
-driver; on Ubuntu 24.04 install `qt6-base-dev qt6-charts-dev libqt6sql6-sqlite fonts-noto-cjk`, then run `OrbitTLM/bin/OrbitTLM`.
+On Linux x86_64, download `OrbitTLM-Linux-x86_64.AppImage`, mark it executable
+(`chmod +x OrbitTLM-Linux-x86_64.AppImage`) and run it. The AppImage bundles Qt
+6.8.3, Charts, platform plugins and the SQLite driver. It targets glibc 2.35+
+(Ubuntu 22.04 or newer), using X11, XWayland or native Wayland. System Qt installation is not
+required. If FUSE is unavailable, run it with `--appimage-extract-and-run`.
+The bundled CLI is available through `--cli --help`.
+The release pipeline checks Ubuntu 22.04, Ubuntu 24.04 and Debian 13 in clean
+containers without system Qt, including startup from a read-only AppDir and native Wayland windows on Weston.
+
+Linux settings, databases and HTML history use Qt's writable application data
+location under `XDG_DATA_HOME` (normally `~/.local/share`), outside the read-only
+AppImage. Windows continues to use `data` beside the executable. For startup
+diagnostics, run the AppImage with `--smoke-test --smoke-report startup.json`;
+this opens the actual GUI, checks SQLite/storage, records the Qt version and
+paths, then exits automatically.
 
 ## Data integrity rules
 
