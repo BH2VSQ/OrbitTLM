@@ -62,10 +62,13 @@ chmod +x "$tools/qmake-filtered"
 export QMAKE="$tools/qmake-filtered"
 export EXTRA_PLATFORM_PLUGINS="libqoffscreen.so;libqminimal.so"
 chmod +x "$repo/packaging/linux/AppRun"
+# linuxdeploy normally leaves these to the host; minimal Debian images do not
+# provide all of them. Include the portable frontends/support libraries too.
 "$tools/linuxdeploy-x86_64.AppImage" --appdir "$appdir" \
     --library /usr/lib/x86_64-linux-gnu/libOpenGL.so.0 \
     --library /usr/lib/x86_64-linux-gnu/libGLdispatch.so.0 \
     --library /usr/lib/x86_64-linux-gnu/libcom_err.so.2 \
+    --library /usr/lib/x86_64-linux-gnu/libgpg-error.so.0 \
     --executable "$appdir/usr/bin/OrbitTLM" \
     --executable "$appdir/usr/bin/OrbitTLM-cli" \
     --desktop-file "$appdir/usr/share/applications/OrbitTLM.desktop" \
@@ -79,6 +82,7 @@ test -f "$appdir/usr/plugins/sqldrivers/libqsqlite.so"
 test -e "$appdir/usr/lib/libOpenGL.so.0"
 test -e "$appdir/usr/lib/libGLdispatch.so.0"
 test -e "$appdir/usr/lib/libcom_err.so.2"
+test -e "$appdir/usr/lib/libgpg-error.so.0"
 test -f "$OUTPUT"
 chmod +x "$OUTPUT"
 (cd "$out" && sha256sum "$(basename "$OUTPUT")" > "$(basename "$OUTPUT").sha256")
