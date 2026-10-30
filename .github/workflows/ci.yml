@@ -38,12 +38,13 @@ jobs:
           if-no-files-found: ignore
       - name: Package Linux AppImage
         run: QMAKE="$QT_ROOT_DIR/bin/qmake" bash tools/package_appimage.sh build dist
-      - name: Test AppImage on clean Ubuntu 22.04 and 24.04 without Qt
+      - name: Test AppImage on clean Ubuntu 22.04, Ubuntu 24.04 and Debian 13 without Qt
         run: |
-          for distro in 22.04 24.04; do
+          for image in ubuntu:22.04 ubuntu:24.04 debian:13; do
+            distro=${image//:/-}
             mkdir -p "runtime-results/$distro"
             chmod 777 "runtime-results/$distro"
-            docker run --rm -v "$PWD:/src:ro" -v "$PWD/runtime-results/$distro:/results" "ubuntu:$distro" bash -ceu '
+            docker run --rm -v "$PWD:/src:ro" -v "$PWD/runtime-results/$distro:/results" "$image" bash -ceu '
               export DEBIAN_FRONTEND=noninteractive
               apt-get update -qq
               apt-get install -y --no-install-recommends python3 xvfb xauth libgl1 libegl1 libfontconfig1 fonts-dejavu-core
@@ -51,7 +52,12 @@ jobs:
                 echo "Clean runtime unexpectedly contains system Qt" >&2
                 exit 1
               fi
-              runuser -u nobody -- python3 /src/tools/smoke_appimage.py /src/dist/OrbitTLM-Linux-x86_64.AppImage /results
+              cp /etc/os-release /results/os-release
+              mkdir /tmp/orbittlm-readonly
+              cd /tmp/orbittlm-readonly
+              /src/dist/OrbitTLM-Linux-x86_64.AppImage --appimage-extract >/dev/null
+              chmod -R a-w squashfs-root
+              runuser -u nobody -- python3 /src/tools/smoke_appimage.py /src/dist/OrbitTLM-Linux-x86_64.AppImage /results --readonly-appdir /tmp/orbittlm-readonly/squashfs-root
             '
           done
       - name: Upload Linux startup diagnostics

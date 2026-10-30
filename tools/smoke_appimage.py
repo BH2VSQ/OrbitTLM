@@ -10,6 +10,7 @@ import tempfile
 args = argparse.ArgumentParser()
 args.add_argument("image", type=Path)
 args.add_argument("reports", type=Path)
+args.add_argument("--readonly-appdir", type=Path)
 options = args.parse_args()
 image = options.image.resolve()
 options.reports.mkdir(parents=True, exist_ok=True)
@@ -49,3 +50,18 @@ for language in ("zh-CN", "en-US", "ja-JP"):
 subprocess.run([str(image), "--appimage-extract-and-run", "--cli", "--help"],
                env=env, check=True, stdout=subprocess.DEVNULL, timeout=30)
 print("Packaged X11 startup, language persistence, SQLite, writable storage and CLI passed.")
+if options.readonly_appdir:
+    appdir = options.readonly_appdir.resolve()
+    assert not os.access(appdir / "usr/bin", os.W_OK), "AppDir must be read-only to the test user"
+    report_file = options.reports.resolve() / "readonly-appdir.json"
+    command = ["xvfb-run", "-a", str(appdir / "AppRun"), "--smoke-test", "--smoke-report", str(report_file)]
+    result = subprocess.run(command, env=env, text=True, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, timeout=90)
+    (options.reports / "readonly-appdir.log").write_text(result.stdout, encoding="utf-8")
+    if result.returncode:
+        print(result.stdout, flush=True)
+        raise SystemExit(f"Read-only AppDir returned {result.returncode}")
+    report = json.loads(report_file.read_text(encoding="utf-8"))
+    assert report["ok"] and Path(report["dataDirectory"]).is_relative_to(state / "data"), report
+    assert not (appdir / "usr/bin/data").exists(), report
+    print("Read-only AppDir startup passed.")

@@ -38,6 +38,28 @@ export LDAI_NO_APPSTREAM=1
 export QMAKE="${QMAKE:-$(command -v qmake6 || command -v qmake)}"
 qt_libs=$("$QMAKE" -query QT_INSTALL_LIBS)
 export LD_LIBRARY_PATH="$qt_libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# OrbitTLM uses SQLite only. Present a curated plugin tree to linuxdeploy
+# without modifying the SDK or pulling in unrelated database clients.
+export ORBITTLM_REAL_QMAKE="$QMAKE"
+export ORBITTLM_QT_PLUGINS="$tools/qt-plugins"
+qt_plugins=$("$QMAKE" -query QT_INSTALL_PLUGINS)
+mkdir -p "$ORBITTLM_QT_PLUGINS/sqldrivers"
+for entry in "$qt_plugins"/*; do
+    [[ $(basename "$entry") == sqldrivers ]] && continue
+    ln -s "$entry" "$ORBITTLM_QT_PLUGINS/$(basename "$entry")"
+done
+install -m755 "$qt_plugins/sqldrivers/libqsqlite.so" "$ORBITTLM_QT_PLUGINS/sqldrivers/"
+cat > "$tools/qmake-filtered" <<'QMAKE_WRAPPER'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ ${1-} == -query && ${2-} == QT_INSTALL_PLUGINS ]]; then
+    printf '%s\n' "$ORBITTLM_QT_PLUGINS"
+else
+    "$ORBITTLM_REAL_QMAKE" "$@" | sed "s|^QT_INSTALL_PLUGINS:.*|QT_INSTALL_PLUGINS:$ORBITTLM_QT_PLUGINS|"
+fi
+QMAKE_WRAPPER
+chmod +x "$tools/qmake-filtered"
+export QMAKE="$tools/qmake-filtered"
 export EXTRA_PLATFORM_PLUGINS="libqoffscreen.so;libqminimal.so"
 chmod +x "$repo/packaging/linux/AppRun"
 "$tools/linuxdeploy-x86_64.AppImage" --appdir "$appdir" \
