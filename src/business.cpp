@@ -1,4 +1,5 @@
 #include "business.h"
+#include "by04.h"
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
@@ -149,8 +150,49 @@ QJsonObject fieldJson(const EngineeringField &f){
     return {{"code",f.code},{"bits",f.bits},{"name_cn",f.nameCn},
         {"name_en",f.nameEn},{"formula",f.formula},{"raw_hex",f.rawHex},
         {"raw_number",f.rawNumber},{"value",f.value},
-        {"unit",f.unit},{"status",f.status}};
+        {"unit",f.unit},{"status",f.status},{"data_type",f.dataType},
+        {"definition_evidence",f.definitionEvidence}};
 }
+}
+EngineeringField BusinessCatalog::decodeField(const QJsonObject &definition,const QByteArray &payload){
+    EngineeringField field;
+    field.code=definition.value("id").toString();
+    field.bits=definition.value("bits").toString();
+    field.nameCn=definition.value("name_cn").toString();
+    field.nameEn=definition.value("name_en").toString();
+    field.formula=definition.value("formula").toString();
+    field.dataType=definition.value("data_type").toString();
+    field.definitionEvidence=definition.value("formula_source").toString();
+    const QStringList address=field.bits.split('.');
+    Raw raw;bool octetOk=false,bitOk=false,widthOk=false;
+    const int octet=address.value(0).toInt(&octetOk);
+    const int highBit=address.value(1).toInt(&bitOk);
+    const int width=address.value(2).toInt(&widthOk);
+    if(address.size()!=3||!octetOk||!bitOk||!widthOk||
+       !readBits(payload,octet,highBit,width,raw)){
+        field.status="truncated_field";
+        return field;
+    }
+    const bool by04BatteryTemperature =
+        field.code == QStringLiteral("OBC-CF0066.7.16") ||
+        field.code == QStringLiteral("OBC-CF0068.7.16");
+    // The payload contains an unsigned decimal count in hundredths of a degree C,
+    // not a hexadecimal display value. Keep this exception scoped to the two
+    // confirmed BY04 battery-temperature fields.
+    if(by04BatteryTemperature)
+        field.formula=QStringLiteral("F=UX*0.01<℃>");
+    const auto converted=convert(field.formula,raw,width);
+    field.rawHex=raw.hex;
+    field.rawNumber=raw.hasNumber?QString::number(raw.bits):QString();
+    field.value=converted.value;
+    field.unit=converted.unit;
+    field.status=converted.status;
+    if(field.dataType=="raw_bits"&&!field.status.startsWith("raw_"))field.status="raw_bits";
+    if(by04BatteryTemperature && raw.hasNumber)
+        field.status=QStringLiteral("table_formula");
+    if((field.dataType=="sample_checked_linear"||field.dataType=="adapted_unit_reference")&&
+       field.status=="table_formula")field.status="reference_formula";
+    return field;
 }
 bool BusinessCatalog::loadDirectory(const QString &directory,QString *error){
     QDir dir(directory);
@@ -203,6 +245,24 @@ QVector<QPair<int,int>> BusinessCatalog::packetTypeIds()const{
     for(const auto &packet:kinds_)ids.push_back({packet.main,packet.sub});
     return ids;
 }
+QVector<BusinessPacket> BusinessCatalog::definitionPackets()const{
+    QVector<BusinessPacket> result;
+    result.reserve(kinds_.size());
+    for(auto it=kinds_.cbegin();it!=kinds_.cend();++it){
+        const Kind &kind=it.value();
+        BusinessPacket packet;
+        packet.packetName=kind.name;packet.packetLabel=kind.name;
+        packet.mainType=kind.main;packet.subType=kind.sub;
+        packet.identification=QStringLiteral("catalog_definition");
+        packet.fields.reserve(kind.fields.size());
+        for(const Definition &d:kind.fields){
+            packet.fields.push_back({d.code,d.bits,d.nameCn,d.nameEn,d.formula,
+                                     {},{},{},{},QStringLiteral("catalog_definition")});
+        }
+        result.push_back(std::move(packet));
+    }
+    return result;
+}
 int BusinessCatalog::fieldDefinitions()const{
     int total=0;for(const auto &k:kinds_)total+=k.fields.size();return total;
 }
@@ -221,7 +281,18 @@ BusinessPacket BusinessCatalog::decode(const ApplicationPacket &packet)const{
     if(native!=kinds_.constEnd()){
         kind=&native.value();payload=bytes;
         out.identification="native_type_prefix";
-    }else if(bytes.size()>8){
+    }else if(packet.classification=="ccsds_space_packet_candidate" &&
+             packet.apid>=0 && !packet.data.isEmpty()){
+        // ASRTU-compatible receivers wrap the subsystem ID in a CCSDS APID
+        // and put the subtype in the first user-data octet. Field bit offsets
+        // start after that subtype byte, matching the legacy soundmodem decoder.
+        const auto ccsdsKind=kinds_.constFind(key(packet.apid,at(packet.data,0)));
+        if(ccsdsKind!=kinds_.constEnd()){
+            kind=&ccsdsKind.value();payload=packet.data.mid(1);
+            out.identification="ccsds_apid_subtype";
+        }
+    }
+    if(!kind && bytes.size()>8){
         const auto legacy=kinds_.constFind(key(at(bytes,1),at(bytes,6)));
         if(legacy!=kinds_.constEnd()){
             kind=&legacy.value();payload=bytes.mid(7);
@@ -290,16 +361,54 @@ QVector<BusinessPacket> BusinessCatalog::decodeAll(const QVector<ApplicationPack
     if(stats)*stats=counts;
     return decoded;
 }
+QVector<BusinessPacket> BusinessCatalog::decodeBySatellite(const QVector<ApplicationPacket> &packets,
+                                                           BusinessStats *stats)const{
+    QVector<BusinessPacket> decoded;
+    QVector<ApplicationPacket> by04Packets;
+    decoded.reserve(packets.size());
+    for(const auto &packet:packets){
+        ApplicationPacket normalized=packet;
+        normalized.satellite=canonicalSatelliteName(packet.satellite);
+        if(normalized.satellite==QStringLiteral("BY04"))by04Packets.push_back(normalized);
+        else if(normalized.satellite==QStringLiteral("ASRTU-1"))decoded.push_back(decode(normalized));
+        else { BusinessPacket unknown; unknown.transport=normalized; unknown.identification="unknown_satellite"; decoded.push_back(unknown); }
+    }
+    decoded+=By04Decoder::decodeAll(by04Packets);
+    std::stable_sort(decoded.begin(),decoded.end(),[](const BusinessPacket &a,const BusinessPacket &b){
+        const auto &ta=a.transport.captureLocal,&tb=b.transport.captureLocal;
+        if(ta.isValid()!=tb.isValid())return ta.isValid();
+        if(!ta.isValid())return false;
+        return ta<tb;
+    });
+    BusinessStats counts;
+    for(const auto &packet:decoded){
+        if(packet.packetName.isEmpty()||packet.identification=="by04_ccsds_header_only")++counts.unknown;
+        else ++counts.recognized;
+        counts.truncatedFields+=packet.skippedFields;
+        for(const auto &field:packet.fields){
+            if(field.status.startsWith("raw_"))++counts.unsupportedFields;
+            if(packet.transport.satellite=="ASRTU-1"||field.status=="table_formula"||
+               field.status=="reference_formula"||field.status=="table_enum")++counts.decodedFields;
+        }
+    }
+    if(stats)*stats=counts;
+    return decoded;
+}
 QJsonObject BusinessCatalog::toJson(const BusinessPacket &packet){
-    QJsonArray fields,sources;
+    QJsonArray fields,sources,segments;
+    for(const auto &segment:packet.transport.segments)segments.append(QString::fromLatin1(segment.toHex()));
     for(const auto &f:packet.fields)fields.append(fieldJson(f));
     for(const auto &s:packet.transport.sources)sources.append(s);
     return {
         {"packet",packet.packetName},{"packet_label",packet.packetLabel},
+        {"satellite",packet.transport.satellite},
         {"main_type",packet.mainType},{"sub_type",packet.subType},
         {"ccsds_apid",packet.transport.apid},
         {"ccsds_packet_sequence",packet.transport.sequence},
         {"identification",packet.identification},
+        {"assembly_status",packet.transport.assemblyStatus},
+        {"raw_segments_hex",segments},
+        {"assembled_packet_hex",QString::fromLatin1(packet.transport.assembledBytes.toHex())},
         {"skipped_fields",packet.skippedFields},{"fields",fields},
         {"vcid",packet.transport.vcid},{"fec_evidence",packet.transport.fecEvidence},
         {"integrity",packet.transport.integrity},{"sources",sources},

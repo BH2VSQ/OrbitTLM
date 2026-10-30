@@ -38,6 +38,33 @@ QByteArray syntheticFrame(bool escaping=false) {
 class ProtocolTest:public QObject {
     Q_OBJECT
 private slots:
+    void automaticSatelliteRecognitionUsesSpacecraftId() {
+        Frame f=Protocol::parse(syntheticFrame(),"AUTO");
+        QVERIFY(f.complete);
+        QCOMPARE(By04Decoder::spacecraftId(f.bytes),0x205);
+        QCOMPARE(f.satellite,QString("BY04"));
+        QCOMPARE(f.vcid,2);
+    }
+    void timestampedTcpArchiveCanBeReimportedAsLog() {
+        QTemporaryDir temp;QVERIFY(temp.isValid());
+        const QByteArray frame=syntheticFrame();
+        QString log=QStringLiteral("2026-10-28 12:34:56.789 TCP frame #1 [tcp]\n")+
+                    QStringLiteral("pdu length = 223 bytes\npdu vector contents =\n");
+        for(int offset=0;offset<frame.size();offset+=16){
+            const QStringList octets=QString::fromLatin1(frame.mid(offset,16).toHex(' ').toUpper()).split(' ');
+            log+=QStringLiteral("%1: %2\n").arg(offset,4,16,QChar('0')).arg(octets.join(' '));
+        }
+        QFile file(temp.filePath("tcp.log"));
+        QVERIFY(file.open(QIODevice::WriteOnly|QIODevice::Text));
+        file.write(log.toUtf8());file.close();
+        QString error;
+        const auto restored=Protocol::fromLog(file.fileName(),"AUTO",&error);
+        QVERIFY2(error.isEmpty(),qPrintable(error));
+        QCOMPARE(restored.size(),1);
+        QCOMPARE(restored[0].satellite,QString("BY04"));
+        QCOMPARE(restored[0].captureLocal,QDateTime::fromString("2026-10-28 12:34:56.789","yyyy-MM-dd HH:mm:ss.zzz"));
+        QCOMPARE(restored[0].quality,QString("structural_only"));
+    }
     void parseKnownStructure() {
         Frame f=Protocol::parse(syntheticFrame(),"ASRTU-1");
         QVERIFY2(f.complete,qPrintable(f.error));
@@ -105,6 +132,28 @@ private slots:
         QFile json(temp.filePath("samples.json"));QVERIFY(json.open(QIODevice::ReadOnly));
         QVERIFY(json.readAll().contains("candidate_unverified"));
     }
+    void by04BatteryTemperaturesUseDecimalHundredths(){
+        auto decode=[](const QString &code,const QString &name,int raw){
+            QJsonObject definition;
+            definition.insert(QStringLiteral("id"),code);
+            definition.insert(QStringLiteral("bits"),QStringLiteral("0.7.16"));
+            definition.insert(QStringLiteral("name_cn"),name);
+            definition.insert(QStringLiteral("formula"),QStringLiteral("F=HX"));
+            definition.insert(QStringLiteral("data_type"),QStringLiteral("raw_bits"));
+            QByteArray payload;
+            payload.append(char((raw>>8)&0xff));
+            payload.append(char(raw&0xff));
+            return BusinessCatalog::decodeField(definition,payload);
+        };
+        const auto first=decode(QStringLiteral("OBC-CF0066.7.16"),QStringLiteral("电池温度1"),2690);
+        QCOMPARE(first.rawNumber,QStringLiteral("2690"));
+        QCOMPARE(first.value,QStringLiteral("26.9"));
+        QCOMPARE(first.unit,QStringLiteral("℃"));
+        QCOMPARE(first.status,QStringLiteral("table_formula"));
+        const auto second=decode(QStringLiteral("OBC-CF0068.7.16"),QStringLiteral("电池温度2"),2671);
+        QCOMPARE(second.value,QStringLiteral("26.71"));
+        QCOMPARE(second.unit,QStringLiteral("℃"));
+    }
     void externalSchemaIsSatelliteIsolated(){
         QTemporaryDir temp;QVERIFY(temp.isValid());
         QFile file(temp.filePath("fields.json"));
@@ -134,16 +183,88 @@ private slots:
         pa.classification="ccsds_space_packet_candidate";
         pa.data=bytes.left(128);
         pb=pa;pb.sequence=12;pb.data=bytes.mid(128);
+        // Header-looking telemetry is not an SSDV image unless its CRC passes
+        // or it is corroborated by another valid packet in that same image.
         const auto found=ImageTools::candidatesFromKiss({pa,pb},0x321);
-        QCOMPARE(found.size(),1);
-        QCOMPARE(found[0].packetId,1);
-        QCOMPARE(found[0].width,320);
+        QCOMPARE(found.size(),0);
         QCOMPARE(ImageTools::candidatesFromKiss({pa,pb},0x320).size(),0);
         b.sequence=14;
         pb.sequence=14;
         QCOMPARE(ImageTools::candidatesFromKiss({pa,pb},0x321).size(),0);
     }
 
+    void oneCrcBadSsdvLikePacketIsNotPromoted(){
+        QByteArray bytes(218,char(0x24));
+        bytes[0]=char(58); bytes[1]=char(0); bytes[2]=char(1);
+        bytes[3]=char(126); bytes[4]=char(16); bytes[5]=char(0);
+        bytes[6]=char(0); bytes[7]=char(0); bytes[8]=char(1);
+        QString error;
+        const auto found=ImageTools::parseBinaryPackets(bytes,0x321,true,&error);
+        QCOMPARE(found.size(),0);
+        QVERIFY(!error.isEmpty());
+    }
+
+    void ssdvAllCrcBadPacketsAreRejectedSafely(){
+        auto makeNormalPacket=[](int packetId){
+            QByteArray bytes(256,char(0x11));
+            bytes[0]=char(0x55); bytes[1]=char(0x67); // SSDV NO-FEC packet header
+            bytes[6]=char(42);                       // image ID
+            bytes[7]=char((packetId>>8)&0xff); bytes[8]=char(packetId&0xff);
+            bytes[9]=char(20); bytes[10]=char(15);   // 320 x 240
+            bytes[11]=char(0);                      // quality 4 / MCU mode 0
+            bytes[12]=char(0); bytes[13]=char(0); bytes[14]=char(0);
+            return bytes; // Deliberately invalid CRC; retain its structurally valid header.
+        };
+        QVector<ImagePacket> packets;
+        for(const int packetId : {0,2}){
+            ImagePacket packet;
+            packet.bytes=makeNormalPacket(packetId);
+            packet.imageId=42; packet.packetId=packetId;
+            packet.width=320; packet.height=240;
+            packet.status=QStringLiteral("candidate_unverified");
+            packets.push_back(packet);
+        }
+        const DecodedImage decoded=ImageTools::decodeImage(packets,42,false);
+        QVERIFY(decoded.jpeg.isEmpty());
+        QVERIFY(!decoded.error.isEmpty());
+        QVERIFY(decoded.badPacketIds.contains(0));
+        QVERIFY(decoded.badPacketIds.contains(2));
+    }
+    void dslwpBadOnlyImageFailsWithoutInvokingJpegDecode(){
+        QByteArray bytes(218,char(0x22));
+        bytes[0]=char(9);                         // image ID
+        bytes[1]=char(0); bytes[2]=char(2);       // only packet 2 was received
+        bytes[3]=char(20); bytes[4]=char(15);     // 320 x 240
+        bytes[5]=char(0);                         // quality 4 / MCU mode 0
+        bytes[6]=char(0); bytes[7]=char(0); bytes[8]=char(2);
+        ImagePacket packet;
+        packet.bytes=bytes; packet.imageId=9; packet.packetId=2;
+        packet.width=320; packet.height=240;
+        packet.status=QStringLiteral("ssdv_crc32_failed");
+        const DecodedImage decoded=ImageTools::decodeImage({packet},9,true);
+        QVERIFY(decoded.jpeg.isEmpty());
+        QVERIFY(!decoded.error.isEmpty());
+        QVERIFY(decoded.badPacketIds.contains(2));
+        QVERIFY(decoded.missingPacketIds.contains(0));
+        QVERIFY(decoded.missingPacketIds.contains(1));
+        QVERIFY(decoded.badPacketIds.contains(2));
+    }
+    void ssdvBinaryExportKeepsEveryFrameByte(){
+        QTemporaryDir temp;QVERIFY(temp.isValid());
+        QVector<ImagePacket> packets;
+        ImagePacket first,second;
+        first.imageId=7;first.packetId=0;first.bytes=QByteArray(256,char(0x11));
+        second.imageId=7;second.packetId=1;second.bytes=QByteArray(256,char(0x22));
+        packets<<first<<second;
+        QString error;
+        const QString path=temp.filePath(QStringLiteral("image_7.bin"));
+        QVERIFY2(ImageTools::savePackets(packets,path,&error),qPrintable(error));
+        QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));
+        const QByteArray exported=file.readAll();
+        QCOMPARE(exported.size(),512);
+        QCOMPARE(exported.left(256),first.bytes);
+        QCOMPARE(exported.mid(256),second.bytes);
+    }
     void physicalHeaderIsFiveBytes(){
         const QByteArray info=syntheticFrame();
         const auto data=Transport::frameData(info);
@@ -241,6 +362,20 @@ private slots:
         QCOMPARE(packets[0].opaqueSuffixBytes,2);
         QCOMPARE(packets[0].data,QByteArray(1,char(0x42)));
         QCOMPARE(packets[0].integrity,QString("not_crc_verified"));
+    }
+    void optionalInnerHeaderRetainsOneByteOpaqueSuffix(){
+        QByteArray frame(223,char(0xaa));
+        frame.replace(0,5,QByteArray::fromHex("2054010100"));
+        const QByteArray packet=QByteArray::fromHex("08F0FBA1000042EE");
+        frame[5]=char(0xc0);
+        frame.replace(6,packet.size(),packet);
+        frame[6+packet.size()]=char(0xc0);
+        const auto packets=Transport::reassemble({Protocol::parse(frame,"BY04")});
+        QCOMPARE(packets.size(),1);
+        QCOMPARE(packets[0].classification,QString("ccsds_space_packet_candidate"));
+        QCOMPARE(packets[0].apid,0xf0);
+        QCOMPARE(packets[0].opaqueSuffixBytes,1);
+        QCOMPARE(packets[0].data,QByteArray::fromHex("42"));
     }
     void all27AsrtuCatalogPacketsLoad(){
         BusinessCatalog catalog;QString error;
@@ -410,6 +545,14 @@ private slots:
         QByteArray vc1(223,char(0));vc1[0]=char(0x20);vc1[1]=char(0x52);
         vc1[2]=char(1);vc1[3]=char(1);
         QByteArray vc2=vc1;vc2[1]=char(0x54);
+        QCOMPARE(canonicalSatelliteName(QStringLiteral("BY70-4")),QStringLiteral("BY04"));
+        QCOMPARE(canonicalSatelliteName(QStringLiteral("BY-04")),QStringLiteral("BY04"));
+        QCOMPARE(canonicalSatelliteName(QStringLiteral("BY04uv")),QStringLiteral("BY04"));
+        QCOMPARE(canonicalSatelliteName(QStringLiteral("ASRTU1")),QStringLiteral("ASRTU-1"));
+        const Frame aliasFrame=Protocol::parse(vc1,QStringLiteral("BY70-4"));
+        QCOMPARE(aliasFrame.satellite,QStringLiteral("BY04"));
+        const Frame knownId=Protocol::parse(vc1,QStringLiteral("AUTO"));
+        QCOMPARE(knownId.satellite,QStringLiteral("BY04"));
         Frame f1=Protocol::parse(vc1,"BY04");
         Frame f2=Protocol::parse(vc2,"BY04");
         QCOMPARE(By04Decoder::spacecraftId(vc1),0x205);
@@ -422,6 +565,32 @@ private slots:
         QByteArray payload(192,char(0));
         payload[0]=char(0x0f);payload[1]=char(0x12);
         payload[2]=char(0x74);payload[3]=char(0x82);
+        // APID 0x0F1 is not present in the pinned BY04 catalog. Keep this
+        // fixture on the generic CCSDS-header-only path.
+        const QByteArray source=QByteArray::fromHex("08F1FBA100BF")+payload;
+        QByteArray frame=QByteArray::fromHex("2054010100");
+        frame.append(char(0xc0));frame+=source;frame.append(char(0xc0));
+        frame+=QByteArray(223-frame.size(),char(0xaa));
+        const auto f=Protocol::parse(frame,"BY04");
+        const auto packets=Transport::reassemble({f});
+        QCOMPARE(packets.size(),1);
+        QCOMPARE(packets[0].apid,0xf1);
+        QCOMPARE(packets[0].sequence,0x3ba1);
+        QCOMPARE(packets[0].data.size(),192);
+        const auto output=By04Decoder::decodeAll(packets);
+        QCOMPARE(output.size(),1);
+        QCOMPARE(output[0].packetName,QString("BY04-CCSDS"));
+        QCOMPARE(output[0].identification,QString("by04_ccsds_header_only"));
+        QCOMPARE(output[0].fields.size(),7);
+        QCOMPARE(output[0].fields[0].value,QString("241"));
+        QCOMPARE(output[0].fields[3].value,QString("192"));
+        QCOMPARE(output[0].fields[6].status,QString("raw_unverified_business"));
+        QVERIFY(output[0].packetLabel.contains("BY04"));
+    }
+    void by04OBCSFMapDecodesMatchingCcsdsPacket(){
+        QByteArray payload(192,char(0));
+        payload[0]=char(0x0f);payload[1]=char(0x12);
+        payload[2]=char(0x74);payload[3]=char(0x82);
         const QByteArray source=QByteArray::fromHex("08F0FBA100BF")+payload;
         QByteArray frame=QByteArray::fromHex("2054010100");
         frame.append(char(0xc0));frame+=source;frame.append(char(0xc0));
@@ -431,16 +600,68 @@ private slots:
         QCOMPARE(packets.size(),1);
         QCOMPARE(packets[0].apid,0xf0);
         QCOMPARE(packets[0].sequence,0x3ba1);
-        QCOMPARE(packets[0].data.size(),192);
         const auto output=By04Decoder::decodeAll(packets);
         QCOMPARE(output.size(),1);
-        QCOMPARE(output[0].packetName,QString("BY04-CCSDS"));
-        QCOMPARE(output[0].identification,QString("by04_ccsds_header_only"));
-        QCOMPARE(output[0].fields.size(),7);
-        QCOMPARE(output[0].fields[0].value,QString("240"));
-        QCOMPARE(output[0].fields[3].value,QString("192"));
-        QCOMPARE(output[0].fields[6].status,QString("raw_unverified_business"));
-        QVERIFY(output[0].packetLabel.contains("BY04"));
+        QCOMPARE(output[0].packetName,QString("BY04-OBC-SF"));
+        QCOMPARE(output[0].identification,QString("by04_kiss_envelope"));
+        QCOMPARE(output[0].mainType,0xf0);
+        QCOMPARE(output[0].subType,0x0f);
+        QVERIFY(!output[0].fields.isEmpty());
+        QCOMPARE(output[0].fields[0].code,QString("OBC-CF0000.7.32"));
+        QCOMPARE(output[0].fields[0].nameCn,QString("UTC时间"));
+        QCOMPARE(output[0].fields[0].value,QString("309625344"));
+        QCOMPARE(output[0].fields[0].unit,QString("s"));
+        QCOMPARE(output[0].fields[0].status,QString("table_formula"));
+    }
+    void by04SsdvReferenceFrameIsRecognizedFromRawTm(){
+        const QByteArray frame=QByteArray::fromHex(
+            "2052EC25FF3300111E1600160155A467E79B96F65FFEBD7255CF565D0F5F2FA3"
+            "65ED1F53A7494515C27D505145140051451401AFA668A6FEC679CB1565E2203A"
+            "123AE7F95749A17FC816DB3C1DA7F99A7E8F088748B651DD031FA9E6AD4108B7"
+            "87CB5E80923F139AEA8412D4F031188751B8BEFA15758FF903DDFFD7235CCDF6"
+            "8A6D34986EF73190E3CD53D067A57613C2B7103C4DF75B8350EA30ACDA6DC46D"
+            "D0C669CE0A44E1EBCA934977D4F3EAE93C25F7AEFFE03FD6B9A1C8AE97C25F7A"
+            "EBFE03FD6B0A7F11EAE37FDDD9D3D2D2515D47822D251450067EB74167F72B"
+        );
+        QCOMPARE(frame.size(),223);
+        const Frame parsed=Protocol::parse(frame,QStringLiteral("BY04"));
+        QVERIFY(parsed.complete);
+        QCOMPARE(parsed.vcid,1);
+        QCOMPARE(By04Decoder::spacecraftId(parsed.bytes),0x205);
+        const auto packets=By04Decoder::images({parsed});
+        QCOMPARE(packets.size(),1);
+        QCOMPARE(packets[0].imageId,0x33);
+        QCOMPARE(packets[0].packetId,0x0011);
+        QCOMPARE(packets[0].width,480);
+        QCOMPARE(packets[0].height,352);
+        QCOMPARE(packets[0].bytes.size(),218);
+        QCOMPARE(packets[0].status,QString("ssdv_crc32_pass"));
+        const auto genericBy04=ImageTools::candidatesFromFrames({parsed});
+        QCOMPARE(genericBy04.size(),1);
+        QCOMPARE(genericBy04[0].imageId,0x33);
+        QByteArray asrtuRaw=frame;
+        asrtuRaw[0]=char(0x03);
+        asrtuRaw[1]=char(0x22);
+        const Frame asrtuFrame=Protocol::parse(asrtuRaw,QStringLiteral("ASRTU-1"));
+        const auto genericAsrtu=ImageTools::candidatesFromFrames({asrtuFrame});
+        QCOMPARE(genericAsrtu.size(),1);
+        QCOMPARE(genericAsrtu[0].imageId,0x33);
+        QString parseError;
+        const auto imported=ImageTools::parseBinaryPackets(packets[0].bytes,240,true,&parseError);
+        QVERIFY2(parseError.isEmpty(),qPrintable(parseError));
+        QCOMPARE(imported.size(),1);
+        QCOMPARE(imported[0].imageId,0x33);
+        QCOMPARE(imported[0].packetId,0x0011);
+        QCOMPARE(imported[0].status,QString("ssdv_crc32_pass"));
+        // A single later packet has no verified image-start context. Refuse to
+        // enter the upstream C JPEG decoder with this underdetermined stream.
+        const auto partial=ImageTools::decodeImage(imported,0x33,true);
+        QVERIFY(partial.jpeg.isEmpty());
+        QVERIFY(partial.error.contains(QStringLiteral("仅有一个非首包")));
+        QCOMPARE(partial.receivedPackets,1);
+        QCOMPARE(partial.width,480);
+        QCOMPARE(partial.height,352);
+        QVERIFY(partial.missingPacketIds.contains(0));
     }
     void by04DslwpNativeVcidOneImageWithSourceVerifiedCrc(){
         QByteArray frame(223,char(0));
@@ -461,11 +682,11 @@ private slots:
         QCOMPARE(recovered[0].width,320);
         QCOMPARE(recovered[0].height,240);
         QCOMPARE(recovered[0].bytes.size(),218);
-        QCOMPARE(recovered[0].status,QString("dslwp_crc32_pass"));
+        QCOMPARE(recovered[0].status,QString("ssdv_crc32_pass"));
         auto altered=frame;altered[5+40]=char(0x77);
         const auto damaged=By04Decoder::images({Protocol::parse(altered,"BY04")});
         QCOMPARE(damaged.size(),1);
-        QCOMPARE(damaged[0].status,QString("dslwp_crc32_failed"));
+        QCOMPARE(damaged[0].status,QString("ssdv_crc32_failed"));
     }
     void by04MixedVcAndWrongSpacecraftIdAreNotParsedAsKiss(){
         QByteArray payload(192,char(0));
@@ -504,8 +725,8 @@ private slots:
         int crcPass=0,crcFail=0;
         for(const auto &packet:images){
             QCOMPARE(packet.bytes.size(),218);
-            if(packet.status=="dslwp_crc32_pass")++crcPass;
-            if(packet.status=="dslwp_crc32_failed")++crcFail;
+            if(packet.status=="ssdv_crc32_pass")++crcPass;
+            if(packet.status=="ssdv_crc32_failed")++crcFail;
             QCOMPARE(packet.width,640);
             QCOMPARE(packet.height,480);
         }
@@ -517,6 +738,15 @@ private slots:
         QVERIFY(f.complete);
         QVERIFY(f.fields.size()>=4);
         for(const auto &x:f.fields)QVERIFY(!x.name.startsWith("candidate.quaternion"));
+    }
+    void malformedDslwpPacketIsRejectedByEmbeddedDecoder(){
+        ImagePacket packet;
+        packet.imageId=7;packet.packetId=0;packet.width=640;packet.height=480;
+        packet.bytes=QByteArray(217,char(0));
+        packet.status="ssdv_crc32_failed";
+        const auto decoded=ImageTools::decodeImage({packet},7,true);
+        QVERIFY(decoded.jpeg.isEmpty());
+        QVERIFY(!decoded.error.isEmpty());
     }
 };
 QTEST_GUILESS_MAIN(ProtocolTest)

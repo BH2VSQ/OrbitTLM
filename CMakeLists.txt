@@ -1,19 +1,94 @@
 cmake_minimum_required(VERSION 3.21)
-project(OrbitTLM VERSION 0.1.0 LANGUAGES CXX)
+project(OrbitTLM VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 include(CTest)
+foreach(tree_file IN ITEMS ASRTU-1.json BY04.json)
+  if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees/${tree_file}")
+    message(FATAL_ERROR "Official telemetry tree JSON is required: telemetry-trees/${tree_file}")
+  endif()
+endforeach()
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Widgets Network Sql Charts)
 qt_standard_project_setup()
-add_library(orbittlm_core STATIC src/core.cpp src/core.h src/schema.cpp src/schema.h src/ssdv.cpp src/ssdv.h src/transport.cpp src/transport.h src/business.cpp src/business.h src/by04.cpp src/by04.h)
+
+# The decoder is compiled into OrbitTLM. No external SSDV executable is
+# required at run time. The files are fetched from immutable upstream commits
+# into the build tree so normal builds do not modify the source checkout.
+set(ORBITTLM_VENDOR_ROOT "${CMAKE_CURRENT_BINARY_DIR}/_deps/orbittlm_vendor")
+set(ORBITTLM_SSDV_DIR "${ORBITTLM_VENDOR_ROOT}/third_party/ssdv_dslwp")
+set(ORBITTLM_BY04_DIR "${ORBITTLM_VENDOR_ROOT}/protocols/by04")
+file(MAKE_DIRECTORY "${ORBITTLM_SSDV_DIR}" "${ORBITTLM_BY04_DIR}")
+
+function(orbittlm_download_pinned repository_path commit relative_path destination)
+  if(NOT EXISTS "${destination}")
+    file(DOWNLOAD
+      "https://raw.githubusercontent.com/${repository_path}/${commit}/${relative_path}"
+      "${destination}"
+      STATUS download_status
+      TLS_VERIFY ON)
+    list(GET download_status 0 download_code)
+    if(NOT download_code EQUAL 0)
+      list(GET download_status 1 download_message)
+      message(FATAL_ERROR "Unable to download pinned OrbitTLM source ${relative_path}: ${download_message}")
+    endif()
+    file(SIZE "${destination}" download_size)
+    if(download_size LESS 64)
+      message(FATAL_ERROR "Downloaded OrbitTLM source is unexpectedly small: ${relative_path}")
+    endif()
+  endif()
+endfunction()
+
+set(ORBITTLM_SSDV_COMMIT "68dd26280b4b7299def8a640d5c0f8122c12bd51")
+foreach(source_file IN ITEMS ssdv.c ssdv.h rs8.c rs8.h)
+  orbittlm_download_pinned(
+    "BG7ZDQ/ASRTU_Series_Receiver" "${ORBITTLM_SSDV_COMMIT}"
+    "third_party/ssdv_dslwp/${source_file}" "${ORBITTLM_SSDV_DIR}/${source_file}")
+endforeach()
+orbittlm_download_pinned(
+  "BG7ZDQ/ASRTU_Series_Receiver" "${ORBITTLM_SSDV_COMMIT}"
+  "third_party/ssdv_dslwp/COPYING" "${ORBITTLM_SSDV_DIR}/COPYING")
+
+set(ORBITTLM_BY04_COMMIT "fe684b0b2124552efa2fc53a1e37dd82af961290")
+foreach(catalog_file IN ITEMS OBC-SF.json BUV-S0.json)
+  orbittlm_download_pinned(
+    "Iu-yang1/OrbitTLM" "${ORBITTLM_BY04_COMMIT}"
+    "protocols/by04/${catalog_file}" "${ORBITTLM_BY04_DIR}/${catalog_file}")
+endforeach()
+
+add_library(orbittlm_core STATIC src/core.cpp src/core.h src/schema.cpp src/schema.h src/ssdv.cpp src/ssdv.h src/transport.cpp src/transport.h src/business.cpp src/business.h src/by04.cpp src/by04.h
+  src/telemetry_store.cpp src/telemetry_store.h
+)
+qt_add_resources(orbittlm_core official_telemetry_tree
+  PREFIX "/telemetry-trees"
+  BASE "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees"
+  FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees/ASRTU-1.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees/BY04.json"
+)
+
 target_include_directories(orbittlm_core PUBLIC src)
 target_link_libraries(orbittlm_core PUBLIC Qt6::Core Qt6::Sql Qt6::Network)
+target_sources(orbittlm_core PRIVATE "${ORBITTLM_SSDV_DIR}/ssdv.c" "${ORBITTLM_SSDV_DIR}/rs8.c")
+target_include_directories(orbittlm_core PRIVATE "${ORBITTLM_VENDOR_ROOT}")
+qt_add_resources(orbittlm_core by04_catalog
+  PREFIX "/by04" BASE "${ORBITTLM_BY04_DIR}"
+  FILES "${ORBITTLM_BY04_DIR}/OBC-SF.json" "${ORBITTLM_BY04_DIR}/BUV-S0.json")
 add_executable(OrbitTLM-cli src/cli.cpp)
 target_link_libraries(OrbitTLM-cli PRIVATE orbittlm_core)
 add_library(orbittlm_ui STATIC src/mainwindow.h src/mainwindow_widgets.h src/mainwindow_build.cpp src/mainwindow_data.cpp)
+# Embed every locale dictionary into the UI binary; runtime language switching reads :/i18n resources.
+qt_add_resources(orbittlm_ui orbittlm_i18n
+  PREFIX "/i18n"
+  BASE "${CMAKE_CURRENT_SOURCE_DIR}/i18n"
+  FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/i18n/zh-CN.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/i18n/en-US.json"
+)
 target_include_directories(orbittlm_ui PUBLIC src)
 target_link_libraries(orbittlm_ui PUBLIC orbittlm_core Qt6::Widgets Qt6::Charts)
 add_executable(OrbitTLM src/main.cpp)
@@ -28,24 +103,41 @@ if(BUILD_TESTING)
     add_executable(orbit_ui_tests tests/ui_smoke.cpp)
     target_link_libraries(orbit_ui_tests PRIVATE orbittlm_ui Qt6::Test)
     add_test(NAME ui_smoke COMMAND orbit_ui_tests)
+  add_executable(orbit_store_tests tests/telemetry_store.cpp)
+    target_link_libraries(orbit_store_tests PRIVATE orbittlm_core Qt6::Test)
+    add_test(NAME telemetry_store COMMAND orbit_store_tests)
     if(UNIX AND NOT APPLE)
       set_tests_properties(ui_smoke PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endif()
 endif()
 install(TARGETS OrbitTLM OrbitTLM-cli RUNTIME DESTINATION bin BUNDLE DESTINATION .)
 
-# Keep all 27 mission field catalogs available offline, including Windows CI artifacts.
+# Keep offline telemetry catalog and the standalone HTML history template available next to the application.
 foreach(target OrbitTLM OrbitTLM-cli orbit_tests)
   if(TARGET ${target})
     add_custom_command(TARGET ${target} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/protocols/asrtu1"
         "$<TARGET_FILE_DIR:${target}>/protocols/asrtu1"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees"
+        "$<TARGET_FILE_DIR:${target}>/telemetry-trees"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target}>/web"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/web/index.template.html"
+        "$<TARGET_FILE_DIR:${target}>/web/index.template.html"
       VERBATIM)
   endif()
 endforeach()
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/protocols/asrtu1"
         DESTINATION "bin/protocols")
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/telemetry-trees"
+        DESTINATION "bin")
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/web/index.template.html"
+        DESTINATION "bin/web")
+install(FILES "${ORBITTLM_SSDV_DIR}/ssdv.c" "${ORBITTLM_SSDV_DIR}/ssdv.h"
+              "${ORBITTLM_SSDV_DIR}/rs8.c" "${ORBITTLM_SSDV_DIR}/rs8.h" "${ORBITTLM_SSDV_DIR}/COPYING"
+        DESTINATION "share/OrbitTLM/third_party/ssdv_dslwp")
 
 # Public BY04 VC1 DSLWP capture fixture used for decoder regression.
 if(TARGET orbit_tests)

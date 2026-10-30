@@ -7,13 +7,17 @@ namespace orbit {
 struct EngineeringField {
     QString code, bits, nameCn, nameEn, formula;
     QString rawHex, rawNumber, value, unit, status;
+    QString dataType, definitionEvidence;
 };
 struct BusinessPacket {
     ApplicationPacket transport;
     QString packetName, packetLabel, identification;
     int mainType=-1, subType=-1;
+    int ssdvImageId=-1, ssdvPacketId=-1;
     int skippedFields=0;
     QVector<EngineeringField> fields;
+    QString definitionEvidence;
+    int fieldBaseKissOctet=-1;
 };
 struct BusinessStats {
     int recognized=0, unknown=0, decodedFields=0, unsupportedFields=0, truncatedFields=0;
@@ -24,7 +28,11 @@ public:
     int packetKinds() const {return kinds_.size();}
     int fieldDefinitions() const;
     QVector<QPair<int,int>> packetTypeIds() const;
+    QVector<BusinessPacket> definitionPackets() const;
     BusinessPacket decode(const ApplicationPacket &packet) const;
+    QVector<BusinessPacket> decodeBySatellite(const QVector<ApplicationPacket> &packets,
+                                              BusinessStats *stats=nullptr) const;
+    static EngineeringField decodeField(const QJsonObject &definition,const QByteArray &payload);
     QVector<BusinessPacket> decodeAll(const QVector<ApplicationPacket> &packets,
                                       BusinessStats *stats=nullptr) const;
     static QJsonObject toJson(const BusinessPacket &packet);

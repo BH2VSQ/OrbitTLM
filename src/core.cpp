@@ -1,5 +1,7 @@
 #include "core.h"
 #include <QCryptographicHash>
+#include <QCoreApplication>
+#include <QDir>
 #include <QFile>
 #include <QHash>
 #include <QJsonArray>
@@ -54,9 +56,21 @@ void candidateQuaternion(Frame &f) {
         QString::number(std::sqrt(norm),'g',10),"","candidate_unverified"});
 }
 }
+QString canonicalSatelliteName(const QString &name) {
+    const QString trimmed=name.trimmed();
+    QString compact=trimmed.toUpper();
+    compact.remove(QLatin1Char('-'));
+    compact.remove(QLatin1Char('_'));
+    compact.remove(QLatin1Char(' '));
+    if(compact==QStringLiteral("BY04")||compact==QStringLiteral("BY704")||
+       compact==QStringLiteral("BY04UV"))return QStringLiteral("BY04");
+    if(compact==QStringLiteral("ASRTU1"))return QStringLiteral("ASRTU-1");
+    if(compact==QStringLiteral("AUTO"))return QStringLiteral("AUTO");
+    return trimmed;
+}
 Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
     Frame f;
-    f.bytes=raw;f.hash=sha(raw);f.satellite=satellite;
+    f.bytes=raw;f.hash=sha(raw);f.satellite=canonicalSatelliteName(satellite);
     if(raw.size()!=223) {
         f.error="RS information frame requires exactly 223 bytes (5-byte TM + 218 data)";
         return f;
@@ -75,6 +89,11 @@ Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
     f.quality="structural_only";
     f.error="TM frame accepted; application CRC and RS parity not verified here";
     const int scid=((first&0x3f)<<4)|(second>>4);
+    // Only infer the spacecraft when AUTO was selected. Explicit choices must
+    // remain authoritative so satellite-specific fields stay isolated.
+    if(f.satellite==QStringLiteral("AUTO"))
+        f.satellite=(scid==0x205?QStringLiteral("BY04"):QStringLiteral("ASRTU-1"));
+    const QString effectiveSatellite=f.satellite;
     f.fields.push_back({"tm.spacecraft_id",QString::number(scid),"","verified_protocol"});
     f.fields.push_back({"tm.vcid",QString::number(f.vcid),"","verified_protocol"});
     f.fields.push_back({"tm.first_header_pointer",QString::number(byte(raw,4)),"","verified_protocol"});
@@ -86,7 +105,7 @@ Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
     f.payload=zone;
     // BY04 VC1 is a binary DSLWP SSDV stream; arbitrary 0xC0 bytes
     // inside compressed image data must never be treated as KISS delimiters.
-    if(satellite=="BY04" && f.vcid==1)return f;
+    if(effectiveSatellite=="BY04" && f.vcid==1)return f;
     const int open=zone.indexOf(char(0xc0));
     if(open<0)return f;
     const int close=zone.indexOf(char(0xc0),open+1);
@@ -97,10 +116,14 @@ Frame Protocol::parse(const QByteArray &raw,const QString &satellite) {
     const int header=(byte(packet,0)<<8)|byte(packet,1);
     const int seq=(byte(packet,2)<<8)|byte(packet,3);
     const int length=1+(byte(packet,4)<<8)+byte(packet,5);
-    if((header>>13)!=0 || length+6!=packet.size())return f;
+    const int suffix=packet.size()-(length+6);
+    // Receiver packets may append an opaque 2-byte or 4-byte trailer. Keep
+    // the bounded CCSDS payload and preserve the trailer in frame bytes.
+    if((header>>13)!=0 || length<1 ||
+       (suffix<0 || suffix>4))return f;
     f.apid=header&0x7ff;
     f.sequence=seq&0x3fff;
-    f.payload=packet.mid(6);
+    f.payload=packet.mid(6,length);
     f.fields.push_back({"candidate.ccsds.apid",QString::number(f.apid),"","header_candidate"});
     f.fields.push_back({"candidate.ccsds.sequence",QString::number(f.sequence),"","header_candidate"});
     candidateQuaternion(f); // experimental offset within *candidate* inner payload
@@ -112,16 +135,16 @@ QVector<Frame> Protocol::fromLog(const QString &path,const QString &satellite,QS
         if(error)*error=file.errorString();return {};
     }
     const QRegularExpression tag(
-        R"(^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+) FEC frame #\d+ \[([^\]]+)\])");
+        R"(^([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.\d+) (FEC frame|TCP frame) #\d+ \[([^\]]+)\])");
     const QRegularExpression row(R"(^[0-9A-Fa-f]{4}:\s+((?:[0-9A-Fa-f]{2}\s*){1,16})$)");
-    QVector<Frame> records;QByteArray buffer;QString when,route;bool active=false;
+    QVector<Frame> records;QByteArray buffer;QString when,route;bool active=false,hasFecEvidence=false;
     auto flush=[&]{
         if(buffer.isEmpty())return;
         Frame f=parse(buffer,satellite);
         f.sources.push_back("log:"+route);
         f.captureLocal=QDateTime::fromString(when,"yyyy-MM-dd HH:mm:ss.zzz");
         f.timeBasis="logger_local_unverified";
-        if(f.complete)f.quality="log_fec_reported";
+        if(f.complete && hasFecEvidence)f.quality="log_fec_reported";
         records.push_back(std::move(f));buffer.clear();
     };
     QTextStream in(&file);
@@ -129,7 +152,9 @@ QVector<Frame> Protocol::fromLog(const QString &path,const QString &satellite,QS
         const QString line=in.readLine().trimmed();
         const auto hdr=tag.match(line);
         if(hdr.hasMatch()){
-            flush();active=true;when=hdr.captured(1);route=hdr.captured(2);continue;
+            flush();active=true;when=hdr.captured(1);
+            hasFecEvidence=hdr.captured(2)==QStringLiteral("FEC frame");
+            route=hdr.captured(3);continue;
         }
         if(!active)continue;
         const auto hexRow=row.match(line);
@@ -360,20 +385,40 @@ QVector<Frame> Database::load(qint64 sessionId,QString *error) const {
 LiveTcp::LiveTcp(QObject *parent):QObject(parent){
     connect(&socket_,&QTcpSocket::readyRead,this,[this]{
         queued_+=socket_.readAll();
-        while(queued_.size()>=223){
-            const QByteArray bytes=queued_.left(223);queued_.remove(0,223);
-            Frame frame=Protocol::parse(bytes,satellite_);
-            frame.sources<<"live:tcp";frame.captureLocal=QDateTime::currentDateTime();
-            frame.timeBasis="receiver_local";
+        constexpr int frameSize=223;
+        while(queued_.size()>=frameSize){
+            const QByteArray bytes=queued_.left(frameSize);
+            queued_.remove(0,frameSize);
+            Frame frame=Protocol::parse(bytes,QStringLiteral("AUTO"));
+            frame.sources<<QStringLiteral("live:tcp");
+            frame.captureLocal=QDateTime::currentDateTime();
+            frame.timeBasis=QStringLiteral("receiver_local");
             emit received(frame);
         }
     });
-    connect(&socket_,&QTcpSocket::connected,this,[this]{emit status("Connected");});
-    connect(&socket_,&QTcpSocket::disconnected,this,[this]{emit status("Disconnected");});
-    connect(&socket_,&QTcpSocket::errorOccurred,this,[this](auto){emit status(socket_.errorString());});
+    connect(&socket_,&QTcpSocket::connected,this,[this]{
+        emit status(QStringLiteral("Connected"));
+    });
+    connect(&socket_,&QTcpSocket::disconnected,this,[this]{
+        emit status(QStringLiteral("Disconnected"));
+    });
+    connect(&socket_,&QTcpSocket::errorOccurred,this,[this](QAbstractSocket::SocketError){
+        emit status(QStringLiteral("连接失败：")+socket_.errorString());
+    });
 }
 void LiveTcp::start(const QString &host,quint16 port,const QString &satellite){
-    socket_.abort();queued_.clear();satellite_=satellite;socket_.connectToHost(host,port);
+    Q_UNUSED(satellite);
+    queued_.clear();
+    socket_.abort();
+    emit status(QStringLiteral("正在连接 %1:%2").arg(host).arg(port));
+    socket_.connectToHost(host,port);
 }
-void LiveTcp::stop(){socket_.disconnectFromHost();queued_.clear();}
+void LiveTcp::stop(){
+    queued_.clear();
+    if(socket_.state()==QAbstractSocket::UnconnectedState){
+        emit status(QStringLiteral("Disconnected"));
+        return;
+    }
+    socket_.disconnectFromHost();
+}
 }

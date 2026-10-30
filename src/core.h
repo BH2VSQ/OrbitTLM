@@ -1,6 +1,7 @@
 #pragma once
 #include <QByteArray>
 #include <QDateTime>
+#include <QFile>
 #include <QObject>
 #include <QJsonObject>
 #include <QSqlDatabase>
@@ -8,6 +9,8 @@
 #include <QStringList>
 #include <QTcpSocket>
 namespace orbit {
+// Normalize aliases for the same spacecraft before protocol routing.
+QString canonicalSatelliteName(const QString &name);
 struct Field {
     QString name;
     QString value;
@@ -63,7 +66,6 @@ signals:
 private:
     QTcpSocket socket_;
     QByteArray queued_;
-    QString satellite_ = "ASRTU-1";
 };
 }
 Q_DECLARE_METATYPE(orbit::Frame)
