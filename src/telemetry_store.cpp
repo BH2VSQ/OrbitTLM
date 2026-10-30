@@ -22,13 +22,16 @@ SatelliteTelemetryStore::SatelliteTelemetryStore(const QString &rootDirectory)
     if (rootDirectory_.isEmpty()) {
         const QString legacyRoot=QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
                                      .filePath(QStringLiteral("telemetry"));
-        rootDirectory_=QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+        rootDirectory_=applicationDataDirectory();
         if(QDir().mkpath(rootDirectory_)){
-            // Keep existing user data available, but never open the legacy path for new writes.
-            QDir legacy(legacyRoot);
-            for(const QString &name:legacy.entryList({QStringLiteral("*.db")},QDir::Files)){
-                const QString destination=QDir(rootDirectory_).filePath(name);
-                if(!QFileInfo::exists(destination))QFile::copy(legacy.filePath(name),destination);
+            const QStringList legacyRoots={legacyRoot,
+                QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"))};
+            for(const QString &path:legacyRoots){
+                QDir legacy(path);
+                for(const QString &name:legacy.entryList({QStringLiteral("*.db")},QDir::Files)){
+                    const QString destination=QDir(rootDirectory_).filePath(name);
+                    if(!QFileInfo::exists(destination))QFile::copy(legacy.filePath(name),destination);
+                }
             }
         }
     }

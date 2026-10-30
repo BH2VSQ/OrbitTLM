@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QStandardPaths>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QTextStream>
@@ -17,6 +18,13 @@
 #include <bit>
 #include <cmath>
 namespace orbit {
+QString applicationDataDirectory(){
+#ifdef Q_OS_LINUX
+    return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+#else
+    return QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("data"));
+#endif
+}
 namespace {
 int byte(const QByteArray &data,int pos) { return static_cast<unsigned char>(data.at(pos)); }
 QString sha(const QByteArray &data) {

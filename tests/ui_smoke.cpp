@@ -32,7 +32,7 @@ private slots:
         const int font=QFontDatabase::addApplicationFont(qEnvironmentVariable("WINDIR")+"/Fonts/meiryo.ttc");
         if(font>=0)QApplication::setFont(QFont(QFontDatabase::applicationFontFamilies(font).first()));
 #endif
-        settingsPath_=QApplication::applicationDirPath()+"/data/app-settings.json";
+        settingsPath_=QDir(orbit::applicationDataDirectory()).filePath("app-settings.json");
         QFile settings(settingsPath_);
         hadSettings_=settings.open(QIODevice::ReadOnly);
         if(hadSettings_)originalSettings_=settings.readAll();
