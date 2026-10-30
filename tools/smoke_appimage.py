@@ -23,6 +23,19 @@ env.update(HOME=str(state), XDG_DATA_HOME=str(state / "data"),
            QT_QPA_PLATFORM="xcb", QT_PLUGIN_PATH="/invalid-host-qt/plugins",
            QT_QPA_PLATFORM_PLUGIN_PATH="/invalid-host-qt/platforms",
            LD_LIBRARY_PATH="/invalid-host-qt/lib", QTDIR="/invalid-host-qt")
+if options.readonly_appdir:
+    appdir = options.readonly_appdir.resolve()
+    assert not os.access(appdir / "usr/bin", os.W_OK), "AppDir must be read-only to the test user"
+    library_env = dict(env, LD_LIBRARY_PATH=str(appdir / "usr/lib"))
+    dependencies = []
+    for binary in (appdir / "usr/bin/OrbitTLM", appdir / "usr/plugins/platforms/libqxcb.so",
+                   appdir / "usr/plugins/sqldrivers/libqsqlite.so"):
+        result = subprocess.run(["ldd", str(binary)], env=library_env, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+        dependencies.append(str(binary) + "\n" + result.stdout)
+    dependency_log = "\n".join(dependencies)
+    (options.reports / "dependencies.log").write_text(dependency_log, encoding="utf-8")
+    assert "not found" not in dependency_log, dependency_log
 data_dir = None
 for language in ("zh-CN", "en-US", "ja-JP"):
     if data_dir:
@@ -51,13 +64,6 @@ subprocess.run([str(image), "--appimage-extract-and-run", "--cli", "--help"],
                env=env, check=True, stdout=subprocess.DEVNULL, timeout=30)
 print("Packaged X11 startup, language persistence, SQLite, writable storage and CLI passed.")
 if options.readonly_appdir:
-    appdir = options.readonly_appdir.resolve()
-    assert not os.access(appdir / "usr/bin", os.W_OK), "AppDir must be read-only to the test user"
-    library_env = dict(env, LD_LIBRARY_PATH=str(appdir / "usr/lib"))
-    dependencies = subprocess.run(["ldd", str(appdir / "usr/bin/OrbitTLM")], env=library_env,
-                                  text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
-    (options.reports / "dependencies.log").write_text(dependencies.stdout, encoding="utf-8")
-    assert "not found" not in dependencies.stdout, dependencies.stdout
     report_file = options.reports.resolve() / "readonly-appdir.json"
     command = ["xvfb-run", "-a", str(appdir / "AppRun"), "--smoke-test", "--smoke-report", str(report_file)]
     result = subprocess.run(command, env=env, text=True, stdout=subprocess.PIPE,

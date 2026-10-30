@@ -65,6 +65,7 @@ chmod +x "$repo/packaging/linux/AppRun"
 "$tools/linuxdeploy-x86_64.AppImage" --appdir "$appdir" \
     --library /usr/lib/x86_64-linux-gnu/libOpenGL.so.0 \
     --library /usr/lib/x86_64-linux-gnu/libGLdispatch.so.0 \
+    --library /usr/lib/x86_64-linux-gnu/libcom_err.so.2 \
     --executable "$appdir/usr/bin/OrbitTLM" \
     --executable "$appdir/usr/bin/OrbitTLM-cli" \
     --desktop-file "$appdir/usr/share/applications/OrbitTLM.desktop" \
@@ -77,6 +78,7 @@ test -f "$appdir/usr/plugins/platforms/libqxcb.so"
 test -f "$appdir/usr/plugins/sqldrivers/libqsqlite.so"
 test -e "$appdir/usr/lib/libOpenGL.so.0"
 test -e "$appdir/usr/lib/libGLdispatch.so.0"
+test -e "$appdir/usr/lib/libcom_err.so.2"
 test -f "$OUTPUT"
 chmod +x "$OUTPUT"
 (cd "$out" && sha256sum "$(basename "$OUTPUT")" > "$(basename "$OUTPUT").sha256")

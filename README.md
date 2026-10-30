@@ -18,6 +18,8 @@ On Linux x86_64, download `OrbitTLM-Linux-x86_64.AppImage`, mark it executable
 (Ubuntu 22.04 or newer), using X11 or XWayland. System Qt installation is not
 required. If FUSE is unavailable, run it with `--appimage-extract-and-run`.
 The bundled CLI is available through `--cli --help`.
+The release pipeline checks Ubuntu 22.04, Ubuntu 24.04 and Debian 13 in clean
+containers without system Qt, including startup from a read-only AppDir.
 
 Linux settings, databases and HTML history use Qt's writable application data
 location under `XDG_DATA_HOME` (normally `~/.local/share`), outside the read-only
