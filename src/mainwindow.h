@@ -10,6 +10,7 @@
 #include <QHash>
 #include <QStringList>
 #include <QJsonObject>
+#include <QTranslator>
 class QCheckBox;
 class QComboBox;
 class QChartView;
@@ -38,6 +39,7 @@ class MainWindow final : public QMainWindow {
 public:
     explicit MainWindow(QWidget *parent=nullptr);
 private:
+    friend class UiSmoke;
     void buildMenus();
     void setReplayListCollapsed(bool collapsed);
     void showExportDialog();
@@ -134,6 +136,7 @@ private:
     QString tcpHost_=QStringLiteral("127.0.0.1");
     int tcpPort_=9985;
     QString languageCode_=QStringLiteral("zh-CN");
+    QTranslator qtTranslator_;
     QJsonObject translations_;
     QJsonObject webTranslations_;
     QStringList translationKeysByLength_;

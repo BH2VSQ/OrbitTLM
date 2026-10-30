@@ -59,6 +59,7 @@
 
 static void registerOrbitTlmI18nResources(){
     Q_INIT_RESOURCE(orbittlm_i18n);
+    Q_INIT_RESOURCE(orbittlm_qt_i18n);
 }
 
 namespace {
@@ -142,7 +143,9 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent){
         }
     });
     connect(live_,&orbit::LiveTcp::status,this,[this](const QString &message){
-        statusBar()->showMessage(uiText(QStringLiteral("TCP 状态："))+uiText(message),7500);
+        const QString visibleStatus=message==QStringLiteral("Connected")?uiText(QStringLiteral("TCP：已连接")):
+            (message==QStringLiteral("Disconnected")?uiText(QStringLiteral("TCP：未连接")):uiText(message));
+        statusBar()->showMessage(visibleStatus,7500);
         if(message==QStringLiteral("Connected")){
             tcpConnected_=true;tcpConnecting_=false;
             if(tcpToggleButton_)tcpToggleButton_->setText(uiText(QStringLiteral("断开 TCP")));
@@ -336,7 +339,7 @@ void MainWindow::buildMenus(){
     languageMenu_->setObjectName(QStringLiteral("languageMenu"));
     // Locale names are metadata in the embedded dictionaries; language codes
     // remain stable identifiers in source code and settings.
-    const QStringList supportedLanguages={QStringLiteral("zh-CN"),QStringLiteral("en-US")};
+    const QStringList supportedLanguages={QStringLiteral("zh-CN"),QStringLiteral("en-US"),QStringLiteral("ja-JP")};
     for(const QString &code:supportedLanguages){
         QString displayName=code;
         QFile localeFile(QStringLiteral(":/i18n/")+code+QStringLiteral(".json"));
@@ -394,6 +397,7 @@ void MainWindow::buildMenus(){
                 if(!sourceFormat.isEmpty())imageCoverage_->setFormat(uiText(sourceFormat));
             }
             saveApplicationSettings();
+            updateWebHistory();
         });
     }
     tools->addAction(QStringLiteral("载入自定义字段规则 JSON"),[this]{
@@ -504,6 +508,10 @@ bool MainWindow::loadLanguageFile(){
     const QJsonObject root=QJsonDocument::fromJson(contents).object();
     const QJsonObject map=root.value(QStringLiteral("translations")).toObject();
     if(map.isEmpty())return false;
+    QCoreApplication::removeTranslator(&qtTranslator_);
+    if(languageCode_==QStringLiteral("ja-JP")&&
+       qtTranslator_.load(QStringLiteral(":/qt-i18n/qtbase_ja.qm")))
+        QCoreApplication::installTranslator(&qtTranslator_);
     translations_=map;
     webTranslations_=root.value(QStringLiteral("webTranslations")).toObject();
     uiTextCache_.clear();
@@ -710,13 +718,8 @@ QString MainWindow::uiText(const QString &source) const{
         if(source.size()<=256&&uiTextCache_.size()<20000)uiTextCache_.insert(source,result);
         return result;
     }
-    if(languageCode_!=QStringLiteral("en-US")||!orbitContainsCjk(source))return source;
-    QString translated=source;
-    for(const QString &key:translationKeysByLength_){
-        if(!translated.contains(key))continue;
-        translated.replace(key,translations_.value(key).toString());
-        if(!orbitContainsCjk(translated))break;
-    }
+    if(languageCode_==QStringLiteral("zh-CN")||!orbitContainsCjk(source))return source;
+    const QString translated=orbitTranslateSource(source,translations_,translationKeysByLength_);
     if(source.size()<=256&&uiTextCache_.size()<20000)uiTextCache_.insert(source,translated);
     return translated;
 }
@@ -1205,7 +1208,7 @@ void MainWindow::buildComponentTabs(QTabWidget *tabs){
                         const QString englishName=field.value(QStringLiteral("english_name")).toString();
                         const QString sourceDisplay=fieldName.isEmpty()?fullCode:fieldName;
                         const QString localizedDisplay=uiText(sourceDisplay);
-                        auto *nameItem=new QTableWidgetItem(languageCode_==QStringLiteral("en-US")?localizedDisplay:sourceDisplay);
+                        auto *nameItem=new QTableWidgetItem(localizedDisplay);
                         nameItem->setData(Qt::UserRole,fullCode);
                         nameItem->setData(Qt::UserRole+1,englishName);
                         nameItem->setData(Qt::UserRole+123,sourceDisplay);

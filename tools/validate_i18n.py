@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,19 +61,47 @@ def catalog_strings() -> set[str]:
 
 
 def apply_dictionary(text: str, *maps: dict[str, str]) -> str:
-    for dictionary in maps:
-        for key in sorted(dictionary, key=len, reverse=True):
-            value = dictionary[key]
-            if key and value != key and CJK.search(key):
-                text = text.replace(key, value)
-    return text
+    dictionary = {}
+    for mapping in reversed(maps):
+        dictionary.update(mapping)
+    keys = sorted((key for key in dictionary if key), key=len, reverse=True)
+    pattern = re.compile("|".join(re.escape(key) for key in keys))
+    return pattern.sub(lambda match: dictionary[match.group()], text)
 
 
 def main() -> int:
     zh = load_locale("zh-CN.json")
     en = load_locale("en-US.json")
+    ja = load_locale("ja-JP.json")
     zh_map, en_map = zh["translations"], en["translations"]
     zh_web, en_web = zh["webTranslations"], en["webTranslations"]
+    placeholder = re.compile(r"%L?\d+|%[nvm]|\$\{[^{}\u3400-\u9fff]*\}")
+    for locale in (zh, en, ja):
+        for group in ("translations", "webTranslations"):
+            if set(locale[group]) != set(zh[group]):
+                raise SystemExit(f"{locale['code']}: {group} key set differs from zh-CN")
+            for key, value in locale[group].items():
+                if not isinstance(value, str) or not value.strip() or "\ufffd" in value:
+                    raise SystemExit(f"{locale['code']}: invalid value for {key!r}")
+                if Counter(placeholder.findall(key)) != Counter(placeholder.findall(value)):
+                    raise SystemExit(f"{locale['code']}: altered placeholders in {key!r}")
+    # Japanese legitimately contains kanji. Check terminology and Chinese-only
+    # phrases, rather than applying the English locale's CJK rejection rule.
+    expected_ja = {
+        "业务遥测": "機器テレメトリ", "工程值": "工学値",
+        "原始值": "生データ値", "四元数": "クォータニオン",
+        "配电遥测 · ": "電力分配テレメトリ · ",
+        "磁强计": "磁力計", "星敏A": "スタートラッカA",
+        "TCP：已连接": "TCP：接続済み", "CRC 未校验": "CRC 未検証",
+    }
+    for key, value in expected_ja.items():
+        if ja["translations"].get(key) != value:
+            raise SystemExit(f"Japanese terminology mismatch: {key!r}")
+    chinese_only = re.compile(r"遥测|电压|电流|开关|飞轮|图像|字段|字节|导出|选择|当前|未识别|没|ParameterParameter")
+    for group in ("translations", "webTranslations"):
+        for key, value in ja[group].items():
+            if chinese_only.search(value):
+                raise SystemExit(f"Japanese locale contains untranslated text: {key!r}")
 
     if set(zh_map) != set(en_map):
         raise SystemExit("zh-CN/en-US translations key sets differ")
@@ -107,6 +136,12 @@ def main() -> int:
     fallback = apply_dictionary(match.group(1), en_web, en_map)
     if CJK.search(fallback):
         raise SystemExit("English localization left CJK text in fallback HTML")
+    for template in ((ROOT / "web/index.template.html").read_text(encoding="utf-8"), match.group(1)):
+        localized = apply_dictionary(template, ja["webTranslations"], ja["translations"])
+        if chinese_only.search(localized) or 'lang="ja-JP"' not in localized:
+            raise SystemExit("Japanese HTML localization is incomplete")
+        if "__DATA_JSON__" not in localized:
+            raise SystemExit("Japanese HTML localization altered the data insertion marker")
 
     cpp_sources = "\n".join(path.read_text(encoding="utf-8") for path in
                                list((ROOT / "src").glob("*.cpp")) + list((ROOT / "src").glob("*.h")))
@@ -118,11 +153,11 @@ def main() -> int:
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     if "qt_add_resources(orbittlm_ui orbittlm_i18n" not in cmake:
         raise SystemExit("i18n resource embedding is not configured")
-    for name in ("zh-CN.json", "en-US.json"):
+    for name in ("zh-CN.json", "en-US.json", "ja-JP.json"):
         if f'"${{CMAKE_CURRENT_SOURCE_DIR}}/i18n/{name}"' not in cmake:
             raise SystemExit(f"{name} is not included in the embedded resources")
 
-    print(f"i18n validation passed: {len(zh_map)} text keys, {len(zh_web)} web snippets, {len(source_literals())} C++ source strings, {len(catalog_strings())} telemetry catalog source strings")
+    print(f"i18n validation passed: 3 locales, {len(zh_map)} text keys, {len(zh_web)} web snippets, {len(source_literals())} C++ source strings, {len(catalog_strings())} telemetry catalog source strings")
     return 0
 
 
