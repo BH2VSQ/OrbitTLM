@@ -29,6 +29,9 @@ if options.readonly_appdir:
     library_env = dict(env, LD_LIBRARY_PATH=str(appdir / "usr/lib"))
     dependencies = []
     for binary in (appdir / "usr/bin/OrbitTLM", appdir / "usr/plugins/platforms/libqxcb.so",
+                   appdir / "usr/plugins/platforms/libqwayland-generic.so",
+                   appdir / "usr/plugins/platforms/libqwayland-egl.so",
+                   appdir / "usr/plugins/wayland-shell-integration/libxdg-shell.so",
                    appdir / "usr/plugins/sqldrivers/libqsqlite.so"):
         result = subprocess.run(["ldd", str(binary)], env=library_env, text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)

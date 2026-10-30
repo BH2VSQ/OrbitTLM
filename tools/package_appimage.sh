@@ -60,7 +60,9 @@ fi
 QMAKE_WRAPPER
 chmod +x "$tools/qmake-filtered"
 export QMAKE="$tools/qmake-filtered"
-export EXTRA_PLATFORM_PLUGINS="libqoffscreen.so;libqminimal.so"
+export EXTRA_PLATFORM_PLUGINS="libqoffscreen.so;libqminimal.so;libqwayland-generic.so;libqwayland-egl.so"
+# This deployer also copies the Wayland client shell/decoration integrations.
+export EXTRA_QT_MODULES="waylandcompositor"
 chmod +x "$repo/packaging/linux/AppRun"
 # linuxdeploy normally leaves these to the host; minimal Debian images do not
 # provide all of them. Include the portable frontends/support libraries too.
@@ -78,6 +80,9 @@ for name in Core Gui Widgets Charts Network Sql; do
     test -e "$appdir/usr/lib/libQt6${name}.so.6"
 done
 test -f "$appdir/usr/plugins/platforms/libqxcb.so"
+test -f "$appdir/usr/plugins/platforms/libqwayland-generic.so"
+test -f "$appdir/usr/plugins/platforms/libqwayland-egl.so"
+test -f "$appdir/usr/plugins/wayland-shell-integration/libxdg-shell.so"
 test -f "$appdir/usr/plugins/sqldrivers/libqsqlite.so"
 test -e "$appdir/usr/lib/libOpenGL.so.0"
 test -e "$appdir/usr/lib/libGLdispatch.so.0"

@@ -15,14 +15,14 @@ jobs:
       - name: Install Linux build and X11 dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build g++ libgl1-mesa-dev libegl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxcb-shape0 libxcb-randr0 libxcb-sync1 libxcb-xfixes0 libdbus-1-3 libfontconfig1 fonts-noto-cjk xvfb xauth
+          sudo apt-get install -y ninja-build g++ libgl1-mesa-dev libegl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxcb-shape0 libxcb-randr0 libxcb-sync1 libxcb-xfixes0 libdbus-1-3 libfontconfig1 libwayland-dev fonts-noto-cjk xvfb xauth
       - name: Install pinned Qt6 Linux runtime and SDK
         uses: jurplel/install-qt-action@v4
         with:
           version: "6.8.3"
           host: linux
           target: desktop
-          modules: qtcharts
+          modules: qtcharts qtwaylandcompositor
           cache: true
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
@@ -47,7 +47,7 @@ jobs:
             docker run --rm -v "$PWD:/src:ro" -v "$PWD/runtime-results/$distro:/results" "$image" bash -ceu '
               export DEBIAN_FRONTEND=noninteractive
               apt-get update -qq
-              apt-get install -y --no-install-recommends python3 xvfb xauth libgl1 libegl1 libfontconfig1 fonts-dejavu-core
+              apt-get install -y --no-install-recommends python3 xvfb xauth weston libgl1 libegl1 libfontconfig1 fonts-dejavu-core
               if dpkg-query -W -f="\${binary:Package}\n" "libqt6*" 2>/dev/null | grep -q "^libqt6"; then
                 echo "Clean runtime unexpectedly contains system Qt" >&2
                 exit 1
@@ -58,6 +58,7 @@ jobs:
               /src/dist/OrbitTLM-Linux-x86_64.AppImage --appimage-extract >/dev/null
               chmod -R a-w squashfs-root
               runuser -u nobody -- python3 /src/tools/smoke_appimage.py /src/dist/OrbitTLM-Linux-x86_64.AppImage /results --readonly-appdir /tmp/orbittlm-readonly/squashfs-root
+              runuser -u nobody -- python3 /src/tools/smoke_wayland.py /src/dist/OrbitTLM-Linux-x86_64.AppImage /results/wayland
             '
           done
       - name: Upload Linux startup diagnostics
