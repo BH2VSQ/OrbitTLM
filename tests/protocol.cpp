@@ -852,11 +852,21 @@ private slots:
         QCOMPARE(raw.size(),189*223);
 
         QVector<Frame> frames;
+        int structurallyInvalidFrames=0;
         for(int offset=0;offset<raw.size();offset+=223){
             const Frame frame=Protocol::parse(raw.mid(offset,223),"AUTO");
-            QVERIFY(frame.complete);
+            if(!frame.complete){
+                // The receiver capture contains one FEC output whose first
+                // octet is 0xDB (CCSDS version bits are 11, not 00). It is a
+                // malformed TM frame and must be rejected, not promoted to
+                // a VC1 SSDV candidate. Keep the other valid frames.
+                ++structurallyInvalidFrames;
+                continue;
+            }
             frames.push_back(frame);
         }
+        QCOMPARE(structurallyInvalidFrames,1);
+        QCOMPARE(frames.size(),188);
         const auto packets=ImageTools::candidatesFromFrames(frames);
         // The raw-frame file also contains two additional, structurally
         // plausible but CRC-failed fragments (IDs 52 and 56) beyond the
