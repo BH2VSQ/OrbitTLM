@@ -1737,7 +1737,7 @@ void MainWindow::scanSsdv(){
     for(const auto &packet:images_)groups.insert(QStringLiteral("%1:%2:%3")
         .arg(orbit::canonicalSatelliteName(packet.satellite)).arg(packet.bytes.size()).arg(packet.imageId));
     setTranslatedLabel(imageInfo_,QStringLiteral("%1 · 已扫描 %2 个 SSDV 数据帧，发现 %3 个卫星/图像组合。选择图像条目即可查看恢复预览。")
-        .arg(hasShortSsdv?QStringLiteral("VC1 218 字节 SSDV（ASRTU-1 / BY04 兼容格式）"):
+        .arg(hasShortSsdv?QStringLiteral("VC1 218 字节 SSDV（ASRTU-1 / BY04 / JAMX 兼容格式）"):
              QStringLiteral("APID %1 标准 SSDV").arg(imageApid_->value()))
         .arg(images_.size()).arg(groups.size()));
     decodedImage_=QPixmap();if(imagePreview_)imagePreview_->setImage(decodedImage_);

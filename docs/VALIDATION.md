@@ -12,7 +12,7 @@
 | Qt replay and SQLite | implemented | CI compilation and SQL tests; manual GUI validation remains |
 | Quaternion series | SAT-S3 signed-int32 q0..q3 /10000 exported; experimental candidate kept separate | application CRC and physical attitude coordinate convention unverified |
 | BY04/8104 | framework and optional schema supported | mission-specific field validation pending |
-| SSDV | embedded JPEG reconstruction with missing-MCU fill; CRC-failed packets retained for diagnostics | a partial preview is best-effort and does not make damaged packets CRC-valid |
+| SSDV | embedded JPEG reconstruction with missing-MCU fill; 218-byte DSLWP and JAMX CRC variants accepted | BY04/ASRTU-1 and JAMX regression fixtures; a partial preview is best-effort and does not make damaged packets CRC-valid |
 | TCP live receive | basic 223-byte record stream | field hardware tests pending |
 
 ## Flight encoding, as described by developer BG7ZDQ
