@@ -868,10 +868,12 @@ private slots:
         QCOMPARE(structurallyInvalidFrames,1);
         QCOMPARE(frames.size(),188);
         const auto packets=ImageTools::candidatesFromFrames(frames);
-        // The raw-frame file also contains two additional, structurally
-        // plausible but CRC-failed fragments (IDs 52 and 56) beyond the
-        // 50-packet image BIN. A valid image group corroborates them.
-        QCOMPARE(packets.size(),52);
+        // The raw stream has 57 unique VC1 payloads. Six fail strict SSDV
+        // structural validation (for example, their MCU IDs are outside the
+        // image's MCU count). Of the 51 structurally valid candidates, one
+        // CRC-failed copy of packet ID 48 is suppressed in favor of its
+        // CRC-passed copy. The final candidate set therefore contains 50.
+        QCOMPARE(packets.size(),50);
         int crcPassed=0,crcFailed=0;
         for(const auto &packet:packets){
             QCOMPARE(packet.satellite,QString("JAMX"));
@@ -881,7 +883,7 @@ private slots:
             else if(packet.status==QStringLiteral("ssdv_crc32_failed"))++crcFailed;
         }
         QCOMPARE(crcPassed,46);
-        QCOMPARE(crcFailed,6);
+        QCOMPARE(crcFailed,4);
     }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
