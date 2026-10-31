@@ -166,5 +166,11 @@ if(TARGET orbit_tests)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/jamx_satnogs_14907288.b64"
       "$<TARGET_FILE_DIR:orbit_tests>/fixtures/jamx_satnogs_14907288.b64"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/jamx_capture_20261031_id2_218.bin"
+      "$<TARGET_FILE_DIR:orbit_tests>/fixtures/jamx_capture_20261031_id2_218.bin"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/jamx_capture_20261031_frames223.bin"
+      "$<TARGET_FILE_DIR:orbit_tests>/fixtures/jamx_capture_20261031_frames223.bin"
     VERBATIM)
 endif()

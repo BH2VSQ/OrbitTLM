@@ -41,3 +41,15 @@ No verifiable BY04 business field dictionary (engineering voltage, thermal, quat
 - https://github.com/BG7ZDQ/ASRTU_Series_Receiver/blob/main/third_party/ssdv_dslwp/ssdv.c
 - https://community.libre.space/t/cz-6c-launches-jamx01-by70-4-2026-08-25-03-30utc/15173?page=10
 - https://db.satnogs.org/satellite/EMBU-7314-7883-5821-1365/
+
+### Additional JAMX capture CRC profile
+
+The 2026-10-31 user-provided JAMX recording is not validated by either the
+DSLWP seed (`0x4EE4FDE1`) or the publicly documented JAMX seed (`0x6AAAC1C5`).
+The 46 intact packets in that capture validate consistently with
+`0xF87754B4`; four packets fail this CRC and remain marked as damaged. OrbitTLM
+therefore accepts this as an additional *capture-observed compatibility
+profile*. It is deliberately documented separately from the published JAMX
+constant and is not asserted to be the universal JAMX CRC initial value.
+Regression fixtures preserve both the 50 compact packets and the 189 raw TM
+frames supplied with the capture.

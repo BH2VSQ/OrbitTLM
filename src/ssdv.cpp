@@ -15,7 +15,13 @@ extern "C" {
 }
 namespace orbit {
 namespace {
+// Publicly documented JAMX01 CRC profile (e.g. SatNOGS observation 14907288).
 constexpr std::uint32_t kJamxCrcInitialValue = 0x6AAAC1C5U;
+// A second, independently observed profile in the user's 2026-10-31 JAMX
+// capture: 46 of 50 packets validate with this exact seed. This value is an
+// empirical compatibility profile, not a claim that it is the universal JAMX
+// seed. Keep the published profile above as the primary protocol definition.
+constexpr std::uint32_t kJamxCaptureCrcInitialValue = 0xF87754B4U;
 constexpr int kShortSsdvPayloadSize = 218;
 constexpr int kShortSsdvCrcDataSize = 214;
 
@@ -47,8 +53,14 @@ bool hasJamxCrc(const QByteArray &packet) {
         (std::uint32_t(bytes[kShortSsdvCrcDataSize + 1]) << 16U) |
         (std::uint32_t(bytes[kShortSsdvCrcDataSize + 2]) << 8U) |
         std::uint32_t(bytes[kShortSsdvCrcDataSize + 3]);
-    return ssdvCrc32(packet.constData(), kShortSsdvCrcDataSize,
-                     kJamxCrcInitialValue) == expected;
+    const std::uint32_t published = ssdvCrc32(
+        packet.constData(), kShortSsdvCrcDataSize, kJamxCrcInitialValue);
+    if (published == expected)
+        return true;
+    const std::uint32_t observedCapture = ssdvCrc32(
+        packet.constData(), kShortSsdvCrcDataSize,
+        kJamxCaptureCrcInitialValue);
+    return observedCapture == expected;
 }
 
 // Validate the packet layout before exposing a candidate to the SSDV state machine.

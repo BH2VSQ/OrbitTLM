@@ -1699,6 +1699,13 @@ void MainWindow::scanSsdv(){
     if(!imageApid_)return;
     QVector<orbit::ImagePacket> found=orbit::ImageTools::candidatesFromFrames(frames_);
     found+=orbit::ImageTools::candidatesFromKiss(packets_,imageApid_->value());
+    // This image-only override never bypasses CRC validation; it only changes
+    // the display/group label after the normal candidate filters have run.
+    const QString imageSatelliteOverride=imageSatelliteSelect_
+        ?imageSatelliteSelect_->currentData().toString():QStringLiteral("AUTO");
+    if(imageSatelliteOverride==QStringLiteral("JAMX"))
+        for(auto &packet:found)
+            if(packet.bytes.size()==218)packet.satellite=QStringLiteral("JAMX");
     const bool hasShortSsdv=std::any_of(found.cbegin(),found.cend(),[](const orbit::ImagePacket &packet){
         return packet.bytes.size()==218;
     });
@@ -2009,7 +2016,11 @@ void MainWindow::importImageBin(){
     QString importSatellite=satellite();
     if(importSatellite==QStringLiteral("AUTO")||importSatellite.isEmpty())importSatellite=activeSatellite;
     if(importSatellite.isEmpty()||importSatellite==QStringLiteral("AUTO"))importSatellite=QStringLiteral("UNKNOWN");
+    const QString imageSatelliteOverride=imageSatelliteSelect_
+        ?imageSatelliteSelect_->currentData().toString():QStringLiteral("AUTO");
     for(auto &packet:imported){
+        if(imageSatelliteOverride==QStringLiteral("JAMX")&&packet.bytes.size()==218)
+            packet.satellite=QStringLiteral("JAMX");
         if(packet.satellite.isEmpty()||packet.satellite==QStringLiteral("AUTO"))packet.satellite=importSatellite;
         if(packet.sources.isEmpty())packet.sources<<QStringLiteral("bin:")+QFileInfo(path).fileName();
     }

@@ -809,6 +809,70 @@ private slots:
             QCOMPARE(packet.status,QString("ssdv_crc32_pass"));
         }
     }
+    void jamxUserCapture218PacketBinUsesObservedCrcProfile(){
+        QFile fixture(QCoreApplication::applicationDirPath()+
+                      "/fixtures/jamx_capture_20261031_id2_218.bin");
+        QVERIFY2(fixture.open(QIODevice::ReadOnly),qPrintable(fixture.errorString()));
+        const QByteArray raw=fixture.readAll();
+        QCOMPARE(raw.size(),50*218);
+
+        QString error;
+        const auto packets=ImageTools::parseBinaryPackets(raw,240,true,&error);
+        QVERIFY2(error.isEmpty(),qPrintable(error));
+        QCOMPARE(packets.size(),50);
+
+        int crcPassed=0,crcFailed=0;
+        for(const auto &packet:packets){
+            QCOMPARE(packet.satellite,QString("JAMX"));
+            QCOMPARE(packet.imageId,2);
+            QCOMPARE(packet.width,640);
+            QCOMPARE(packet.height,480);
+            if(packet.status==QStringLiteral("ssdv_crc32_pass"))++crcPassed;
+            else if(packet.status==QStringLiteral("ssdv_crc32_failed"))++crcFailed;
+        }
+        // The capture has four FEC/CRC-damaged fragments; the other 46 share
+        // a stable capture-observed CRC profile and must be admitted as JAMX.
+        QCOMPARE(crcPassed,46);
+        QCOMPARE(crcFailed,4);
+
+        const DecodedImage decoded=ImageTools::decodeImage(packets,2,true);
+        QVERIFY2(!decoded.jpeg.isEmpty(),qPrintable(decoded.error));
+        QVERIFY(decoded.jpeg.startsWith(QByteArray::fromHex("FFD8")));
+        QCOMPARE(decoded.imageId,2);
+        QCOMPARE(decoded.width,640);
+        QCOMPARE(decoded.height,480);
+        QCOMPARE(decoded.receivedPackets,46);
+        QCOMPARE(decoded.crcPassedPackets,46);
+    }
+    void jamxUserCapture223FrameStreamIsDetectedOnVc1(){
+        QFile fixture(QCoreApplication::applicationDirPath()+
+                      "/fixtures/jamx_capture_20261031_frames223.bin");
+        QVERIFY2(fixture.open(QIODevice::ReadOnly),qPrintable(fixture.errorString()));
+        const QByteArray raw=fixture.readAll();
+        QCOMPARE(raw.size(),189*223);
+
+        QVector<Frame> frames;
+        for(int offset=0;offset<raw.size();offset+=223){
+            const Frame frame=Protocol::parse(raw.mid(offset,223),"AUTO");
+            QVERIFY(frame.complete);
+            frames.push_back(frame);
+        }
+        const auto packets=ImageTools::candidatesFromFrames(frames);
+        // The raw-frame file also contains two additional, structurally
+        // plausible but CRC-failed fragments (IDs 52 and 56) beyond the
+        // 50-packet image BIN. A valid image group corroborates them.
+        QCOMPARE(packets.size(),52);
+        int crcPassed=0,crcFailed=0;
+        for(const auto &packet:packets){
+            QCOMPARE(packet.satellite,QString("JAMX"));
+            QCOMPARE(packet.imageId,2);
+            QCOMPARE(packet.bytes.size(),218);
+            if(packet.status==QStringLiteral("ssdv_crc32_pass"))++crcPassed;
+            else if(packet.status==QStringLiteral("ssdv_crc32_failed"))++crcFailed;
+        }
+        QCOMPARE(crcPassed,46);
+        QCOMPARE(crcFailed,6);
+    }
     void by04DoesNotMislabelAttitude(){
         Frame f=Protocol::parse(syntheticFrame(),"BY04");
         QVERIFY(f.complete);
