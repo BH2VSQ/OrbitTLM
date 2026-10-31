@@ -811,9 +811,9 @@ private slots:
     }
     void jamxUserCapture218PacketBinUsesObservedCrcProfile(){
         QFile fixture(QCoreApplication::applicationDirPath()+
-                      "/fixtures/jamx_capture_20261031_id2_218.bin");
+                      "/fixtures/jamx_capture_20261031_id2_218.b64");
         QVERIFY2(fixture.open(QIODevice::ReadOnly),qPrintable(fixture.errorString()));
-        const QByteArray raw=fixture.readAll();
+        const QByteArray raw=QByteArray::fromBase64(fixture.readAll());
         QCOMPARE(raw.size(),50*218);
 
         QString error;
@@ -846,9 +846,9 @@ private slots:
     }
     void jamxUserCapture223FrameStreamIsDetectedOnVc1(){
         QFile fixture(QCoreApplication::applicationDirPath()+
-                      "/fixtures/jamx_capture_20261031_frames223.bin");
+                      "/fixtures/jamx_capture_20261031_frames223.b64");
         QVERIFY2(fixture.open(QIODevice::ReadOnly),qPrintable(fixture.errorString()));
-        const QByteArray raw=fixture.readAll();
+        const QByteArray raw=QByteArray::fromBase64(fixture.readAll());
         QCOMPARE(raw.size(),189*223);
 
         QVector<Frame> frames;
